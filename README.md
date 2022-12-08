@@ -31,10 +31,10 @@ There is no need for special ceremony to create separate issues. The pull reques
 
 ## Documentation [![Javadoc](https://img.shields.io/badge/Documentation-Javadoc-ff69b4.svg)](https://www.javadoc.io/doc/org.apereo.cas/cas-server-core)
 
-| Version         | Reference
-|------------|-----------------------------------
-| ![](https://img.shields.io/badge/Development-WIP-blue.svg?style=flat) | [Link](https://apereo.github.io/cas/development)
-| ![](https://img.shields.io/badge/6.2.x-Current-green.svg?style=flat) | [Link](https://apereo.github.io/cas/6.2.x)
+| Version                                                               | Reference                                        |
+|-----------------------------------------------------------------------|--------------------------------------------------|
+| ![](https://img.shields.io/badge/Development-WIP-blue.svg?style=flat) | [Link](https://apereo.github.io/cas/development) |
+| ![](https://img.shields.io/badge/6.6.x-Current-green.svg?style=flat)  | [Link](https://apereo.github.io/cas/6.6.x)       |
 
 Additional resources are available as follows:
 
@@ -48,10 +48,9 @@ Additional resources are available as follows:
 
 [![Contributing Guide](https://img.shields.io/badge/Contributions-guide-green.svg?style=flat)][contribute]
 [![Open Pull Requests](https://img.shields.io/github/issues-pr/apereo/cas.svg?style=flat)][contribute]
-[![codecov](https://codecov.io/gh/apereo/cas/branch/master/graph/badge.svg)](https://codecov.io/gh/apereo/cas)
-![CAS Build](https://github.com/apereo/cas/workflows/Build/badge.svg)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.apereo.cas/cas-server-core/badge.svg?style=flat)](https://maven-badges.herokuapp.com/maven-central/org.apereo.cas/cas-server-core)
 [![Github Releases](https://img.shields.io/github/release/apereo/cas.svg)](https://github.com/apereo/cas/releases)
+[![codecov](https://codecov.io/gh/apereo/cas/branch/master/graph/badge.svg)](https://codecov.io/gh/apereo/cas)
 
 It is recommended to deploy CAS locally using the [WAR Overlay method][overlay]. Cloning or downloading the CAS codebase
 is **ONLY** required if you wish to contribute to the development of the project.
@@ -63,12 +62,12 @@ The following features are supported by the CAS project:
 * CAS v1, v2 and v3 Protocol
 * SAML v1 and v2 Protocol
 * OAuth v2 Protocol
-* OpenID & OpenID Connect Protocol
+* OpenID Connect Protocol
 * WS-Federation Passive Requestor Protocol
 * Authentication via JAAS, LDAP, RDBMS, X.509, Radius, SPNEGO, JWT, Remote, Apache Cassandra, Trusted, BASIC, Apache Shiro, MongoDb, Pac4J and more.
-* Delegated authentication to WS-FED, Facebook, Twitter, SAML IdP, OpenID, OpenID Connect, CAS and more.
+* Delegated authentication to WS-FED, Facebook, Twitter, SAML IdP, OpenID Connect, CAS and more.
 * Authorization via ABAC, Time/Date, REST, Internet2's Grouper and more.
-* HA clustered deployments via Hazelcast, Ehcache, JPA, Apache Cassandra, Memcached, Apache Ignite, MongoDb, Redis, DynamoDb, Couchbase and more.
+* HA clustered deployments via Hazelcast, JPA, Apache Cassandra, Memcached, Apache Ignite, MongoDb, Redis, DynamoDb, and more.
 * Application registration backed by JSON, LDAP, YAML, Apache Cassandra, JPA, Couchbase, MongoDb, DynamoDb, Redis and more.
 * Multifactor authentication via Duo Security, YubiKey, RSA, Google Authenticator, U2F, WebAuthn and more.
 * Administrative UIs to manage logging, monitoring, statistics, configuration, client registration and more.
@@ -81,10 +80,7 @@ The foundations of CAS are built upon: [Spring Boot](https://projects.spring.io/
 
 ## Development
 
-[![Codacy Badge](https://api.codacy.com/project/badge/grade/cc934b4c7d5d42d28e63757ff9e56d47)](http://bit.ly/1Uf6rwC)
 [![CLA assistant](https://cla-assistant.io/readme/badge/apereo/cas)](https://cla-assistant.io/apereo/cas)
-[![Sonarqube Quality](https://sonarcloud.io/api/project_badges/measure?project=org.apereo.cas%3Acas-server&metric=alert_status)](https://sonarcloud.io/dashboard?id=org.apereo.cas%3Acas-server)
-[![Sonarqube Quality](https://sonarcloud.io/api/project_badges/measure?project=org.apereo.cas%3Acas-server&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=org.apereo.cas%3Acas-server)
 
 To build the project locally, please follow [this guide](https://apereo.github.io/cas/developer/Build-Process.html).
 The release schedule is [available here][releaseschedule].
@@ -102,7 +98,7 @@ If you (or your employer) benefit from this project, please consider becoming a 
 [wiki]: https://apereo.github.io/cas
 [overlay]: https://apereo.github.io/cas/development/installation/WAR-Overlay-Installation.html
 [contribute]: https://apereo.github.io/cas/developer/Contributor-Guidelines.html
-[downloadcas]: http://www.apereo.org/cas/download
+[downloadcas]: https://www.apereo.org/cas/download
 [cassonatype]: https://oss.sonatype.org/content/repositories/snapshots/org/apereo/cas/
 [casmavencentral]: http://mvnrepository.com/artifact/org.apereo.cas
 [downloadcasgithub]: https://github.com/apereo/cas/archive/master.zip

@@ -9,12 +9,15 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.GenericGenerator;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import javax.persistence.UniqueConstraint;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.io.Serial;
+import java.math.BigInteger;
+import java.util.stream.Collectors;
 
 /**
  * This is {@link JpaGoogleAuthenticatorAccount}.
@@ -24,12 +27,13 @@ import javax.persistence.UniqueConstraint;
  */
 @Entity
 @Table(name = "GoogleAuthenticatorRegistrationRecord",
-    uniqueConstraints = @UniqueConstraint(columnNames = { "username", "name" }))
+    uniqueConstraints = @UniqueConstraint(columnNames = {"username", "name"}))
 @Getter
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 @SuperBuilder
 @NoArgsConstructor
 public class JpaGoogleAuthenticatorAccount extends GoogleAuthenticatorAccount {
+    @Serial
     private static final long serialVersionUID = -4546447152725241946L;
 
     @Id
@@ -47,10 +51,13 @@ public class JpaGoogleAuthenticatorAccount extends GoogleAuthenticatorAccount {
     public static JpaGoogleAuthenticatorAccount from(final OneTimeTokenAccount acct) {
         return JpaGoogleAuthenticatorAccount.builder()
             .id(acct.getId())
-            .username(acct.getUsername())
+            .username(acct.getUsername().trim().toLowerCase())
             .secretKey(acct.getSecretKey())
             .validationCode(acct.getValidationCode())
-            .scratchCodes(acct.getScratchCodes())
+            .scratchCodes(acct.getScratchCodes()
+                .stream()
+                .map(c -> BigInteger.valueOf(c.longValue()))
+                .collect(Collectors.toList()))
             .registrationDate(acct.getRegistrationDate())
             .name(acct.getName())
             .build();

@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Lazy;
 
 /**
  * This is {@link CasOAuth20TestAuthenticationEventExecutionPlanConfiguration}.
@@ -18,11 +17,10 @@ import org.springframework.context.annotation.Lazy;
  * @since 5.1.0
  */
 @Tag("OAuth")
-@TestConfiguration("casOAuth20TestAuthenticationEventExecutionPlanConfiguration")
-@Lazy(false)
+@TestConfiguration(value = "casOAuth20TestAuthenticationEventExecutionPlanConfiguration", proxyBeanMethods = false)
 public class CasOAuth20TestAuthenticationEventExecutionPlanConfiguration implements AuthenticationEventExecutionPlanConfigurer {
     @Autowired
-    @Qualifier("defaultPrincipalResolver")
+    @Qualifier(PrincipalResolver.BEAN_NAME_PRINCIPAL_RESOLVER)
     private PrincipalResolver defaultPrincipalResolver;
 
     @Override

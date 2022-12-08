@@ -3,9 +3,12 @@ package org.apereo.cas.configuration.model.core.authentication;
 import org.apereo.cas.configuration.model.SpringResourceProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+
+import java.io.Serial;
 
 /**
  * This is {@link GroovyPrincipalAttributesProperties}.
@@ -17,8 +20,10 @@ import lombok.experimental.Accessors;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("GroovyPrincipalAttributesProperties")
 public class GroovyPrincipalAttributesProperties extends SpringResourceProperties {
 
+    @Serial
     private static final long serialVersionUID = 7901595963842506684L;
 
     /**
@@ -38,4 +43,9 @@ public class GroovyPrincipalAttributesProperties extends SpringResourcePropertie
      * A value can be assigned to this field to uniquely identify this resolver.
      */
     private String id;
+
+    /**
+     * Whether attribute resolution based on this source is enabled.
+     */
+    private AttributeRepositoryStates state = AttributeRepositoryStates.ACTIVE;
 }

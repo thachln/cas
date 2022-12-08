@@ -5,7 +5,7 @@ import org.apereo.cas.config.CasCouchDbThrottlingConfiguration;
 import org.apereo.cas.config.CasSupportCouchDbAuditConfiguration;
 import org.apereo.cas.couchdb.audit.AuditActionContextCouchDbRepository;
 import org.apereo.cas.couchdb.core.CouchDbConnectorFactory;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import org.junit.jupiter.api.AfterEach;
@@ -34,16 +34,16 @@ import org.springframework.boot.test.context.SpringBootTest;
         "cas.audit.couch-db.username=cas",
         "cas.audit.couch-db.caching=false",
         "cas.audit.couch-db.password=password",
-        "cas.authn.throttle.username-parameter=username",
+        "cas.authn.throttle.core.username-parameter=username",
         "cas.authn.throttle.failure.range-seconds=5"
     })
 @Getter
-@EnabledIfPortOpen(port = 5984)
+@EnabledIfListeningOnPort(port = 5984)
 public class CouchDbThrottledSubmissionHandlerInterceptorAdapterTests extends
     BaseThrottledSubmissionHandlerInterceptorAdapterTests {
 
     @Autowired
-    @Qualifier("authenticationThrottle")
+    @Qualifier(ThrottledSubmissionHandlerInterceptor.BEAN_NAME)
     private ThrottledSubmissionHandlerInterceptor throttle;
 
     @Autowired

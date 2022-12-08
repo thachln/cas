@@ -18,12 +18,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Jerome Leleu
  * @since 3.5.2
  */
-@Tag("OAuth")
+@Tag("OAuthToken")
 public class OAuth20RefreshTokenTests extends AbstractOAuth20Tests {
 
     @BeforeEach
     public void initialize() {
         clearAllServices();
+        ticketRegistry.deleteAll();
     }
 
     @Test
@@ -42,7 +43,7 @@ public class OAuth20RefreshTokenTests extends AbstractOAuth20Tests {
         val at2 = this.ticketRegistry.getTicket(at.getId(), OAuth20AccessToken.class);
         assertNotNull(at2);
 
-        val rt = this.ticketRegistry.getTicket(result.getRight(), OAuth20RefreshToken.class);
+        val rt = ticketRegistry.getTicket(result.getRight(), OAuth20RefreshToken.class);
         assertNotNull(rt);
 
         val result2 = assertRefreshTokenOk(service, rt, createPrincipal());

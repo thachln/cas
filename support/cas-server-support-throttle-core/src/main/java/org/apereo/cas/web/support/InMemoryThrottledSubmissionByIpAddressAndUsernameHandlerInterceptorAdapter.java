@@ -4,9 +4,7 @@ import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.apereo.inspektr.common.web.ClientInfoHolder;
 
-import javax.servlet.http.HttpServletRequest;
-import java.time.ZonedDateTime;
-import java.util.concurrent.ConcurrentMap;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Attempts to throttle by both IP Address and username.  Protects against instances where there is a NAT, such as
@@ -18,19 +16,18 @@ import java.util.concurrent.ConcurrentMap;
 public class InMemoryThrottledSubmissionByIpAddressAndUsernameHandlerInterceptorAdapter
     extends AbstractInMemoryThrottledSubmissionHandlerInterceptorAdapter {
 
-    public InMemoryThrottledSubmissionByIpAddressAndUsernameHandlerInterceptorAdapter(final ThrottledSubmissionHandlerConfigurationContext configurationContext,
-                                                                                      final ConcurrentMap<String, ZonedDateTime> ipMap) {
-        super(configurationContext, ipMap);
+    public InMemoryThrottledSubmissionByIpAddressAndUsernameHandlerInterceptorAdapter(
+        final ThrottledSubmissionHandlerConfigurationContext configurationContext) {
+        super(configurationContext);
     }
 
     @Override
     public String constructKey(final HttpServletRequest request) {
-        val username = request.getParameter(getConfigurationContext().getUsernameParameter());
-
+        val throttle = getConfigurationContext().getCasProperties().getAuthn().getThrottle().getCore();
+        val username = request.getParameter(throttle.getUsernameParameter());
         if (StringUtils.isBlank(username)) {
             return request.getRemoteAddr();
         }
-
         return ClientInfoHolder.getClientInfo().getClientIpAddress() + ';' + username.toLowerCase();
     }
 

@@ -1,12 +1,15 @@
 package org.apereo.cas.web.report;
 
-import org.apereo.cas.CentralAuthenticationService;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.ticket.ServiceTicket;
+import org.apereo.cas.ticket.registry.TicketRegistry;
 import org.apereo.cas.web.BaseCasActuatorEndpoint;
 
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.val;
 import org.apache.commons.io.FileUtils;
+import org.jooq.lambda.Unchecked;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 
@@ -18,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
+ * Statistics endpoint reports back on cas metrics and ticket stats.
  * @author Scott Battaglia
  * @since 3.3.5
  */
@@ -25,12 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StatisticsEndpoint extends BaseCasActuatorEndpoint {
     private final ZonedDateTime upTimeStartDate = ZonedDateTime.now(ZoneOffset.UTC);
 
-    private final CentralAuthenticationService centralAuthenticationService;
+    private final ObjectProvider<TicketRegistry> ticketRegistry;
 
-    public StatisticsEndpoint(final CentralAuthenticationService centralAuthenticationService,
+    public StatisticsEndpoint(final ObjectProvider<TicketRegistry> ticketRegistry,
                               final CasConfigurationProperties casProperties) {
         super(casProperties);
-        this.centralAuthenticationService = centralAuthenticationService;
+        this.ticketRegistry = ticketRegistry;
     }
 
     /**
@@ -39,6 +43,7 @@ public class StatisticsEndpoint extends BaseCasActuatorEndpoint {
      * @return the availability
      */
     @ReadOperation
+    @Operation(summary = "Get a report of CAS statistics")
     public Map<String, Object> handle() {
         val model = new HashMap<String, Object>();
 
@@ -55,24 +60,24 @@ public class StatisticsEndpoint extends BaseCasActuatorEndpoint {
         val expiredTgts = new AtomicInteger();
         val expiredSts = new AtomicInteger();
 
-        val tickets = this.centralAuthenticationService.getTickets(ticket -> true);
-        tickets.forEach(ticket -> {
+        val tickets = ticketRegistry.getObject().getTickets(ticket -> true);
+        tickets.forEach(Unchecked.consumer(ticket -> {
             if (ticket instanceof ServiceTicket) {
                 if (ticket.isExpired()) {
-                    this.centralAuthenticationService.deleteTicket(ticket.getId());
+                    ticketRegistry.getObject().deleteTicket(ticket.getId());
                     expiredSts.incrementAndGet();
                 } else {
                     unexpiredSts.incrementAndGet();
                 }
             } else {
                 if (ticket.isExpired()) {
-                    this.centralAuthenticationService.deleteTicket(ticket.getId());
+                    ticketRegistry.getObject().deleteTicket(ticket.getId());
                     expiredTgts.incrementAndGet();
                 } else {
                     unexpiredTgts.incrementAndGet();
                 }
             }
-        });
+        }));
 
         model.put("unexpiredTgts", unexpiredTgts);
         model.put("unexpiredSts", unexpiredSts);

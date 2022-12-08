@@ -2,13 +2,16 @@ package org.apereo.cas.adaptors.x509.config;
 
 import org.apereo.cas.adaptors.x509.authentication.principal.X509CertificateCredential;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.util.serialization.ComponentSerializationPlanConfigurer;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 /**
  * This is {@link X509AuthenticationComponentSerializationConfiguration}.
@@ -16,12 +19,13 @@ import org.springframework.context.annotation.Configuration;
  * @author Misagh Moayyed
  * @since 6.0.0
  */
-@Configuration(value = "x509AuthenticationComponentSerializationConfiguration", proxyBeanMethods = false)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.X509)
+@AutoConfiguration
 public class X509AuthenticationComponentSerializationConfiguration {
     @Bean
     @ConditionalOnMissingBean(name = "x509ComponentSerializationPlanConfigurer")
-    @RefreshScope
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     public ComponentSerializationPlanConfigurer x509ComponentSerializationPlanConfigurer() {
         return plan -> plan.registerSerializableClass(X509CertificateCredential.class);
     }

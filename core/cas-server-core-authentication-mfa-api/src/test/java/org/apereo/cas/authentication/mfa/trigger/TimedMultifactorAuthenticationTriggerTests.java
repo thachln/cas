@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.springframework.test.annotation.DirtiesContext;
 
 import java.util.List;
 
@@ -25,8 +24,7 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 6.2.0
  */
-@Tag("MFA")
-@DirtiesContext
+@Tag("MFATrigger")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TimedMultifactorAuthenticationTriggerTests extends BaseMultifactorAuthenticationTriggerTests {
     @Test
@@ -34,11 +32,11 @@ public class TimedMultifactorAuthenticationTriggerTests extends BaseMultifactorA
     public void verifyUndefined() {
         val props = new CasConfigurationProperties();
         var trigger = new TimedMultifactorAuthenticationTrigger(props, applicationContext);
-        var result = trigger.isActivated(authentication, registeredService, this.httpRequest, mock(Service.class));
+        var result = trigger.isActivated(authentication, registeredService, this.httpRequest, this.httpResponse, mock(Service.class));
         assertFalse(result.isPresent());
 
         trigger = new TimedMultifactorAuthenticationTrigger(props, applicationContext);
-        result = trigger.isActivated(null, null, this.httpRequest, mock(Service.class));
+        result = trigger.isActivated(null, null, this.httpRequest, this.httpResponse, mock(Service.class));
         assertFalse(result.isPresent());
     }
 
@@ -51,16 +49,16 @@ public class TimedMultifactorAuthenticationTriggerTests extends BaseMultifactorA
         timeProps.setOnOrAfterHour(0);
         timeProps.setOnOrBeforeHour(24);
         timeProps.setOnDays(List.of("Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"));
-        props.getAuthn().getAdaptive().getRequireTimedMultifactor().add(timeProps);
+        props.getAuthn().getAdaptive().getPolicy().getRequireTimedMultifactor().add(timeProps);
 
         var trigger = new TimedMultifactorAuthenticationTrigger(props, applicationContext);
-        var result = trigger.isActivated(authentication, registeredService, this.httpRequest, mock(Service.class));
+        var result = trigger.isActivated(authentication, registeredService, this.httpRequest, this.httpResponse, mock(Service.class));
         assertTrue(result.isPresent());
 
         timeProps.setProviderId("bad-id");
         val trigger2 = new TimedMultifactorAuthenticationTrigger(props, applicationContext);
         assertThrows(AuthenticationException.class,
-            () -> trigger2.isActivated(authentication, registeredService, this.httpRequest, mock(Service.class)));
+            () -> trigger2.isActivated(authentication, registeredService, this.httpRequest, this.httpResponse, mock(Service.class)));
     }
 
 
@@ -76,8 +74,8 @@ public class TimedMultifactorAuthenticationTriggerTests extends BaseMultifactorA
         timeProps.setOnOrBeforeHour(2);
         timeProps.setOnDays(List.of("Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"));
 
-        props.getAuthn().getAdaptive().getRequireTimedMultifactor().add(timeProps);
+        props.getAuthn().getAdaptive().getPolicy().getRequireTimedMultifactor().add(timeProps);
         assertThrows(AuthenticationException.class,
-            () -> trigger.isActivated(authentication, registeredService, this.httpRequest, mock(Service.class)));
+            () -> trigger.isActivated(authentication, registeredService, this.httpRequest, this.httpResponse, mock(Service.class)));
     }
 }

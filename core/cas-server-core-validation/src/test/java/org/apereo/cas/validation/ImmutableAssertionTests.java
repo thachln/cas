@@ -28,16 +28,18 @@ public class ImmutableAssertionTests {
         list.add(CoreAuthenticationTestUtils.getAuthentication("test"));
         list.add(CoreAuthenticationTestUtils.getAuthentication("test1"));
         list.add(CoreAuthenticationTestUtils.getAuthentication("test2"));
-        val assertion = new ImmutableAssertion(CoreAuthenticationTestUtils.getAuthentication(), list, true, RegisteredServiceTestUtils.getService());
-        assertEquals(list.toArray(Authentication[]::new).length, assertion.getChainedAuthentications().size());
+        val assertion = new ImmutableAssertion(CoreAuthenticationTestUtils.getAuthentication(), list, true,
+            RegisteredServiceTestUtils.getService(), RegisteredServiceTestUtils.getRegisteredService());
+        assertEquals(list.toArray(Authentication[]::new).length, assertion.chainedAuthentications().size());
     }
 
     @Test
     public void verifyGetterFalseForNewLogin() {
         val list = new ArrayList<Authentication>();
         list.add(CoreAuthenticationTestUtils.getAuthentication());
-        val assertion = new ImmutableAssertion(CoreAuthenticationTestUtils.getAuthentication(), list, false, RegisteredServiceTestUtils.getService());
-        assertFalse(assertion.isFromNewLogin());
+        val assertion = new ImmutableAssertion(CoreAuthenticationTestUtils.getAuthentication(), list, false,
+            RegisteredServiceTestUtils.getService(), RegisteredServiceTestUtils.getRegisteredService());
+        assertFalse(assertion.fromNewLogin());
     }
 
     @Test
@@ -47,9 +49,10 @@ public class ImmutableAssertionTests {
         list.add(CoreAuthenticationTestUtils.getAuthentication());
 
         val assertion = new ImmutableAssertion(
-            CoreAuthenticationTestUtils.getAuthentication(), list, true, RegisteredServiceTestUtils.getService());
+            CoreAuthenticationTestUtils.getAuthentication(), list, true,
+            RegisteredServiceTestUtils.getService(), RegisteredServiceTestUtils.getRegisteredService());
 
-        assertTrue(assertion.isFromNewLogin());
+        assertTrue(assertion.fromNewLogin());
     }
 
     @Test
@@ -58,17 +61,19 @@ public class ImmutableAssertionTests {
         list.add(CoreAuthenticationTestUtils.getAuthentication());
 
         val assertion = new ImmutableAssertion(
-            CoreAuthenticationTestUtils.getAuthentication(), list, true, RegisteredServiceTestUtils.getService());
+            CoreAuthenticationTestUtils.getAuthentication(), list, true,
+            RegisteredServiceTestUtils.getService(), RegisteredServiceTestUtils.getRegisteredService());
 
-        assertNotEquals(assertion, null);
+        assertNotEquals(null, assertion);
     }
 
     @Test
     public void verifyEqualsWithInvalidObject() {
         val list = new ArrayList<Authentication>();
         list.add(CoreAuthenticationTestUtils.getAuthentication());
-        val assertion = new ImmutableAssertion(CoreAuthenticationTestUtils.getAuthentication(), list, true, RegisteredServiceTestUtils.getService());
-        assertFalse("test".equals(assertion));
+        val assertion = new ImmutableAssertion(CoreAuthenticationTestUtils.getAuthentication(), list, true,
+            RegisteredServiceTestUtils.getService(), RegisteredServiceTestUtils.getRegisteredService());
+        assertNotEquals("test", assertion);
     }
 
     @Test
@@ -80,21 +85,21 @@ public class ImmutableAssertionTests {
         list1.add(auth);
         list2.add(auth);
 
-        val assertion1 = new ImmutableAssertion(auth, list1, true, RegisteredServiceTestUtils.getService());
-        val assertion2 = new ImmutableAssertion(auth, list2, true, RegisteredServiceTestUtils.getService());
-
-        assertTrue(assertion1.equals(assertion2));
+        val registeredService = RegisteredServiceTestUtils.getRegisteredService();
+        val assertion1 = new ImmutableAssertion(auth, list1, true,
+            RegisteredServiceTestUtils.getService(), registeredService);
+        val assertion2 = new ImmutableAssertion(auth, list2, true,
+            RegisteredServiceTestUtils.getService(), registeredService);
+        assertEquals(assertion2, assertion1);
     }
 
     @Test
     public void verifyGetService() {
         val service = RegisteredServiceTestUtils.getService();
-
         val list = new ArrayList<Authentication>();
         list.add(CoreAuthenticationTestUtils.getAuthentication());
-
-        val assertion = new ImmutableAssertion(CoreAuthenticationTestUtils.getAuthentication(), list, false, service);
-
-        assertEquals(service, assertion.getService());
+        val assertion = new ImmutableAssertion(CoreAuthenticationTestUtils.getAuthentication(),
+            list, false, service, RegisteredServiceTestUtils.getRegisteredService());
+        assertEquals(service, assertion.service());
     }
 }

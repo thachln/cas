@@ -1,12 +1,15 @@
 package org.apereo.cas.util;
 
+import org.apereo.cas.util.http.SimpleHttpClientFactoryBean;
+
 import lombok.val;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 
-import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -21,26 +24,67 @@ import static org.mockito.Mockito.*;
 public class HttpUtilsTests {
 
     @Test
+    public void verifyExecWithExistingClient() {
+        try (val webServer = new MockWebServer(8081, HttpStatus.OK)) {
+            webServer.start();
+            val exec = HttpUtils.HttpExecutionRequest.builder()
+                .basicAuthPassword("password")
+                .basicAuthUsername("user")
+                .method(HttpMethod.GET)
+                .entity("entity")
+                .url("http://localhost:8081")
+                .httpClient(new SimpleHttpClientFactoryBean().getObject())
+                .build();
+            assertNotNull(HttpUtils.execute(exec));
+        }
+    }
+
+    @Test
     public void verifyExec() {
-        assertNull(HttpUtils.execute("http://localhost:1234", "GET", "user", "password", "entity"));
-        assertNull(HttpUtils.execute("http://localhost:1234", "GET", Map.of()));
-        assertNull(HttpUtils.executeGet("http://localhost:1234", "user", "password", Map.of()));
-        assertNotNull(HttpUtils.executeGet("http://localhost:1234", "https://httpbin.org:443"));
-        assertNotNull(HttpUtils.executeGet("http://localhost:1234", "http://httpbin.org"));
-        assertNull(HttpUtils.executeDelete("http://localhost:1234", "user", "password", Map.of(), Map.of()));
+        val exec = HttpUtils.HttpExecutionRequest.builder()
+            .basicAuthPassword("password")
+            .basicAuthUsername("user")
+            .method(HttpMethod.GET)
+            .entity("entity")
+            .url("http://localhost:8081")
+            .proxyUrl("http://localhost:8080")
+            .build();
+
+        assertNull(HttpUtils.execute(exec));
+    }
+
+    @Test
+    public void verifyBearerToken() {
+        val exec = HttpUtils.HttpExecutionRequest.builder()
+            .bearerToken(UUID.randomUUID().toString())
+            .method(HttpMethod.GET)
+            .entity("entity")
+            .url("http://localhost:8081")
+            .proxyUrl("http://localhost:8080")
+            .build();
+
+        assertNull(HttpUtils.execute(exec));
     }
 
     @Test
     public void verifyClose() {
-        assertDoesNotThrow(new Executable() {
-            @Override
-            public void execute() throws Exception {
-                HttpUtils.close(null);
-                val response = mock(CloseableHttpResponse.class);
-                doThrow(new RuntimeException()).when(response).close();
-                HttpUtils.close(response);
-            }
+        assertDoesNotThrow(() -> {
+            HttpUtils.close(null);
+            val response = mock(CloseableHttpResponse.class);
+            doThrow(new RuntimeException()).when(response).close();
+            HttpUtils.close(response);
         });
     }
 
+    @Test
+    public void verifyBadSSLLogging() {
+        val exec = HttpUtils.HttpExecutionRequest.builder()
+            .method(HttpMethod.GET)
+            .url("https://untrusted-root.badssl.com/endpoint?secret=sensitiveinfo")
+            .build();
+        val response = HttpUtils.execute(exec);
+        assertNotNull(response);
+        assertTrue(HttpStatus.resolve(response.getStatusLine().getStatusCode()).is5xxServerError());
+        assertTrue(response.getStatusLine().getReasonPhrase().contains("https://untrusted-root.badssl.com/endpoint"));
+    }
 }

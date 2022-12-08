@@ -7,6 +7,7 @@ import lombok.val;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.core.io.Resource;
 
+import java.io.Serial;
 import java.util.Set;
 
 /**
@@ -17,9 +18,10 @@ import java.util.Set;
  */
 @Slf4j
 public class GroovyConsentRepository extends BaseConsentRepository implements DisposableBean {
+    @Serial
     private static final long serialVersionUID = 3482998768083902246L;
 
-    private final transient WatchableGroovyScriptResource watchableScript;
+    private final WatchableGroovyScriptResource watchableScript;
 
     public GroovyConsentRepository(final Resource groovyResource) {
         this.watchableScript = new WatchableGroovyScriptResource(groovyResource);
@@ -39,16 +41,28 @@ public class GroovyConsentRepository extends BaseConsentRepository implements Di
         return watchableScript.execute("delete", Boolean.class, decisionId, principal, LOGGER);
     }
 
+    @Override
+    public boolean deleteConsentDecisions(final String principal) {
+        super.deleteConsentDecisions(principal);
+        return watchableScript.execute("deletePrincipal", Boolean.class, principal, LOGGER);
+    }
+
+    @Override
+    public void deleteAll() {
+        super.deleteAll();
+        watchableScript.execute("deleteAll", Void.class, LOGGER);
+    }
+
+    @Override
+    public void destroy() {
+        this.watchableScript.close();
+    }
+
     private void writeAccountToGroovyResource(final ConsentDecision decision) {
         watchableScript.execute("write", Boolean.class, decision, LOGGER);
     }
 
     private Set<ConsentDecision> readDecisionsFromGroovyResource() {
         return watchableScript.execute("read", Set.class, getConsentDecisions(), LOGGER);
-    }
-
-    @Override
-    public void destroy() {
-        this.watchableScript.close();
     }
 }

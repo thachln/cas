@@ -1,8 +1,9 @@
 package org.apereo.cas.authentication;
 
 import org.apereo.cas.authentication.bypass.MultifactorAuthenticationProviderBypassEvaluator;
+import org.apereo.cas.configuration.model.support.mfa.BaseMultifactorAuthenticationProviderProperties.MultifactorAuthenticationProviderFailureModes;
 import org.apereo.cas.services.RegisteredService;
-import org.apereo.cas.services.RegisteredServiceMultifactorPolicyFailureModes;
+import org.apereo.cas.util.RegexUtils;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -11,6 +12,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+
+import java.io.Serial;
 
 /**
  * The {@link AbstractMultifactorAuthenticationProvider} is responsible for
@@ -26,13 +29,14 @@ import org.apache.commons.lang3.StringUtils;
 @EqualsAndHashCode(of = {"order", "id"})
 public abstract class AbstractMultifactorAuthenticationProvider implements MultifactorAuthenticationProvider {
 
+    @Serial
     private static final long serialVersionUID = 4789727148134156909L;
 
     private MultifactorAuthenticationProviderBypassEvaluator bypassEvaluator;
 
     private MultifactorAuthenticationFailureModeEvaluator failureModeEvaluator;
 
-    private String failureMode = "UNDEFINED";
+    private MultifactorAuthenticationProviderFailureModes failureMode = MultifactorAuthenticationProviderFailureModes.UNDEFINED;
 
     private String id;
 
@@ -45,11 +49,7 @@ public abstract class AbstractMultifactorAuthenticationProvider implements Multi
 
     @Override
     public boolean matches(final String identifier) {
-        return StringUtils.isNotBlank(getId()) && getId().matches(identifier);
-    }
-
-    @Override
-    public RegisteredServiceMultifactorPolicyFailureModes getFailureMode() {
-        return RegisteredServiceMultifactorPolicyFailureModes.valueOf(failureMode);
+        return StringUtils.isNotBlank(getId()) && StringUtils.isNotBlank(identifier)
+               && RegexUtils.find(identifier, getId());
     }
 }

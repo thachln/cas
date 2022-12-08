@@ -5,9 +5,10 @@ import org.apereo.cas.config.CasServicesStreamingKafkaConfiguration;
 import org.apereo.cas.util.PublisherIdentifier;
 import org.apereo.cas.util.cache.DistributedCacheManager;
 import org.apereo.cas.util.cache.DistributedCacheObject;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,9 +34,9 @@ import static org.junit.jupiter.api.Assertions.*;
     CasServicesStreamingConfiguration.class
 }, properties = {
     "cas.service-registry.stream.kafka.bootstrap-address=localhost:9092",
-    "cas.service-registry.stream.enabled=true"
+    "cas.service-registry.stream.core.enabled=true"
 })
-@EnabledIfPortOpen(port = 9092)
+@EnabledIfListeningOnPort(port = 9092)
 public class RegisteredServiceKafkaDistributedCacheManagerTests {
 
     @Autowired
@@ -59,5 +60,12 @@ public class RegisteredServiceKafkaDistributedCacheManagerTests {
         assertNotNull(registeredServiceDistributedCacheManager.update(service, item, true));
         assertNotNull(registeredServiceDistributedCacheManager.update(service, item, false));
     }
+
+
+    @BeforeEach
+    public void tearDown() {
+        registeredServiceDistributedCacheManager.clear();
+    }
+
 
 }

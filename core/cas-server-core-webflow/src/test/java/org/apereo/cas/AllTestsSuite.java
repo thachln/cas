@@ -1,10 +1,12 @@
 package org.apereo.cas;
 
+import org.apereo.cas.web.flow.AccountProfileWebflowConfigurerTests;
 import org.apereo.cas.web.flow.ChainingSingleSignOnParticipationStrategyTests;
 import org.apereo.cas.web.flow.DefaultLoginWebflowConfigurerRememberMeTests;
 import org.apereo.cas.web.flow.DefaultLoginWebflowConfigurerTests;
 import org.apereo.cas.web.flow.DefaultLogoutWebflowConfigurerTests;
 import org.apereo.cas.web.flow.DefaultSingleSignOnParticipationStrategyTests;
+import org.apereo.cas.web.flow.FlowBuilderConversionServiceTests;
 import org.apereo.cas.web.flow.actions.AuthenticationExceptionHandlerActionTests;
 import org.apereo.cas.web.flow.actions.CasDefaultFlowUrlHandlerTests;
 import org.apereo.cas.web.flow.actions.CheckWebAuthenticationRequestActionTests;
@@ -15,15 +17,16 @@ import org.apereo.cas.web.flow.actions.RenewAuthenticationRequestCheckActionTest
 import org.apereo.cas.web.flow.authentication.DefaultCasWebflowAbstractTicketExceptionHandlerTests;
 import org.apereo.cas.web.flow.authentication.DefaultCasWebflowAuthenticationExceptionHandlerTests;
 import org.apereo.cas.web.flow.authentication.GenericCasWebflowExceptionHandlerTests;
+import org.apereo.cas.web.flow.authentication.GroovyCasWebflowAuthenticationExceptionHandlerTests;
 import org.apereo.cas.web.flow.authentication.RegisteredServiceAuthenticationPolicySingleSignOnParticipationStrategyTests;
 import org.apereo.cas.web.flow.configurer.CasWebflowConfigurerTests;
 import org.apereo.cas.web.flow.configurer.GroovyWebflowConfigurerTests;
+import org.apereo.cas.web.flow.configurer.MultifactorAuthenticationAccountProfileWebflowConfigurerTests;
 import org.apereo.cas.web.flow.executor.ClientFlowExecutionKeyTests;
 import org.apereo.cas.web.flow.executor.WebflowCipherBeanTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * This is {@link AllTestsSuite}.
@@ -44,15 +47,19 @@ import org.junit.runner.RunWith;
     ClearWebflowCredentialActionTests.class,
     CasWebflowConfigurerTests.class,
     WebflowCipherBeanTests.class,
+    FlowBuilderConversionServiceTests.class,
+    AccountProfileWebflowConfigurerTests.class,
+    GroovyCasWebflowAuthenticationExceptionHandlerTests.class,
     RenewAuthenticationRequestCheckActionTests.class,
     DefaultCasWebflowAbstractTicketExceptionHandlerTests.class,
     DefaultCasWebflowAuthenticationExceptionHandlerTests.class,
     GenericCasWebflowExceptionHandlerTests.class,
+    MultifactorAuthenticationAccountProfileWebflowConfigurerTests.class,
     RegisteredServiceAuthenticationPolicySingleSignOnParticipationStrategyTests.class,
     DefaultSingleSignOnParticipationStrategyTests.class,
     ChainingSingleSignOnParticipationStrategyTests.class,
     AuthenticationExceptionHandlerActionTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class AllTestsSuite {
 }

@@ -1,26 +1,31 @@
 package org.apereo.cas.config;
 
+import org.apereo.cas.authentication.CasSSLContext;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.mongo.MongoDbConnectionFactory;
 import org.apereo.cas.services.MongoDbServiceRegistry;
 import org.apereo.cas.services.ServiceRegistry;
 import org.apereo.cas.services.ServiceRegistryExecutionPlanConfigurer;
 import org.apereo.cas.services.ServiceRegistryListener;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import lombok.val;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.index.TextIndexDefinition;
 
-import javax.net.ssl.SSLContext;
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * This is {@link MongoDbServiceRegistryConfiguration}.
@@ -28,48 +33,49 @@ import java.util.Collection;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration("mongoDbServiceRegistryConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.ServiceRegistry, module = "mongo")
+@AutoConfiguration
 public class MongoDbServiceRegistryConfiguration {
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    private ConfigurableApplicationContext applicationContext;
-
-    @Autowired
-    @Qualifier("serviceRegistryListeners")
-    private ObjectProvider<Collection<ServiceRegistryListener>> serviceRegistryListeners;
-
-    @Autowired
-    @Qualifier("sslContext")
-    private ObjectProvider<SSLContext> sslContext;
 
     @ConditionalOnMissingBean(name = "mongoDbServiceRegistryTemplate")
     @Bean
-    public MongoTemplate mongoDbServiceRegistryTemplate() {
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public MongoOperations mongoDbServiceRegistryTemplate(
+        final CasConfigurationProperties casProperties,
+        @Qualifier(CasSSLContext.BEAN_NAME)
+        final CasSSLContext casSslContext) {
         val mongo = casProperties.getServiceRegistry().getMongo();
-        val factory = new MongoDbConnectionFactory(sslContext.getObject());
-
+        val factory = new MongoDbConnectionFactory(casSslContext.getSslContext());
         val mongoTemplate = factory.buildMongoTemplate(mongo);
-        factory.createCollection(mongoTemplate, mongo.getCollection(), mongo.isDropCollection());
+        MongoDbConnectionFactory.createCollection(mongoTemplate, mongo.getCollection(), mongo.isDropCollection());
+        val collection = mongoTemplate.getCollection(mongo.getCollection());
+        val columnsIndex = new TextIndexDefinition.TextIndexDefinitionBuilder().onField("id")
+            .onField("serviceId").onField("name").build();
+        MongoDbConnectionFactory.createOrUpdateIndexes(mongoTemplate, collection, List.of(columnsIndex));
         return mongoTemplate;
     }
 
     @Bean
-    public ServiceRegistry mongoDbServiceRegistry() {
+    @ConditionalOnMissingBean(name = "mongoDbServiceRegistry")
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public ServiceRegistry mongoDbServiceRegistry(
+        @Qualifier("mongoDbServiceRegistryTemplate")
+        final MongoOperations mongoDbServiceRegistryTemplate,
+        final ObjectProvider<List<ServiceRegistryListener>> serviceRegistryListeners,
+        final CasConfigurationProperties casProperties,
+        final ConfigurableApplicationContext applicationContext) {
         val mongo = casProperties.getServiceRegistry().getMongo();
-        return new MongoDbServiceRegistry(
-            applicationContext,
-            mongoDbServiceRegistryTemplate(),
-            mongo.getCollection(),
-            serviceRegistryListeners.getObject());
+        return new MongoDbServiceRegistry(applicationContext, mongoDbServiceRegistryTemplate, mongo.getCollection(),
+            Optional.ofNullable(serviceRegistryListeners.getIfAvailable()).orElseGet(ArrayList::new));
     }
 
     @Bean
     @ConditionalOnMissingBean(name = "mongoDbServiceRegistryExecutionPlanConfigurer")
-    @RefreshScope
-    public ServiceRegistryExecutionPlanConfigurer mongoDbServiceRegistryExecutionPlanConfigurer() {
-        return plan -> plan.registerServiceRegistry(mongoDbServiceRegistry());
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public ServiceRegistryExecutionPlanConfigurer mongoDbServiceRegistryExecutionPlanConfigurer(
+        @Qualifier("mongoDbServiceRegistry")
+        final ServiceRegistry mongoDbServiceRegistry) {
+        return plan -> plan.registerServiceRegistry(mongoDbServiceRegistry);
     }
 }

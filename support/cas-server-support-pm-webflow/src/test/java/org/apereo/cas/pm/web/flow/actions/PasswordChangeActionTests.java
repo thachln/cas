@@ -2,6 +2,7 @@ package org.apereo.cas.pm.web.flow.actions;
 
 import org.apereo.cas.pm.PasswordChangeRequest;
 import org.apereo.cas.pm.web.flow.PasswordManagementWebflowConfigurer;
+import org.apereo.cas.pm.web.flow.PasswordManagementWebflowUtils;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
 import org.apereo.cas.web.flow.CasWebflowConstants;
 import org.apereo.cas.web.support.WebUtils;
@@ -30,10 +31,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 6.3.0
  */
 @Tag("WebflowActions")
-@TestPropertySource(properties = "cas.authn.pm.policy-pattern=P@ss.+")
+@TestPropertySource(properties = "cas.authn.pm.core.password-policy-pattern=P@ss.+")
 public class PasswordChangeActionTests extends BasePasswordManagementActionTests {
     @Autowired
-    @Qualifier("passwordChangeAction")
+    @Qualifier(CasWebflowConstants.ACTION_ID_PASSWORD_CHANGE)
     private Action passwordChangeAction;
 
     @Test
@@ -46,7 +47,7 @@ public class PasswordChangeActionTests extends BasePasswordManagementActionTests
         ExternalContextHolder.setExternalContext(context.getExternalContext());
         val changeReq = new PasswordChangeRequest();
         changeReq.setUsername("casuser");
-        changeReq.setPassword("123456");
+        changeReq.setPassword("123456".toCharArray());
         context.getFlowScope().put(PasswordManagementWebflowConfigurer.FLOW_VAR_ID_PASSWORD, changeReq);
         assertEquals(CasWebflowConstants.TRANSITION_ID_ERROR, passwordChangeAction.execute(context).getId());
     }
@@ -64,7 +65,7 @@ public class PasswordChangeActionTests extends BasePasswordManagementActionTests
 
         val changeReq = new PasswordChangeRequest();
         changeReq.setUsername("casuser");
-        changeReq.setPassword("123456");
+        changeReq.setPassword("123456".toCharArray());
         context.getFlowScope().put(PasswordManagementWebflowConfigurer.FLOW_VAR_ID_PASSWORD, changeReq);
         assertEquals(CasWebflowConstants.TRANSITION_ID_ERROR, passwordChangeAction.execute(context).getId());
     }
@@ -79,13 +80,14 @@ public class PasswordChangeActionTests extends BasePasswordManagementActionTests
         ExternalContextHolder.setExternalContext(context.getExternalContext());
 
         WebUtils.putCredential(context,
-            RegisteredServiceTestUtils.getCredentialsWithDifferentUsernameAndPassword("casuser", "P@ssword"));
+            RegisteredServiceTestUtils.getCredentialsWithDifferentUsernameAndPassword("casuser", "Th!$isT3$t"));
 
         val changeReq = new PasswordChangeRequest();
         changeReq.setUsername("casuser");
-        changeReq.setPassword("P@ssword");
-        changeReq.setConfirmedPassword("P@ssword");
+        changeReq.setPassword("P@ssword".toCharArray());
+        changeReq.setConfirmedPassword("P@ssword".toCharArray());
         context.getFlowScope().put(PasswordManagementWebflowConfigurer.FLOW_VAR_ID_PASSWORD, changeReq);
+        PasswordManagementWebflowUtils.putPasswordResetUsername(context, changeReq.getUsername());
         assertEquals(CasWebflowConstants.TRANSITION_ID_PASSWORD_UPDATE_SUCCESS, passwordChangeAction.execute(context).getId());
     }
 
@@ -103,8 +105,8 @@ public class PasswordChangeActionTests extends BasePasswordManagementActionTests
 
         val changeReq = new PasswordChangeRequest();
         changeReq.setUsername("bad-credential");
-        changeReq.setPassword("P@ssword");
-        changeReq.setConfirmedPassword("P@ssword");
+        changeReq.setPassword("P@ssword".toCharArray());
+        changeReq.setConfirmedPassword("P@ssword".toCharArray());
         context.getFlowScope().put(PasswordManagementWebflowConfigurer.FLOW_VAR_ID_PASSWORD, changeReq);
         assertEquals(CasWebflowConstants.TRANSITION_ID_ERROR, passwordChangeAction.execute(context).getId());
     }
@@ -123,9 +125,10 @@ public class PasswordChangeActionTests extends BasePasswordManagementActionTests
 
         val changeReq = new PasswordChangeRequest();
         changeReq.setUsername("error-credential");
-        changeReq.setPassword("P@ssword");
-        changeReq.setConfirmedPassword("P@ssword");
+        changeReq.setPassword("P@ssword".toCharArray());
+        changeReq.setConfirmedPassword("P@ssword".toCharArray());
         context.getFlowScope().put(PasswordManagementWebflowConfigurer.FLOW_VAR_ID_PASSWORD, changeReq);
+        PasswordManagementWebflowUtils.putPasswordResetUsername(context, changeReq.getUsername());
         assertEquals(CasWebflowConstants.TRANSITION_ID_ERROR, passwordChangeAction.execute(context).getId());
     }
 

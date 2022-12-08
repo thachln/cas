@@ -1,5 +1,10 @@
 package org.apereo.cas.token;
 
+import org.apereo.cas.authentication.ProtocolAttributeEncoder;
+import org.apereo.cas.authentication.principal.PrincipalFactoryUtils;
+import org.apereo.cas.config.CasCoreAuthenticationPrincipalConfiguration;
+import org.apereo.cas.config.CasCoreAuthenticationServiceSelectionStrategyConfiguration;
+import org.apereo.cas.config.CasCoreConfiguration;
 import org.apereo.cas.config.CasCoreHttpConfiguration;
 import org.apereo.cas.config.CasCoreNotificationsConfiguration;
 import org.apereo.cas.config.CasCoreServicesConfiguration;
@@ -7,23 +12,23 @@ import org.apereo.cas.config.CasCoreTicketCatalogConfiguration;
 import org.apereo.cas.config.CasCoreTicketIdGeneratorsConfiguration;
 import org.apereo.cas.config.CasCoreTicketsConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
+import org.apereo.cas.config.CasCoreWebConfiguration;
 import org.apereo.cas.config.CasDefaultServiceTicketIdGeneratorsConfiguration;
+import org.apereo.cas.config.CasPersonDirectoryTestConfiguration;
 import org.apereo.cas.config.CasRegisteredServicesTestConfiguration;
 import org.apereo.cas.config.TokenCoreComponentSerializationConfiguration;
 import org.apereo.cas.config.TokenCoreConfiguration;
-import org.apereo.cas.services.AbstractRegisteredService;
+import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
+import org.apereo.cas.services.BaseRegisteredService;
 import org.apereo.cas.services.DefaultRegisteredServiceProperty;
 import org.apereo.cas.services.RegisteredServiceProperty;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
 import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.ticket.TicketValidator;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.crypto.CipherExecutor;
 
 import lombok.val;
-import org.jasig.cas.client.authentication.AttributePrincipalImpl;
-import org.jasig.cas.client.validation.AbstractUrlBasedTicketValidator;
-import org.jasig.cas.client.validation.Assertion;
-import org.jasig.cas.client.validation.AssertionImpl;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -31,10 +36,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Lazy;
 
-import java.net.URL;
 import java.util.List;
+
+import static org.mockito.Mockito.*;
 
 /**
  * This is {@link BaseJwtTokenTicketBuilderTests}.
@@ -44,9 +49,9 @@ import java.util.List;
  */
 @SpringBootTest(classes = {
     RefreshAutoConfiguration.class,
+    BaseJwtTokenTicketBuilderTests.TokenTicketBuilderTestConfiguration.class,
     TokenCoreConfiguration.class,
     TokenCoreComponentSerializationConfiguration.class,
-    BaseJwtTokenTicketBuilderTests.TokenTicketBuilderTestConfiguration.class,
     CasCoreTicketsConfiguration.class,
     CasCoreNotificationsConfiguration.class,
     CasCoreServicesConfiguration.class,
@@ -55,6 +60,12 @@ import java.util.List;
     CasCoreTicketCatalogConfiguration.class,
     CasCoreTicketIdGeneratorsConfiguration.class,
     CasCoreHttpConfiguration.class,
+    CasCoreAuthenticationPrincipalConfiguration.class,
+    CasCoreWebConfiguration.class,
+    CasWebApplicationServiceFactoryConfiguration.class,
+    CasCoreConfiguration.class,
+    CasPersonDirectoryTestConfiguration.class,
+    CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
     CasDefaultServiceTicketIdGeneratorsConfiguration.class
 })
 public abstract class BaseJwtTokenTicketBuilderTests {
@@ -67,24 +78,39 @@ public abstract class BaseJwtTokenTicketBuilderTests {
     protected CipherExecutor tokenCipherExecutor;
 
     @Autowired
-    @Qualifier("servicesManager")
+    @Qualifier("tokenTicketJwtBuilder")
+    protected JwtBuilder tokenTicketJwtBuilder;
+
+    @Autowired
+    @Qualifier(ServicesManager.BEAN_NAME)
     protected ServicesManager servicesManager;
 
-    @TestConfiguration("TokenTicketBuilderTestConfiguration")
-    @Lazy(false)
+    @TestConfiguration(value = "TokenTicketBuilderTestConfiguration", proxyBeanMethods = false)
     public static class TokenTicketBuilderTestConfiguration implements InitializingBean {
         @Autowired
-        @Qualifier("inMemoryRegisteredServices")
-        private List inMemoryRegisteredServices;
+        @Qualifier("servicesManager")
+        private ServicesManager servicesManager;
 
         @Override
         public void afterPropertiesSet() {
-            inMemoryRegisteredServices.add(RegisteredServiceTestUtils.getRegisteredService("https://cas.example.org.+"));
-            inMemoryRegisteredServices.add(createRegisteredService("https://jwt.example.org/cas.*", true, true));
-            inMemoryRegisteredServices.add(createRegisteredService("https://jwt.no-encryption-key.example.org/cas.*", true, false));
+            servicesManager.save(RegisteredServiceTestUtils.getRegisteredService("https://cas.example.org.+"));
+            servicesManager.save(createRegisteredService("https://jwt.example.org/cas.*", true, true));
+            servicesManager.save(createRegisteredService("https://jwt.no-encryption-key.example.org/cas.*", true, false));
         }
 
-        private AbstractRegisteredService createRegisteredService(final String id, final boolean hasSigningKey, final boolean hasEncryptionKey) {
+        @Bean
+        public TicketValidator tokenTicketValidator() {
+            val validator = mock(TicketValidator.class);
+            val principal = PrincipalFactoryUtils.newPrincipalFactory().createPrincipal("casuser",
+                CollectionUtils.wrap("name", List.of("value"),
+                    ProtocolAttributeEncoder.encodeAttribute("custom:name"), CollectionUtils.wrapList("custom:value")));
+            when(validator.validate(anyString(), anyString()))
+                .thenReturn(TicketValidator.ValidationResult.builder().principal(principal).build());
+            return validator;
+
+        }
+
+        private BaseRegisteredService createRegisteredService(final String id, final boolean hasSigningKey, final boolean hasEncryptionKey) {
             val registeredService = RegisteredServiceTestUtils.getRegisteredService(id);
 
             if (hasSigningKey) {
@@ -99,29 +125,9 @@ public abstract class BaseJwtTokenTicketBuilderTests {
                 registeredService.getProperties().put(
                     RegisteredServiceProperty.RegisteredServiceProperties.TOKEN_AS_SERVICE_TICKET_ENCRYPTION_KEY.getPropertyName(), encKey);
 
-                inMemoryRegisteredServices.add(registeredService);
+                servicesManager.save(registeredService);
             }
             return registeredService;
-        }
-
-        @Bean
-        public AbstractUrlBasedTicketValidator casClientTicketValidator() {
-            return new AbstractUrlBasedTicketValidator("https://cas.example.org") {
-                @Override
-                protected String getUrlSuffix() {
-                    return "/cas";
-                }
-
-                @Override
-                protected Assertion parseResponseFromServer(final String s) {
-                    return new AssertionImpl(new AttributePrincipalImpl("casuser", CollectionUtils.wrap("name", "value")));
-                }
-
-                @Override
-                protected String retrieveResponseFromServer(final URL url, final String s) {
-                    return "theresponse";
-                }
-            };
         }
     }
 }

@@ -1,13 +1,14 @@
 package org.apereo.cas.configuration.model.core.authentication;
 
-import org.apereo.cas.configuration.model.SpringResourceProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 
 import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -22,22 +23,19 @@ import java.io.Serializable;
 @Accessors(chain = true)
 @JsonFilter("AuthenticationEngineProperties")
 public class AuthenticationEngineProperties implements Serializable {
+    @Serial
     private static final long serialVersionUID = -2475347572099983874L;
 
     /**
      * Groovy script to handle the authentication pre-processor.
      */
-    private Groovy groovyPreProcessor = new Groovy();
+    @NestedConfigurationProperty
+    private GroovyAuthenticationEngineProcessorProperties groovyPreProcessor = new GroovyAuthenticationEngineProcessorProperties();
 
     /**
      * Groovy script to handle the authentication post-processor.
      */
-    private Groovy groovyPostProcessor = new Groovy();
+    @NestedConfigurationProperty
+    private GroovyAuthenticationEngineProcessorProperties groovyPostProcessor = new GroovyAuthenticationEngineProcessorProperties();
 
-    @RequiresModule(name = "cas-server-core-authentication", automated = true)
-    @Getter
-    @Setter
-    public static class Groovy extends SpringResourceProperties {
-        private static final long serialVersionUID = 8079027843747126083L;
-    }
 }

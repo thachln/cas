@@ -9,14 +9,12 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
+
 /**
  * This is {@link CouchDbTicketRegistryProperties}.
  *
  * @author Timur Duehr
- * @see org.apache.http.params.HttpParams
- * @see org.apache.http.params.HttpProtocolParams
- * @see org.apache.http.params.HttpConnectionParams
- * @see org.apache.http.params.BasicHttpParams
  * @since 5.3.0
  */
 @RequiresModule(name = "cas-server-support-couchdb-ticket-registry")
@@ -24,6 +22,7 @@ import org.springframework.boot.context.properties.NestedConfigurationProperty;
 @Setter
 @Accessors(chain = true)
 public class CouchDbTicketRegistryProperties extends BaseCouchDbProperties {
+    @Serial
     private static final long serialVersionUID = 6895485069081125319L;
 
     /**

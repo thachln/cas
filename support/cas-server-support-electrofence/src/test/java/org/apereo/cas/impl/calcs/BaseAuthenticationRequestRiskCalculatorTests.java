@@ -3,6 +3,7 @@ package org.apereo.cas.impl.calcs;
 import org.apereo.cas.api.AuthenticationRiskEvaluator;
 import org.apereo.cas.api.AuthenticationRiskNotifier;
 import org.apereo.cas.audit.spi.config.CasCoreAuditConfiguration;
+import org.apereo.cas.authentication.CasSSLContext;
 import org.apereo.cas.config.CasCoreAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationHandlersConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationMetadataConfiguration;
@@ -28,8 +29,8 @@ import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguratio
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.impl.mock.MockTicketGrantingTicketCreatedEventProducer;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
+import org.apereo.cas.notifications.sms.MockSmsSender;
 import org.apereo.cas.notifications.sms.SmsSender;
-import org.apereo.cas.sms.MockSmsSender;
 import org.apereo.cas.support.events.CasEventRepository;
 import org.apereo.cas.support.events.config.CasCoreEventsConfiguration;
 import org.apereo.cas.support.events.config.CasEventsInMemoryRepositoryConfiguration;
@@ -46,15 +47,16 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.test.annotation.DirtiesContext;
+
+import javax.net.ssl.HttpsURLConnection;
 
 /**
  * This is {@link BaseAuthenticationRequestRiskCalculatorTests}.
@@ -63,14 +65,13 @@ import org.springframework.test.annotation.DirtiesContext;
  * @since 5.3.0
  */
 @SpringBootTest(classes = BaseAuthenticationRequestRiskCalculatorTests.SharedTestConfiguration.class)
-@DirtiesContext
 @EnableScheduling
 public abstract class BaseAuthenticationRequestRiskCalculatorTests {
     @Autowired
     protected ConfigurableApplicationContext applicationContext;
 
     @Autowired
-    @Qualifier("casEventRepository")
+    @Qualifier(CasEventRepository.BEAN_NAME)
     protected CasEventRepository casEventRepository;
 
     @Autowired
@@ -89,12 +90,13 @@ public abstract class BaseAuthenticationRequestRiskCalculatorTests {
     protected AuthenticationRiskNotifier authenticationRiskSmsNotifier;
 
     @BeforeEach
-    public void prepTest() {
+    public void prepTest() throws Exception {
         MockTicketGrantingTicketCreatedEventProducer.createEvents(this.casEventRepository);
+        HttpsURLConnection.setDefaultHostnameVerifier(CasSSLContext.disabled().getHostnameVerifier());
+        HttpsURLConnection.setDefaultSSLSocketFactory(CasSSLContext.disabled().getSslContext().getSocketFactory());
     }
 
-    @TestConfiguration
-    @Lazy(false)
+    @TestConfiguration(value = "ElectronicFenceTestConfiguration", proxyBeanMethods = false)
     public static class ElectronicFenceTestConfiguration {
         @Bean
         public SmsSender smsSender() {
@@ -105,6 +107,7 @@ public abstract class BaseAuthenticationRequestRiskCalculatorTests {
     @ImportAutoConfiguration({
         RefreshAutoConfiguration.class,
         MailSenderAutoConfiguration.class,
+        WebMvcAutoConfiguration.class,
         AopAutoConfiguration.class
     })
     @SpringBootConfiguration

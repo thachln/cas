@@ -1,12 +1,14 @@
 package org.apereo.cas.config;
 
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.util.AsciiArtUtils;
 import org.apereo.cas.util.DateTimeUtils;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
 import java.time.Instant;
@@ -18,7 +20,8 @@ import java.time.Instant;
  * @since 6.0.0
  */
 @Slf4j
-@Configuration(value = "casSpringBootAdminServerConfiguration", proxyBeanMethods = false)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.SpringBootAdmin)
+@AutoConfiguration
 public class CasSpringBootAdminServerConfiguration {
     /**
      * Handle application ready event.

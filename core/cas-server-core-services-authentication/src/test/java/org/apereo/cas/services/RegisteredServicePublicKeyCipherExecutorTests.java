@@ -17,8 +17,17 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 5.2.0
  */
-@Tag("RegisteredService")
+@Tag("Cipher")
 public class RegisteredServicePublicKeyCipherExecutorTests {
+
+    private static BaseRegisteredService getService(final String keyLocation) {
+        val svc = new CasRegisteredService();
+        svc.setServiceId("Testing");
+        if (StringUtils.isNotBlank(keyLocation)) {
+            svc.setPublicKey(new RegisteredServicePublicKeyImpl(keyLocation, "RSA"));
+        }
+        return svc;
+    }
 
     @Test
     public void verifyCipherUnableToEncodeForStringIsTooLong() {
@@ -43,14 +52,5 @@ public class RegisteredServicePublicKeyCipherExecutorTests {
         val ticketId = RandomUtils.randomAlphanumeric(120);
         val e = new RegisteredServicePublicKeyCipherExecutor();
         assertNull(e.encode(ticketId, Optional.of(svc)));
-    }
-
-    private static AbstractRegisteredService getService(final String keyLocation) {
-        val svc = new RegexRegisteredService();
-        svc.setServiceId("Testing");
-        if (StringUtils.isNotBlank(keyLocation)) {
-            svc.setPublicKey(new RegisteredServicePublicKeyImpl(keyLocation, "RSA"));
-        }
-        return svc;
     }
 }

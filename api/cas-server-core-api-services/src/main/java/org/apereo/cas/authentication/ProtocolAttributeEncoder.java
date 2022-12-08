@@ -1,9 +1,9 @@
 package org.apereo.cas.authentication;
 
+import org.apereo.cas.authentication.principal.WebApplicationService;
 import org.apereo.cas.services.RegisteredService;
 
 import com.google.common.collect.Maps;
-import lombok.SneakyThrows;
 import lombok.val;
 import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
@@ -25,35 +25,15 @@ import java.util.Map;
  * @since 4.1
  */
 public interface ProtocolAttributeEncoder {
+    /**
+     * Logger instance.
+     */
     Logger LOGGER = LoggerFactory.getLogger(ProtocolAttributeEncoder.class);
 
     /**
-     * The constant ENCODED_ATTRIBUTE_PREFIX.
+     * The prefix that is prepended to the name of the attribute name.
      */
     String ENCODED_ATTRIBUTE_PREFIX = "_";
-
-    /**
-     * Encodes attributes that are ready to be released.
-     * Typically, this method tries to ensure that the
-     * PGT and the credential password are correctly encrypted
-     * before they are released. Attributes should not be filtered
-     * and removed and it is assumed that all will be returned
-     * back to the service.
-     *
-     * @param attributes The attribute collection that is ready to be released
-     * @param service    the requesting service for which attributes are to be encoded
-     * @return collection of attributes after encryption ready for release.
-     * @since 4.1
-     */
-    default Map<String, Object> encodeAttributes(final Map<String, Object> attributes, final RegisteredService service) {
-        val finalAttributes = Maps.<String, Object>newHashMapWithExpectedSize(attributes.size());
-        attributes.forEach((k, v) -> {
-            val attributeName = decodeAttribute(k);
-            LOGGER.debug("Decoded attribute [{}] to [{}] with value(s) [{}]", k, attributeName, v);
-            finalAttributes.put(attributeName, v);
-        });
-        return finalAttributes;
-    }
 
     /**
      * Is attribute name encoded boolean.
@@ -81,11 +61,59 @@ public interface ProtocolAttributeEncoder {
      * @param s the s
      * @return the string
      */
-    @SneakyThrows
     static String decodeAttribute(final String s) {
-        if (isAttributeNameEncoded(s)) {
-            return new String(Hex.decodeHex(s.substring(1)), StandardCharsets.UTF_8);
+        try {
+            if (isAttributeNameEncoded(s)) {
+                return new String(Hex.decodeHex(s.substring(1)), StandardCharsets.UTF_8);
+            }
+        } catch (final Exception e) {
+            LOGGER.trace("Unable to decode attribute [{}]: [{}]", s, e.getMessage());
         }
         return s;
+    }
+
+    /**
+     * Decode attributes map.
+     *
+     * @param attributes            the attributes
+     * @param registeredService     the registered service
+     * @param webApplicationService the web application service
+     * @return the map
+     */
+    static Map<String, Object> decodeAttributes(final Map<String, Object> attributes,
+                                                final RegisteredService registeredService,
+                                                final WebApplicationService webApplicationService) {
+        val finalAttributes = Maps.<String, Object>newHashMapWithExpectedSize(attributes.size());
+        attributes.forEach((k, v) -> {
+            val attributeName = ProtocolAttributeEncoder.decodeAttribute(k);
+            LOGGER.debug("Decoded SAML attribute [{}] to [{}] with value(s) [{}]", k, attributeName, v);
+            finalAttributes.put(attributeName, v);
+        });
+        return finalAttributes;
+    }
+
+    /**
+     * Encodes attributes that are ready to be released.
+     * Typically, this method tries to ensure that the
+     * PGT and the credential password are correctly encrypted
+     * before they are released. Attributes should not be filtered
+     * and removed and it is assumed that all will be returned
+     * back to the service.
+     *
+     * @param attributes            The attribute collection that is ready to be released
+     * @param registeredService     the requesting service for which attributes are to be encoded
+     * @param webApplicationService the web application service
+     * @return collection of attributes after encryption ready for release.
+     * @since 4.1
+     */
+    default Map<String, Object> encodeAttributes(final Map<String, Object> attributes,
+                                                 final RegisteredService registeredService, final WebApplicationService webApplicationService) {
+        val finalAttributes = Maps.<String, Object>newHashMapWithExpectedSize(attributes.size());
+        attributes.forEach((k, v) -> {
+            val attributeName = decodeAttribute(k);
+            LOGGER.debug("Decoded attribute [{}] to [{}] with value(s) [{}]", k, attributeName, v);
+            finalAttributes.put(attributeName, v);
+        });
+        return finalAttributes;
     }
 }

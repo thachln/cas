@@ -10,8 +10,11 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
-import javax.persistence.Transient;
+import jakarta.persistence.Transient;
+
+import java.io.Serial;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,12 +28,10 @@ import java.util.Map;
 @ToString
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 public class DefaultSingleLogoutRequestContext implements SingleLogoutRequestContext {
 
-    /**
-     * Generated serialVersionUID.
-     */
+    @Serial
     private static final long serialVersionUID = -6411421298859045022L;
 
     /**

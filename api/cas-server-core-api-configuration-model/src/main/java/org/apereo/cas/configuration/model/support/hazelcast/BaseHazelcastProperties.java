@@ -1,12 +1,15 @@
 package org.apereo.cas.configuration.model.support.hazelcast;
 
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -19,7 +22,8 @@ import java.io.Serializable;
 @Getter
 @Setter
 @Accessors(chain = true)
-public class BaseHazelcastProperties implements Serializable {
+@JsonFilter("BaseHazelcastProperties")
+public class BaseHazelcastProperties implements Serializable, CasFeatureModule {
 
     /**
      * Whether shut down hook is enabled.
@@ -63,21 +67,18 @@ public class BaseHazelcastProperties implements Serializable {
      */
     public static final String IPV4_STACK_PROP = "hazelcast.prefer.ipv4.stack";
 
+    @Serial
     private static final long serialVersionUID = 4204884717547468480L;
-
-    /**
-     * Hazelcast enterprise license key.
-     */
-    private String licenseKey;
-
-    /**
-     * Enables compression when default java serialization is used.
-     */
-    private boolean enableCompression;
 
     /**
      * Hazelcast cluster settings if CAS is able to auto-create caches.
      */
     @NestedConfigurationProperty
     private HazelcastClusterProperties cluster = new HazelcastClusterProperties();
+
+    /**
+     * Core configuration settings for hazelcast.
+     */
+    @NestedConfigurationProperty
+    private HazelcastCoreProperties core = new HazelcastCoreProperties();
 }

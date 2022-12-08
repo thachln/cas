@@ -1,14 +1,17 @@
 package org.apereo.cas.configuration.model.support.wsfed;
 
 import org.apereo.cas.configuration.model.core.util.EncryptionJwtSigningJwtCryptographyProperties;
-import org.apereo.cas.configuration.model.support.cookie.CookieProperties;
+import org.apereo.cas.configuration.model.support.cookie.PinnableCookieProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 import org.apereo.cas.util.crypto.CipherExecutor;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
+
+import java.io.Serial;
 
 /**
  * This is {@link WsFederationDelegatedCookieProperties}.
@@ -20,7 +23,9 @@ import org.springframework.boot.context.properties.NestedConfigurationProperty;
 @Getter
 @Accessors(chain = true)
 @Setter
-public class WsFederationDelegatedCookieProperties extends CookieProperties {
+@JsonFilter("WsFederationDelegatedCookieProperties")
+public class WsFederationDelegatedCookieProperties extends PinnableCookieProperties {
+    @Serial
     private static final long serialVersionUID = 7392972818105536350L;
 
     /**

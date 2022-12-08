@@ -23,9 +23,9 @@ import static org.mockito.Mockito.*;
  * @since 6.2.0
  */
 
-@Tag("MFA")
+@Tag("MFATrigger")
 public class NeverAllowMultifactorAuthenticationProviderBypassEvaluatorTests {
-    
+
     @Test
     public void verifyOperation() {
         val applicationContext = new StaticApplicationContext();
@@ -36,7 +36,7 @@ public class NeverAllowMultifactorAuthenticationProviderBypassEvaluatorTests {
         val authentication = CoreAuthenticationTestUtils.getAuthentication(principal);
         val registeredService = CoreAuthenticationTestUtils.getRegisteredService();
         val policy = new DefaultRegisteredServiceMultifactorPolicy();
-        when(registeredService.getMultifactorPolicy()).thenReturn(policy);
+        when(registeredService.getMultifactorAuthenticationPolicy()).thenReturn(policy);
         assertTrue(NeverAllowMultifactorAuthenticationProviderBypassEvaluator.getInstance()
             .shouldMultifactorAuthenticationProviderExecute(authentication, registeredService, provider, new MockHttpServletRequest()));
     }

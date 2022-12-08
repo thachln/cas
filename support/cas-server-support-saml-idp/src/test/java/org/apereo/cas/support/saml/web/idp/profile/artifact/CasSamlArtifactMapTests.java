@@ -7,7 +7,7 @@ import org.apereo.cas.web.support.WebUtils;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestPropertySource;
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.2.0
  */
-@Tag("SAML")
+@Tag("SAML2")
 @TestPropertySource(properties = "cas.tgc.crypto.enabled=false")
 public class CasSamlArtifactMapTests extends BaseSamlIdPConfigurationTests {
     @Test
@@ -44,7 +44,7 @@ public class CasSamlArtifactMapTests extends BaseSamlIdPConfigurationTests {
         val response = new MockHttpServletResponse();
         val request = new MockHttpServletRequest();
         samlIdPDistributedSessionStore.set(
-            new JEEContext(request, response, samlIdPDistributedSessionStore),
+            new JEEContext(request, response),
             WebUtils.PARAMETER_TICKET_GRANTING_TICKET_ID, tgt);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request, response));
         samlArtifactMap.put("artifact", "relying-party", "issuer", getAuthnRequestFor("example"));

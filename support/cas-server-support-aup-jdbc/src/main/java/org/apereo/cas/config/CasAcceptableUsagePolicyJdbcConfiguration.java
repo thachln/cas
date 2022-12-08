@@ -3,22 +3,26 @@ package org.apereo.cas.config;
 import org.apereo.cas.aup.AcceptableUsagePolicyRepository;
 import org.apereo.cas.aup.JdbcAcceptableUsagePolicyRepository;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.configuration.support.JpaBeans;
 import org.apereo.cas.ticket.registry.TicketRegistrySupport;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import lombok.val;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.integration.transaction.PseudoTransactionManager;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
 
@@ -28,42 +32,78 @@ import javax.sql.DataSource;
  * @author Misagh Moayyed
  * @since 5.2.0
  */
-@Configuration("casAcceptableUsagePolicyJdbcConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@AutoConfigureAfter(CasCoreTicketsConfiguration.class)
-@ConditionalOnProperty(prefix = "cas.acceptable-usage-policy", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.AcceptableUsagePolicy, module = "jdbc")
+@AutoConfiguration
 public class CasAcceptableUsagePolicyJdbcConfiguration {
 
-    @Autowired
-    @Qualifier("defaultTicketRegistrySupport")
-    private ObjectProvider<TicketRegistrySupport> ticketRegistrySupport;
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
     @Bean
-    @RefreshScope
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @ConditionalOnMissingBean(name = "acceptableUsagePolicyDataSource")
-    public DataSource acceptableUsagePolicyDataSource() {
-        val jdbc = casProperties.getAcceptableUsagePolicy().getJdbc();
-        return JpaBeans.newDataSource(jdbc);
+    public DataSource acceptableUsagePolicyDataSource(
+        final ConfigurableApplicationContext applicationContext,
+        final CasConfigurationProperties casProperties) throws Exception {
+        return BeanSupplier.of(DataSource.class)
+            .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+            .supply(() -> {
+                val jdbc = casProperties.getAcceptableUsagePolicy().getJdbc();
+                return JpaBeans.newDataSource(jdbc);
+            })
+            .otherwiseProxy()
+            .get();
     }
 
-    @RefreshScope
     @Bean
-    public AcceptableUsagePolicyRepository acceptableUsagePolicyRepository() {
-        val properties = casProperties.getAcceptableUsagePolicy();
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public PlatformTransactionManager jdbcAcceptableUsagePolicyTransactionManager(
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier("acceptableUsagePolicyDataSource")
+        final DataSource acceptableUsagePolicyDataSource) throws Exception {
+        return BeanSupplier.of(PlatformTransactionManager.class)
+            .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+            .supply(() -> new DataSourceTransactionManager(acceptableUsagePolicyDataSource))
+            .otherwise(PseudoTransactionManager::new)
+            .get();
+    }
 
-        if (StringUtils.isBlank(properties.getJdbc().getTableName())) {
-            throw new BeanCreationException("Database table for acceptable usage policy must be specified.");
-        }
+    @ConditionalOnMissingBean(name = "jdbcAcceptableUsagePolicyTransactionTemplate")
+    @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public TransactionOperations jdbcAcceptableUsagePolicyTransactionTemplate(
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier("jdbcAcceptableUsagePolicyTransactionManager")
+        final PlatformTransactionManager jdbcAcceptableUsagePolicyTransactionManager,
+        final CasConfigurationProperties casProperties) throws Exception {
+        return BeanSupplier.of(TransactionOperations.class)
+            .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+            .supply(() -> {
+                val t = new TransactionTemplate(jdbcAcceptableUsagePolicyTransactionManager);
+                t.setIsolationLevelName(casProperties.getAcceptableUsagePolicy().getJdbc().getIsolationLevelName());
+                t.setPropagationBehaviorName(casProperties.getAcceptableUsagePolicy().getJdbc().getPropagationBehaviorName());
+                return t;
+            })
+            .otherwiseProxy()
+            .get();
+    }
 
-        if (StringUtils.isBlank(properties.getJdbc().getSqlUpdate())) {
-            throw new BeanCreationException("SQL to update acceptable usage policy must be specified.");
-        }
-
-        return new JdbcAcceptableUsagePolicyRepository(ticketRegistrySupport.getObject(),
-            casProperties.getAcceptableUsagePolicy(),
-            acceptableUsagePolicyDataSource());
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    @Bean
+    public AcceptableUsagePolicyRepository acceptableUsagePolicyRepository(
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier("acceptableUsagePolicyDataSource")
+        final DataSource acceptableUsagePolicyDataSource,
+        @Qualifier("jdbcAcceptableUsagePolicyTransactionTemplate")
+        final TransactionOperations jdbcAcceptableUsagePolicyTransactionTemplate,
+        final CasConfigurationProperties casProperties,
+        @Qualifier(TicketRegistrySupport.BEAN_NAME)
+        final TicketRegistrySupport ticketRegistrySupport) throws Exception {
+        return BeanSupplier.of(AcceptableUsagePolicyRepository.class)
+            .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+            .supply(() -> new JdbcAcceptableUsagePolicyRepository(ticketRegistrySupport,
+                casProperties.getAcceptableUsagePolicy(),
+                acceptableUsagePolicyDataSource,
+                jdbcAcceptableUsagePolicyTransactionTemplate))
+            .otherwise(AcceptableUsagePolicyRepository::noOp)
+            .get();
     }
 }

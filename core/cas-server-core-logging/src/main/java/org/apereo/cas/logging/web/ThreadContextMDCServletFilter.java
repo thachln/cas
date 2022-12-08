@@ -7,19 +7,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.ObjectProvider;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.Filter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.FilterConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.TimeZone;
+import java.util.UUID;
 
 /**
  * This is {@link ThreadContextMDCServletFilter}.
@@ -30,8 +34,9 @@ import java.util.TimeZone;
 @RequiredArgsConstructor
 public class ThreadContextMDCServletFilter implements Filter {
 
-    private final TicketRegistrySupport ticketRegistrySupport;
-    private final CasCookieBuilder ticketGrantingTicketCookieGenerator;
+    private final ObjectProvider<TicketRegistrySupport> ticketRegistrySupport;
+
+    private final ObjectProvider<CasCookieBuilder> ticketGrantingTicketCookieGenerator;
 
     private static void addContextAttribute(final String attributeName, final Object value) {
         val result = Optional.ofNullable(value).map(Object::toString).orElse(null);
@@ -40,11 +45,6 @@ public class ThreadContextMDCServletFilter implements Filter {
         }
     }
 
-    /**
-     * Does nothing.
-     *
-     * @param filterConfig filter initial configuration. Ignored.
-     */
     @Override
     public void init(final FilterConfig filterConfig) {
     }
@@ -54,6 +54,7 @@ public class ThreadContextMDCServletFilter implements Filter {
                          final FilterChain filterChain) throws IOException, ServletException {
         try {
             val request = (HttpServletRequest) servletRequest;
+            val response = (HttpServletResponse) servletResponse;
 
             addContextAttribute("remoteAddress", request.getRemoteAddr());
             addContextAttribute("remoteUser", request.getRemoteUser());
@@ -74,10 +75,15 @@ public class ThreadContextMDCServletFilter implements Filter {
             addContextAttribute("scheme", request.getScheme());
             addContextAttribute("timezone", TimeZone.getDefault().getDisplayName());
 
+            val requestId = UUID.randomUUID().toString();
+            addContextAttribute("requestId", requestId);
+            request.setAttribute("requestId", requestId);
+            response.setHeader("requestId", requestId);
+
             val params = request.getParameterMap();
             params.keySet()
                 .stream()
-                .filter(k -> !k.equalsIgnoreCase("password"))
+                .filter(k -> !"password".equalsIgnoreCase(k))
                 .forEach(k -> {
                     val values = params.get(k);
                     addContextAttribute(k, Arrays.toString(values));
@@ -89,9 +95,9 @@ public class ThreadContextMDCServletFilter implements Filter {
                 Collections.list(requestHeaderNames).forEach(h -> addContextAttribute(h, request.getHeader(h)));
             }
 
-            val cookieValue = this.ticketGrantingTicketCookieGenerator.retrieveCookieValue(request);
+            val cookieValue = this.ticketGrantingTicketCookieGenerator.getObject().retrieveCookieValue(request);
             if (StringUtils.isNotBlank(cookieValue)) {
-                val p = this.ticketRegistrySupport.getAuthenticatedPrincipalFrom(cookieValue);
+                val p = this.ticketRegistrySupport.getObject().getAuthenticatedPrincipalFrom(cookieValue);
                 if (p != null) {
                     addContextAttribute("principal", p.getId());
                 }
@@ -102,9 +108,6 @@ public class ThreadContextMDCServletFilter implements Filter {
         }
     }
 
-    /**
-     * Does nothing.
-     */
     @Override
     public void destroy() {
     }

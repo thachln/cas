@@ -1,6 +1,7 @@
 package org.apereo.cas.util.serialization;
 
 import lombok.val;
+import org.springframework.http.MediaType;
 
 import java.io.File;
 import java.io.InputStream;
@@ -10,6 +11,7 @@ import java.io.Serializable;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Interface to define operations needed to map objects from/to  clobs.
@@ -19,6 +21,22 @@ import java.util.Collection;
  * @since 4.1.0
  */
 public interface StringSerializer<T> extends Serializable {
+    /**
+     * Helper method with reusable code.
+     *
+     * @param <T>  the type param
+     * @param elem the elem
+     * @return collection
+     */
+    private static <T> Collection<T> makeCollectionOf(T elem) {
+        if (elem != null) {
+            val list = new ArrayList<T>(1);
+            list.add(elem);
+            return list;
+        }
+        return new ArrayList<>(0);
+    }
+
     /**
      * Create the object type from the given  string.
      *
@@ -141,18 +159,15 @@ public interface StringSerializer<T> extends Serializable {
     Class<T> getTypeToSerialize();
 
     /**
-     * Helper method with reusable code.
+     * Read and consum the input
+     * and parse the result into a list/collection.
      *
-     * @param <T> the type param
-     * @param elem the elem
-     * @return collection
+     * @param json the json
+     * @return the list
      */
-    private static <T> Collection<T> makeCollectionOf(T elem) {
-        if (elem != null) {
-            val list = new ArrayList<T>(1);
-            list.add(elem);
-            return list;
-        }
-        return new ArrayList<>(0);
+    List<T> fromList(String json);
+
+    default List<MediaType> getContentTypes() {
+        return List.of(MediaType.TEXT_PLAIN);
     }
 }

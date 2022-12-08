@@ -14,13 +14,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
-import javax.persistence.Column;
-import javax.persistence.DiscriminatorColumn;
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
-import javax.persistence.Lob;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
+import java.io.Serial;
 
 /**
  * Domain object representing a Service Ticket. A service ticket grants specific
@@ -31,40 +25,33 @@ import javax.persistence.Table;
  * @author Scott Battaglia
  * @since 3.0.0
  */
-@Entity
-@Table(name = "SERVICETICKET")
-@DiscriminatorColumn(name = "TYPE")
-@DiscriminatorValue(ServiceTicket.PREFIX)
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 @Slf4j
 @Setter
 @NoArgsConstructor
 @Getter
-public class ServiceTicketImpl extends AbstractTicket implements ServiceTicket {
+public class ServiceTicketImpl extends AbstractTicket
+    implements ServiceTicket, RenewableServiceTicket, ProxyGrantingTicketIssuerTicket {
 
+    @Serial
     private static final long serialVersionUID = -4223319704861765405L;
 
     /**
      * The {@link TicketGrantingTicket} this is associated with.
      */
-    @ManyToOne(targetEntity = TicketGrantingTicketImpl.class)
     @JsonProperty("ticketGrantingTicket")
     private TicketGrantingTicket ticketGrantingTicket;
 
     /**
      * The service this ticket is valid for.
      */
-    @Lob
-    @Column(name = "SERVICE", nullable = false, length = Integer.MAX_VALUE)
     private Service service;
 
     /**
      * Is this service ticket the result of a new login?
      */
-    @Column(name = "FROM_NEW_LOGIN", nullable = false)
     private boolean fromNewLogin;
 
-    @Column(name = "TICKET_ALREADY_GRANTED", nullable = false)
     private Boolean grantedTicketAlready = Boolean.FALSE;
 
     /**
@@ -80,11 +67,12 @@ public class ServiceTicketImpl extends AbstractTicket implements ServiceTicket {
      * @throws IllegalArgumentException if the TicketGrantingTicket or the Service are null.
      */
     @JsonCreator
-    public ServiceTicketImpl(@JsonProperty("id") final @NonNull String id,
-                             @JsonProperty("ticketGrantingTicket") final @NonNull TicketGrantingTicket ticket,
-                             @JsonProperty("service") final @NonNull Service service,
-                             @JsonProperty("credentialProvided") final boolean credentialProvided,
-                             @JsonProperty("expirationPolicy") final ExpirationPolicy policy) {
+    public ServiceTicketImpl(
+        @JsonProperty("id") final @NonNull String id,
+        @JsonProperty("ticketGrantingTicket") final @NonNull TicketGrantingTicket ticket,
+        @JsonProperty("service") final @NonNull Service service,
+        @JsonProperty("credentialProvided") final boolean credentialProvided,
+        @JsonProperty("expirationPolicy") final ExpirationPolicy policy) {
         super(id, policy);
         this.ticketGrantingTicket = ticket;
         this.service = service;
@@ -92,8 +80,10 @@ public class ServiceTicketImpl extends AbstractTicket implements ServiceTicket {
     }
 
     @Override
-    public ProxyGrantingTicket grantProxyGrantingTicket(final @NonNull String id, final @NonNull Authentication authentication,
-                                                        final ExpirationPolicy expirationPolicy) throws AbstractTicketException {
+    public ProxyGrantingTicket grantProxyGrantingTicket(
+        final @NonNull String id,
+        final @NonNull Authentication authentication,
+        final ExpirationPolicy expirationPolicy) throws AbstractTicketException {
         if (this.grantedTicketAlready) {
             LOGGER.warn("Service ticket [{}] issued for service [{}] has already allotted a proxy-granting ticket", getId(), this.service.getId());
             throw new InvalidProxyGrantingTicketForServiceTicketException(this.service);

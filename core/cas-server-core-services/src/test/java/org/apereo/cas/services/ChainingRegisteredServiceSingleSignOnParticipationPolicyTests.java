@@ -1,7 +1,7 @@
 package org.apereo.cas.services;
 
 import org.apereo.cas.authentication.Authentication;
-import org.apereo.cas.ticket.TicketState;
+import org.apereo.cas.ticket.AuthenticationAwareTicket;
 import org.apereo.cas.util.model.TriStateBoolean;
 
 import lombok.val;
@@ -28,23 +28,22 @@ public class ChainingRegisteredServiceSingleSignOnParticipationPolicyTests {
     public void verifyOperation() {
         val input = mock(RegisteredServiceSingleSignOnParticipationPolicy.class);
         when(input.getOrder()).thenCallRealMethod();
-        when(input.isCreateCookieOnRenewedAuthentication()).thenCallRealMethod();
+        when(input.getCreateCookieOnRenewedAuthentication()).thenCallRealMethod();
         assertEquals(0, input.getOrder());
-        assertEquals(TriStateBoolean.UNDEFINED, input.isCreateCookieOnRenewedAuthentication());
+        assertEquals(TriStateBoolean.UNDEFINED, input.getCreateCookieOnRenewedAuthentication());
     }
 
-    
     @Test
     public void verifySsoParticipationByAuthenticationDateFails() {
         val authn = mock(Authentication.class);
         when(authn.getAuthenticationDate()).thenReturn(ZonedDateTime.now(ZoneOffset.UTC).minusSeconds(10));
 
-        val state = mock(TicketState.class);
+        val state = mock(AuthenticationAwareTicket.class);
         when(state.getAuthentication()).thenReturn(authn);
         val chain = new ChainingRegisteredServiceSingleSignOnParticipationPolicy();
         chain.addPolicy(new AuthenticationDateRegisteredServiceSingleSignOnParticipationPolicy(TimeUnit.SECONDS, 1, 0));
 
-        assertFalse(chain.shouldParticipateInSso(state));
+        assertFalse(chain.shouldParticipateInSso(RegisteredServiceTestUtils.getRegisteredService(), state));
     }
 
     @Test
@@ -52,32 +51,31 @@ public class ChainingRegisteredServiceSingleSignOnParticipationPolicyTests {
         val authn = mock(Authentication.class);
         when(authn.getAuthenticationDate()).thenReturn(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(5));
 
-        val state = mock(TicketState.class);
+        val state = mock(AuthenticationAwareTicket.class);
         when(state.getAuthentication()).thenReturn(authn);
         val chain = new ChainingRegisteredServiceSingleSignOnParticipationPolicy();
         chain.addPolicy(new AuthenticationDateRegisteredServiceSingleSignOnParticipationPolicy(TimeUnit.SECONDS, 10, 0));
 
-        assertTrue(chain.shouldParticipateInSso(state));
+        assertTrue(chain.shouldParticipateInSso(RegisteredServiceTestUtils.getRegisteredService(), state));
     }
 
     @Test
     public void verifySsoParticipationByLastUsedTimeFails() {
-        val state = mock(TicketState.class);
+        val state = mock(AuthenticationAwareTicket.class);
         when(state.getLastTimeUsed()).thenReturn(ZonedDateTime.now(ZoneOffset.UTC).minusSeconds(10));
         val chain = new ChainingRegisteredServiceSingleSignOnParticipationPolicy();
         chain.addPolicy(new LastUsedTimeRegisteredServiceSingleSignOnParticipationPolicy(TimeUnit.SECONDS, 1, 0));
-
-        assertFalse(chain.shouldParticipateInSso(state));
+        assertFalse(chain.shouldParticipateInSso(RegisteredServiceTestUtils.getRegisteredService(), state));
     }
 
     @Test
     public void verifySsoParticipationByLastUsedTimePasses() {
-        val state = mock(TicketState.class);
+        val state = mock(AuthenticationAwareTicket.class);
         when(state.getLastTimeUsed()).thenReturn(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(5));
         val chain = new ChainingRegisteredServiceSingleSignOnParticipationPolicy();
         chain.addPolicy(new LastUsedTimeRegisteredServiceSingleSignOnParticipationPolicy(TimeUnit.SECONDS, 10, 0));
 
-        assertTrue(chain.shouldParticipateInSso(state));
+        assertTrue(chain.shouldParticipateInSso(RegisteredServiceTestUtils.getRegisteredService(), state));
     }
 
     @Test
@@ -85,6 +83,6 @@ public class ChainingRegisteredServiceSingleSignOnParticipationPolicyTests {
         val chain = new ChainingRegisteredServiceSingleSignOnParticipationPolicy();
         chain.addPolicies(new LastUsedTimeRegisteredServiceSingleSignOnParticipationPolicy(TimeUnit.SECONDS, 10, 0));
         assertFalse(chain.getPolicies().isEmpty());
-        assertEquals(TriStateBoolean.UNDEFINED, chain.isCreateCookieOnRenewedAuthentication());
+        assertEquals(TriStateBoolean.TRUE, chain.getCreateCookieOnRenewedAuthentication());
     }
 }

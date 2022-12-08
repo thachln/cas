@@ -1,6 +1,7 @@
 package org.apereo.cas.authentication.policy;
 
 import org.apereo.cas.authentication.Authentication;
+import org.apereo.cas.authentication.AuthenticationPolicyExecutionResult;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
@@ -10,6 +11,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
+import java.io.Serial;
 import java.util.Set;
 
 /**
@@ -28,6 +30,7 @@ import java.util.Set;
 @Getter
 public class RequiredAuthenticationHandlerAuthenticationPolicy extends BaseAuthenticationHandlerAuthenticationPolicy {
 
+    @Serial
     private static final long serialVersionUID = -3871692225877293627L;
 
     public RequiredAuthenticationHandlerAuthenticationPolicy(final String requiredHandlerNames) {
@@ -39,7 +42,7 @@ public class RequiredAuthenticationHandlerAuthenticationPolicy extends BaseAuthe
     }
 
     @Override
-    boolean isSatisfiedByInternal(final Authentication authn) {
+    public AuthenticationPolicyExecutionResult isSatisfiedByInternal(final Authentication authn) {
         LOGGER.debug("Examining authentication successes for authentication handler [{}]", getHandlerNames());
         if (!getHandlerNames().isEmpty()) {
             val credsOk = authn.getSuccesses()
@@ -48,12 +51,12 @@ public class RequiredAuthenticationHandlerAuthenticationPolicy extends BaseAuthe
                 .anyMatch(s -> getHandlerNames().contains(s));
 
             if (!credsOk) {
-                LOGGER.warn("Required authentication handler(s) [{}] is not present in the list of recorded successful authentications",
-                    getHandlerNames());
-                return false;
+                LOGGER.info("Required authentication handler(s) [{}] is not present in the list of successful authentications [{}]",
+                    getHandlerNames(), authn.getSuccesses().keySet());
+                return AuthenticationPolicyExecutionResult.failure();
             }
         }
         LOGGER.trace("Authentication policy is satisfied");
-        return true;
+        return AuthenticationPolicyExecutionResult.success();
     }
 }

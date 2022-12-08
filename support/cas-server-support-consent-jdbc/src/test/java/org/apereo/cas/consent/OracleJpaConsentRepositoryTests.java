@@ -1,6 +1,6 @@
 package org.apereo.cas.consent;
 
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import org.junit.jupiter.api.Tag;
 import org.springframework.test.context.TestPropertySource;
@@ -11,10 +11,10 @@ import org.springframework.test.context.TestPropertySource;
  * @author Misagh Moayyed
  * @since 5.2.0
  */
-@EnabledIfPortOpen(port = 1521)
+@EnabledIfListeningOnPort(port = 1521)
 @Tag("Oracle")
 @TestPropertySource(properties = {
-    "cas.jdbc.show-sql=true",
+    "cas.jdbc.show-sql=false",
     "cas.consent.jpa.ddl-auto=create-drop",
     "cas.consent.jpa.user=system",
     "cas.consent.jpa.password=Oradoc_db1",

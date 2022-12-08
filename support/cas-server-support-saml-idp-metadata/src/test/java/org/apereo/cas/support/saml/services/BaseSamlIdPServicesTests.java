@@ -4,7 +4,9 @@ import org.apereo.cas.config.CasCoreHttpConfiguration;
 import org.apereo.cas.config.CoreSamlConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.support.saml.OpenSamlConfigBean;
+import org.apereo.cas.util.http.HttpClient;
 
+import lombok.val;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -25,9 +27,26 @@ import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 public abstract class BaseSamlIdPServicesTests {
     @Autowired
-    @Qualifier("shibboleth.OpenSAMLConfig")
+    @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
     protected OpenSamlConfigBean openSamlConfigBean;
 
     @Autowired
+    @Qualifier("httpClient")
+    protected HttpClient httpClient;
+
+    @Autowired
     protected CasConfigurationProperties casProperties;
+
+
+    protected SamlRegisteredService getSamlRegisteredService(
+        final long id,
+        final String entityId,
+        final String metadataLocation) {
+        val svc = new SamlRegisteredService();
+        svc.setName("AggregatedService-" + id);
+        svc.setId(id);
+        svc.setServiceId(entityId);
+        svc.setMetadataLocation(metadataLocation);
+        return svc;
+    }
 }

@@ -1,11 +1,13 @@
 package org.apereo.cas.configuration.model.core.web.tomcat;
 
+import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,11 +24,13 @@ import java.util.Map;
 @Accessors(chain = true)
 public class CasEmbeddedApacheTomcatHttpProxyProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 9129851352067677264L;
 
     /**
      * Enable the container running in proxy mode.
      */
+    @RequiredProperty
     private boolean enabled;
 
     /**

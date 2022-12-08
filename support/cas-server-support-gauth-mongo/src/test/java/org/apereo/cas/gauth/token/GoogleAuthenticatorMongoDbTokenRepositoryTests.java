@@ -24,8 +24,7 @@ import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguratio
 import org.apereo.cas.config.support.authentication.GoogleAuthenticatorAuthenticationEventExecutionPlanConfiguration;
 import org.apereo.cas.config.support.authentication.GoogleAuthenticatorAuthenticationMultifactorProviderBypassConfiguration;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
-import org.apereo.cas.util.SchedulingUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 import org.apereo.cas.web.config.CasCookieConfiguration;
 import org.apereo.cas.web.flow.config.CasCoreWebflowConfiguration;
 import org.apereo.cas.web.flow.config.CasMultifactorAuthenticationWebflowConfiguration;
@@ -34,15 +33,11 @@ import org.apereo.cas.web.flow.config.CasWebflowContextConfiguration;
 import lombok.Getter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
@@ -77,6 +72,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     GoogleAuthenticatorAuthenticationMultifactorProviderBypassConfiguration.class,
     GoogleAuthenticatorAuthenticationEventExecutionPlanConfiguration.class,
     AopAutoConfiguration.class,
+    WebMvcAutoConfiguration.class,
     CasCoreConfiguration.class,
     CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
     CasCoreUtilConfiguration.class,
@@ -94,28 +90,18 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         "cas.authn.mfa.gauth.mongo.database-name=gauth-token",
         "cas.authn.mfa.gauth.crypto.enabled=false"
     })
-@EnableTransactionManagement(proxyTargetClass = true)
-@EnableAspectJAutoProxy(proxyTargetClass = true)
+@EnableTransactionManagement(proxyTargetClass = false)
+@EnableAspectJAutoProxy(proxyTargetClass = false)
 @EnableScheduling
 @Getter
-@EnabledIfPortOpen(port = 27017)
+@EnabledIfListeningOnPort(port = 27017)
 public class GoogleAuthenticatorMongoDbTokenRepositoryTests extends BaseOneTimeTokenRepositoryTests {
 
+    @Override
     @BeforeEach
     public void initialize() {
+        super.initialize();
         oneTimeTokenAuthenticatorTokenRepository.removeAll();
     }
-
-    @TestConfiguration("MongoTestConfiguration")
-    @Lazy(false)
-    public static class MongoTestConfiguration implements InitializingBean {
-        @Autowired
-        protected ApplicationContext applicationContext;
-
-        @Override
-        public void afterPropertiesSet() {
-            SchedulingUtils.prepScheduledAnnotationBeanPostProcessor(applicationContext);
-        }
-    }
-
+    
 }

@@ -1,6 +1,7 @@
 package org.apereo.cas.oidc.jwks;
 
 import org.apereo.cas.oidc.AbstractOidcTests;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -20,11 +21,12 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Tag("OIDC")
 public class OidcJsonWebKeyStoreJacksonDeserializerTests extends AbstractOidcTests {
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(false).build().toObjectMapper();
 
     @Test
     public void verifyOperation() throws Exception {
-        val key = OidcJsonWebKeyStoreUtils.generateJsonWebKey("rsa", 2048);
+        val key = OidcJsonWebKeyStoreUtils.generateJsonWebKey("rsa", 2048, OidcJsonWebKeyUsage.SIGNING);
         val keyset = new JsonWebKeySet(key).toJson(JsonWebKey.OutputControlLevel.INCLUDE_PRIVATE);
 
         val module = new SimpleModule();

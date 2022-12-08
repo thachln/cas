@@ -4,16 +4,22 @@ title: CAS - Release Notes
 category: Planning
 ---
 
-# RC1 Release Notes
+# 7.0.0-RC1 Release Notes
 
-We strongly recommend that you take advantage of the release candidates as they come out. Waiting for a `GA` release is only going to set 
-you up for unpleasant surprises. A `GA` is simply [a tag and nothing more](https://apereo.github.io/2017/03/08/the-myth-of-ga-rel/). Note that CAS 
-releases are *strictly* time-based releases; they are not scheduled or based on specific benchmarks, statistics or completion of features. To gain 
-confidence in a particular release, it is strongly recommended that you start early by experimenting with release candidates and/or follow-up snapshots.
+We strongly recommend that you take advantage of the release candidates as they come out. Waiting for a `GA` release is only going to set
+you up for unpleasant surprises. A `GA` is [a tag and nothing more](https://apereo.github.io/2017/03/08/the-myth-of-ga-rel/). Note 
+that CAS releases are *strictly* time-based releases; they are not scheduled or based on specific benchmarks, 
+statistics or completion of features. To gain confidence in a particular
+release, it is strongly recommended that you start early by experimenting with release candidates and/or follow-up snapshots.
 
 ## Apereo Membership
 
-If you benefit from Apereo CAS as free and open-source software, we invite you to [join the Apereo Foundation](https://www.apereo.org/content/apereo-membership) and financially support the project at a capacity that best suits your deployment. Note that all development activity is performed *almost exclusively* on a voluntary basis with no expectations, commitments or strings attached. Having the financial means to better sustain engineering activities will allow the developer community to allocate *dedicated and committed* time for long-term support, maintenance and release planning, especially when it comes to addressing critical and security issues in a timely manner. Funding will ensure support for the software you rely on and you gain an advantage and say in the way Apereo, and the CAS project at that, runs and operates. If you consider your CAS deployment to be a critical part of the identity and access management ecosystem, this is a viable option to consider.
+If you benefit from Apereo CAS as free and open-source software, we invite you
+to [join the Apereo Foundation](https://www.apereo.org/content/apereo-membership)
+and financially support the project at a capacity that best suits your deployment. Note that all development activity is performed
+*almost exclusively* on a voluntary basis with no expectations, commitments or strings attached. Having the financial means to better
+sustain engineering activities will allow the developer community to allocate *dedicated and committed* time for long-term support,
+maintenance and release planning, especially when it comes to addressing critical and security issues in a timely manner. 
 
 ## Get Involved
 
@@ -26,179 +32,143 @@ If you benefit from Apereo CAS as free and open-source software, we invite you t
 - [Release Schedule](https://github.com/apereo/cas/milestones)
 - [Release Policy](/cas/developer/Release-Policy.html)
 
-## Overlay
-
-In the `gradle.properties` of the [CAS WAR Overlay](../installation/WAR-Overlay-Installation.html), adjust the following setting:
-
-```properties
-cas.version=6.3.0-RC1
-```
-
-<div class="alert alert-info">
-  <strong>System Requirements</strong><br/>There are no changes to the minimum system/platform requirements for this release.
-</div>
-
 ## New & Noteworthy
 
-### Spring Boot 2.3
+The following items are new improvements and enhancements presented in this release. 
+   
+### JDK Requirement
 
-CAS has switched to Spring Boot `2.3.x.RELEASE`. The CAS Overlay has also been updated to be in sync with this change. While 
-this is classified as a Spring Boot feature/minor release, the effects of the upgrade might be more apparent given the framework's significant usage in CAS.
+The JDK baseline requirement for this CAS release is and **MUST** be JDK `17`. All compatible distributions
+such as Amazon Corretto, Zulu, Eclipse Temurin, etc should work and are implicitly supported.
 
-The following settings are affected by the upgrade and should be adjusted to match below:
+### Testing Strategy
 
-```properties
-server.tomcat.threads.min-spare=10
-server.tomcat.threads.max=200
+The collection of end-to-end browser tests based on Puppeteer continue to grow to cover more use cases 
+and scenarios. At the moment, total number of jobs stands at approximately `342` distinct scenarios. The overall 
+test coverage of the CAS codebase is approximately `94%`.
+ 
+### OpenID Connect Claim Definitions
 
-server.servlet.encoding.charset=UTF-8
-server.servlet.encoding.enabled=true
-server.servlet.encoding.force=true
+Attribute definitions that specifically apply to the release of attributes as part of 
+OpenID Connect responses can be decorated using the [attribute definition store](../authentication/OIDC-Attribute-Definitions.html).
+       
+### CAS Protocol Views
 
-management.endpoint.health.status.order=WARN,DOWN,OUT_OF_SERVICE,UNKNOWN,UP
+CAS Protocol views and responses, previously managed and rendered via Thymeleaf, are now switched to use Mustache as the templating engine.
+This allow CAS to render and log the final output for better visibility and troubleshooting. Protocol responses are sent to the `PROTOCOL_MESSAGE` logger.
 
-server.tomcat.connection-timeout=PT20S
-server.tomcat.max-http-form-post-size=2097152
+### CosmosDb Ticket Registry
 
-server.tomcat.remoteip.port-header=X-Forwarded-Port
-server.tomcat.remoteip.protocol-header=X-Forwarded-Proto
-server.tomcat.remoteip.protocol-header-https-value=https
-server.tomcat.remoteip.remote-ip-header=X-FORWARDED-FOR
-```
+A new ticket registry implementation backed by [Azure Cosmos DB](../ticketing/CosmosDb-Ticket-Registry.html) is now available.
 
-There were no compatibility issues discovered during the upgrade and the configuration namespace remains largely unaffected for CAS. That said, please suspect and verify.
+### OpenID Connect Logging
 
-### Test Coverage via CodeCov
+Authentication requests and responses for OpenID Connect and OAuth are logged via a dedicated 
+logger. Similar to CAS and SAML2 protocols, protocol responses such a profile requests, access token generation, etc 
+are sent to the `PROTOCOL_MESSAGE` logger.
 
-CAS test coverage across all modules in the codebase has now reached `82%` and continues to climb. Additional validation rules are also applied 
-to fail all pull requests that fall below this threshold. This area will be closely monitored and improved
-as progress is made with the goal of hopefully reaching at least `85%` before the final GA release. Of course, this will not be a blocker for the final release.
+### Removed Modules
 
-### Redis Cluster Support
+The following modules that were previously marked as deprecated are now removed from CAS and will no longer
+be supported, maintained or released:
 
-Redis support and configuration namespace are now capable of supporting connections to Redis clusters.
+- OpenID Protocol
+- Digest Authentication
+- Apache Shiro Authentication
+- Apache Fortress Authentication
+- Ehcache Ticket Registry
+- SwivelSecure Multifactor Authentication
+- Acceptto Multifactor Authentication
+- Infinispan Ticket Registry
+- Couchbase Ticket Registry
+- Scripted Attribute Repository
+- Scripted Registered Service Attribute Release Policy
+- Scripted Username Attribute Provider
+- NTLM Authentication
+- SCIM v1 Provisioning 
 
-### DynamoDb Storage for CAS Events
+### Conditional Access Strategy
 
-[CAS Events](../installation/Configuring-Authentication-Events.html) can now be stored in DynamoDb instances.
+The ABAC authorization policy assigned to a registered service can 
+now be [conditionally activated](../services/Service-Access-Strategy-ABAC-Activation.html).
 
-### Couchbase Acceptable Usage Policy
+### Attribute Definitions
 
-[Acceptable Usage Policy](../webflow/Webflow-Customization-AUP.html) decisions can now be managed and tracked via Couchbase databases.
+[Attribute definitions](../integration/Attribute-Definitions.html) can now be dynamically and programmatically registered with CAS via a dedicated API.
 
-### SAML2 Metadata via Git Repositories
+### OAuth2/UMA Scopes
 
-[SAML2 Metadata](../installation/Configuring-SAML2-DynamicMetadata.html) artifacts can now be fetched and pulled from Git repositories. This capability supports both service and identity provider artifacts.
+Certain OAuth2 and/or UMA authorization requests are now able to enforce scope access by comparing requested scopes in the authorization
+request with what must be explicitly allowed in the registered service definition. In other words, scopes can only be allowed and requested
+if they are already authorized for the application definition in CAS.
 
-### Multifactor Authentication Webflows
+### SAML2 Metadata Resolution
 
-Webflow definitions for multifactor authentication providers (i.e Google Authenticator, Authy, etc) are now constructed dynamically 
-at runtime via webflow auto-configuration rather than static XML definitions. This allows for better flexibility as well as test coverage when it comes to customizations.
+In the event that a SAML2 service provider is configured to download metadata from a URL, CAS may now attempt to reuse the previously-downloaded
+backup file on disk for the service provider, if the metadata file is still seen as valid. This capability will require the forceful fetching
+of the metadata over HTTP to be disabled.
 
-### U2F Multifactor Authentication Trusted Devices
+### Delegated Authentication Dynamic Discovery
 
-Support for [Multifactor Authentication Trusted Device/Browser](../mfa/Multifactor-TrustedDevice-Authentication.html) is now extended 
-to also include [U2F](../mfa/FIDO-U2F-Authentication.html). Furthermore, a number of new administrative actuator endpoints are 
-presented to report back on the registered devices or delete/deregister devices.
+[Dynamic Discovery](../integration/Delegate-Authentication-DiscoverySelection.html) configured for delegated authentication is able to
+start the delegation flow based on a principal attribute that would then be matched against the configuration rules to locate the 
+appropriate external identity provider.
+     
+### AMQP Ticket Registry
 
-### Authentication Actuator Endpoints
+The JMS ticket registry has now been removed and replaced with a ticket registry implementation that is backed by the AMQP protocol
+and RabbitMQ. [See this](../ticketing/Messaging-AMQP-Ticket-Registry.html) for more info. 
+ 
+### SAML2 Attribute Definitions
 
-A number of new [administrative actuator endpoints](../installation/Configuring-Authentication-Components.html) are presented 
-to report back on the registered authentication handlers and policies.
+[SAML2 attribute definitions](../installation/Configuring-SAML2-Attribute-Definitions.html) can now register persistent attribute definitions.
 
-### DynamoDb Storage for U2F Multifactor Authentication
+### Docker Images
 
-[U2F Multifactor Authentication](../mfa/FIDO-U2F-Authentication.html) devices can now be stored in DynamoDb instances.
+A number of Docker images used for integration testing are now upgraded to their latest available versions:
 
-### Gradle Remote Build Cache
-
-The CAS Gradle build is now connected to a remote build cache server to maximize performance for continuous integration builds.
-
-![image](https://user-images.githubusercontent.com/1205228/84562682-9d46f300-ad6b-11ea-8ed8-3042a3facbec.png)
-
-### Google Authenticator Account Registration
-
-Google Authenticator for multifactor authentication is now enhanced to ask for tokens prior to finalizing the account registration process. Once the provided token is validated, the account will be registered with CAS and is prepared for follow-up multifactor authentication.
-
-![image](https://user-images.githubusercontent.com/1205228/86023135-83323380-ba40-11ea-8d16-4fe8ff560c99.png)
-
-### Apache JMeter Performance Tests
-
-[Apache JMeter performance tests](../high_availability/Performance-Testing-JMeter.html) that ship with CAS are now 
-added to [GitHub Actions](https://github.com/apereo/cas/actions). At this point, only the *CAS* variant is tested and 
-other test categories for SAML2 and OAuth will be gradually added once a CAS runtime context (i.e. WAR Overlay) can 
-be dynamically constructed on-demand with a module selection menu. The goal is to ensure the JMeter test artifacts 
-and scripts are maintainable and manageable from one CAS release to the next.
-
-### Google Firebase Cloud Messaging
-
-Preliminary support is available for notification based on [Google Firebase Cloud Messaging](../notifications/Notifications-Configuration.html). The very first consumer
-of this feature is the [Simple Multifactor Authentication](../mfa/Simple-Multifactor-Authentication.html) module.
-
-### Service Registry Replication via Apache Kafka
-
-In the event that CAS service definitions are not managed globally via a centralized store, definitions need to be kept in 
-sync throughout all CAS nodes in a cluster when more than one node is deployed. If you’d rather not resort to outside tooling and processes or if the native options for your 
-deployment are not that attractive, you can take advantage of CAS’ own tooling [backed by Apache Kafka](../services/Configuring-Service-Replication.html) that provides a 
-distributed cache to broadcast service definition files across the cluster.
-
-### Google Authenticator Multiple Devices
-
-<div class="alert alert-warning">
-  <strong>WATCH OUT!</strong><br />This may be a breaking change. The underlying data models and repository implementations that manage device records for users are modified to handle a collection of devices per user. This does affect database or filesystem schemas and API calls where a collection is expected instead of a single result.
-</div>
-
-Google Authenticator for multifactor authentication is now allowed to accept and register multiple devices. Accounts or devices must be assigned a name on registration that is used for the device selection menu when multiple registration records are found. When validating Google Authenticator tokens via REST, the account identifier must be specified if the user account has more than one registered device. Furthermore, note that allowing multiple devices per user is controlled via CAS settings and is disabled by default to preserve behavioral compatibility with previous versions.
-
-|   |  |
-| ------------- | ------------- |
-| ![image](https://user-images.githubusercontent.com/1205228/85271898-ad0fb700-b490-11ea-9f69-60ae4aa59bd2.png) | ![image](https://user-images.githubusercontent.com/1205228/85271811-8a7d9e00-b490-11ea-9d49-5689f7f539f2.png) |
-
-### DynamoDb Storage for YubiKey Devices
-
-[YubiKey Devices](../mfa/YubiKey-Authentication.html) can now be stored in DynamoDb instances.
-
-### Swagger Integration
-
-[Swagger Integration](../integration/Swagger-Integration.html) can is upgraded to use Swagger v2 via [SpringDoc](https://springdoc.org/).
+- LocalStack
+- Apereo CAS
+- Apache Cassandra
+- Couchbase Server
+- Amazon DynamoDb
+- InfluxDb
+- MariaDb
+- MongoDb
+- MySQL
+- PostgreSQL
+- Redis
 
 ## Other Stuff
+   
+- A [Redis-based health indicator](../monitoring/Configuring-Monitoring-Redis.html) is available to report back on the health status of 
+  Redis connections. 
+- [Registered Service ABAC policy](../services/Service-Access-Strategy-ABAC.html) can now support inline Groovy conditions for attributes.
+- [CAS configuration security](../configuration/Configuration-Properties-Security-CAS.html) via Jasypt is able to respect the IV 
+  generation flag based on algorithms.
+- Embedded YAML application configuration files are able to override default application properties that ship with CAS.
+- Authentication context classes in the SAML2 response can be determined from context mapping settings when no specific context class is present in the 
+  SAML2 authentication context.
+- Integration tests for [CosmosDb Service Registry](../services/CosmosDb-Service-Management.html) are now turned on using a Azure Cosmos DB account on Azure 
+  free services.
+- SAML2 metadata resolution for service providers are now sent to the CAS audit log and recorded under `SAML2_METADATA_RESOLUTION`.
+- Support for [Google Analytics 4](../integration/Configuring-Google-Analytics.html) is now included.
+- Small improvements to how [Redis Ticket Registry](../ticketing/Redis-Ticket-Registry.html) can count ticket types.
+- [Auditable CAS events](../audits/Audits.html) are now automatically collected and displayed in the documentation.
 
-- Attribute definitions mapped to an external Groovy script are corrected to handle caching in more resource-friendly ways.
-- The management of service definitions is now delegating search operations to the service registry rather than filtering matches internally while also utilizing a caching layer to improve performance as much as possible.
-- Generation of OAuth/OIDC `code` tokens is now properly audited. Additionally, the `who` flag for OAuth/OIDC functionality is restored back to the active principal id.
-- The authentication strategy backed by [Apache Syncope](../installation/Syncope-Authentication.html) is enhanced to not require a dependency on Apache Syncope modules, allowing the integration to work with all Apache Syncope versions. Additional improvements are put in to ensure the configuration can comply with reload requests and the likes of `@RefreshScope`.
-- The eligibility of passwordless accounts for multifactor & delegated authentication has switched to a `TriStateBoolean` type to allow for easier overrides and undefined states when examined against the global settings.
-- When working with Git integrations, username and email attributes used for commit operations are now resolved via local, global and system git configuration before falling back onto default CAS-controlled values.
-- Service management `findServiceBy()` operations are now delegated to the service registry directly with a modest cache layer in between to improve and preserve performance as much as possible.
-- Test improvements to reduce the number of duplicate configuration classes required to bootstrap the runtime context.
-- OpenID Connect ID tokens can now be correctly signed using the algorithm fetched from the keystore, and the `iss` field should properly reflect the configured issuer in CAS configuration.
-- [Locust performance tests](../high_availability/Performance-Testing-Locust.html) are now upgraded to use locust `1.1`.
-- Generation of id tokens or user-info payloads for OAuth or OpenID Connect are now hardenized to prevent the `none` algorithm if undefined in discovery settings.
- 
 ## Library Upgrades
 
-- ErrorProne Compiler
-- UnboundID LDAP SDK
+- Spring 
 - Spring Boot
-- Spring Cloud
-- Spring Data
-- Spring Boot Admin
+- Mockito
 - Nimbus
-- Swagger
-- Swagger
-- Amazon SDK
-- Apache Tomcat
+- Twilio
+- Netty
+- JGit
+- Spring Cloud
 - Pac4j
-- Twillio
-- ActiveMQ
-- BouncyCastle
-- Swagger
-- DropWizard
-- Apache Curator
-- Locust
-- OpenSAML
-- Oshi
-- Couchbase Driver
-- MongoDb Driver
-- Nimbus OIDC
+- Couchbase Client
+- Micrometer
+- Apache Tomcat
+- Puppeteer
+- Spring Shell

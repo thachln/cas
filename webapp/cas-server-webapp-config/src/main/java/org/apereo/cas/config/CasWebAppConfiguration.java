@@ -1,17 +1,20 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.util.spring.RefreshableHandlerInterceptor;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -24,9 +27,12 @@ import org.springframework.web.servlet.mvc.ParameterizableViewController;
 import org.springframework.web.servlet.mvc.UrlFilenameViewController;
 import org.springframework.web.servlet.theme.ThemeChangeInterceptor;
 import org.springframework.web.servlet.view.RedirectView;
+import org.springframework.web.util.CookieGenerator;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.annotation.Nonnull;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Optional;
@@ -37,32 +43,27 @@ import java.util.Optional;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration(value = "casWebAppConfiguration", proxyBeanMethods = false)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-public class CasWebAppConfiguration implements WebMvcConfigurer {
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("localeChangeInterceptor")
-    private ObjectProvider<LocaleChangeInterceptor> localeChangeInterceptor;
-
-    @RefreshScope
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.WebApplication)
+@AutoConfiguration
+public class CasWebAppConfiguration {
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @Bean
-    public ThemeChangeInterceptor themeChangeInterceptor() {
+    public ThemeChangeInterceptor themeChangeInterceptor(final CasConfigurationProperties casProperties) {
         val bean = new ThemeChangeInterceptor();
         bean.setParamName(casProperties.getTheme().getParamName());
         return bean;
     }
 
-    @ConditionalOnMissingBean(name = "localeResolver")
+    @ConditionalOnMissingBean(name = "casLocaleResolver")
     @Bean
-    public LocaleResolver localeResolver() {
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public LocaleResolver localeResolver(final CasConfigurationProperties casProperties) {
         val localeProps = casProperties.getLocale();
         val localeCookie = localeProps.getCookie();
 
         val resolver = new CookieLocaleResolver() {
+            @Nonnull
             @Override
             protected Locale determineDefaultLocale(final HttpServletRequest request) {
                 val locale = request.getLocale();
@@ -70,11 +71,11 @@ public class CasWebAppConfiguration implements WebMvcConfigurer {
                     || !locale.getLanguage().equals(localeProps.getDefaultValue())) {
                     return locale;
                 }
-                return new Locale(localeProps.getDefaultValue());
+                return Locale.forLanguageTag(localeProps.getDefaultValue());
             }
         };
         resolver.setCookieDomain(localeCookie.getDomain());
-        resolver.setCookiePath(StringUtils.defaultIfBlank(localeCookie.getPath(), CookieLocaleResolver.DEFAULT_COOKIE_PATH));
+        resolver.setCookiePath(StringUtils.defaultIfBlank(localeCookie.getPath(), CookieGenerator.DEFAULT_COOKIE_PATH));
         resolver.setCookieHttpOnly(localeCookie.isHttpOnly());
         resolver.setCookieSecure(localeCookie.isSecure());
         resolver.setCookieName(StringUtils.defaultIfBlank(localeCookie.getName(), CookieLocaleResolver.DEFAULT_COOKIE_NAME));
@@ -85,9 +86,8 @@ public class CasWebAppConfiguration implements WebMvcConfigurer {
     }
 
     @Bean
-    @Autowired
-    public SimpleUrlHandlerMapping handlerMapping(@Qualifier("rootController")
-                                                  final Controller rootController) {
+    public SimpleUrlHandlerMapping handlerMapping(
+        @Qualifier("rootController") final Controller rootController) {
         val mapping = new SimpleUrlHandlerMapping();
 
         mapping.setOrder(1);
@@ -100,10 +100,16 @@ public class CasWebAppConfiguration implements WebMvcConfigurer {
         return mapping;
     }
 
-    @Override
-    public void addInterceptors(final InterceptorRegistry registry) {
-        registry.addInterceptor(localeChangeInterceptor.getObject())
-            .addPathPatterns("/**");
+    @Bean
+    public WebMvcConfigurer casWebAppWebMvcConfigurer(
+        @Qualifier("localeChangeInterceptor") final ObjectProvider<LocaleChangeInterceptor> localeChangeInterceptor) {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(
+                @Nonnull final InterceptorRegistry registry) {
+                registry.addInterceptor(new RefreshableHandlerInterceptor(localeChangeInterceptor)).addPathPatterns("/**");
+            }
+        };
     }
 
     @Bean
@@ -111,11 +117,12 @@ public class CasWebAppConfiguration implements WebMvcConfigurer {
     public Controller rootController() {
         return new ParameterizableViewController() {
             @Override
-            protected ModelAndView handleRequestInternal(final HttpServletRequest request,
-                                                         final HttpServletResponse response) {
+            protected ModelAndView handleRequestInternal(
+                @Nonnull final HttpServletRequest request,
+                @Nonnull final HttpServletResponse response) {
                 val queryString = request.getQueryString();
                 val url = request.getContextPath() + "/login"
-                    + Optional.ofNullable(queryString).map(string -> '?' + string).orElse(StringUtils.EMPTY);
+                          + Optional.ofNullable(queryString).map(value -> '?' + value).orElse(StringUtils.EMPTY);
                 return new ModelAndView(new RedirectView(response.encodeURL(url)));
             }
 

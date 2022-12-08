@@ -7,7 +7,10 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This is {@link BaseRestEndpointProperties}.
@@ -20,6 +23,7 @@ import java.io.Serializable;
 @RequiresModule(name = "cas-server-core-util", automated = true)
 @Accessors(chain = true)
 public class BaseRestEndpointProperties implements Serializable {
+    @Serial
     private static final long serialVersionUID = 2687020856160473089L;
 
     /**
@@ -39,4 +43,13 @@ public class BaseRestEndpointProperties implements Serializable {
      * specify the password for authentication.
      */
     private String basicAuthPassword;
+
+    /**
+     * Headers, defined as a Map, to include in the request when making the REST call.
+     * Will overwrite any header that CAS is pre-defined to
+     * send and include in the request. Key in the map should be the header name
+     * and the value in the map should be the header value.
+     */
+    private Map<String, String> headers = new HashMap<>();
+
 }

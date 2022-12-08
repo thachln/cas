@@ -3,11 +3,13 @@ package org.apereo.cas.redis;
 import org.apereo.cas.authentication.AuthenticationHandler;
 import org.apereo.cas.authentication.credential.UsernamePasswordCredential;
 import org.apereo.cas.authentication.exceptions.AccountPasswordMustChangeException;
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.config.CasCoreAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationHandlersConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationMetadataConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPolicyConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPrincipalConfiguration;
+import org.apereo.cas.config.CasCoreAuthenticationServiceSelectionStrategyConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationSupportConfiguration;
 import org.apereo.cas.config.CasCoreConfiguration;
 import org.apereo.cas.config.CasCoreHttpConfiguration;
@@ -23,9 +25,10 @@ import org.apereo.cas.config.CasPersonDirectoryConfiguration;
 import org.apereo.cas.config.RedisAuthenticationConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
+import org.apereo.cas.redis.core.CasRedisTemplate;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.DigestUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +38,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import javax.security.auth.login.AccountExpiredException;
@@ -45,6 +47,7 @@ import javax.security.auth.login.FailedLoginException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * This is {@link RedisAuthenticationHandlerTests}.
@@ -62,6 +65,7 @@ import static org.junit.jupiter.api.Assertions.*;
     CasCoreAuthenticationMetadataConfiguration.class,
     CasCoreAuthenticationSupportConfiguration.class,
     CasCoreAuthenticationHandlersConfiguration.class,
+    CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
     CasCoreHttpConfiguration.class,
     CasCoreTicketCatalogConfiguration.class,
     CasCoreTicketIdGeneratorsConfiguration.class,
@@ -82,7 +86,7 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 @EnableScheduling
 @Tag("Redis")
-@EnabledIfPortOpen(port = 6379)
+@EnabledIfListeningOnPort(port = 6379)
 public class RedisAuthenticationHandlerTests {
 
     @Autowired
@@ -91,7 +95,7 @@ public class RedisAuthenticationHandlerTests {
 
     @Autowired
     @Qualifier("authenticationRedisTemplate")
-    private RedisTemplate authenticationRedisTemplate;
+    private CasRedisTemplate authenticationRedisTemplate;
 
     @BeforeEach
     public void initialize() {
@@ -110,7 +114,7 @@ public class RedisAuthenticationHandlerTests {
 
     @Test
     public void verifySuccessful() throws Exception {
-        val result = authenticationHandler.authenticate(new UsernamePasswordCredential("casuser", "caspassword"));
+        val result = authenticationHandler.authenticate(new UsernamePasswordCredential("casuser", "caspassword"), mock(Service.class));
         assertNotNull(result);
         val principal = result.getPrincipal();
         assertNotNull(principal);
@@ -122,30 +126,30 @@ public class RedisAuthenticationHandlerTests {
     @Test
     public void verifyNotFound() {
         assertThrows(AccountNotFoundException.class,
-            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("123456", "caspassword")));
+            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("123456", "caspassword"), mock(Service.class)));
     }
 
     @Test
     public void verifyInvalid() {
         assertThrows(FailedLoginException.class,
-            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("casuser", "badpassword")));
+            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("casuser", "badpassword"), mock(Service.class)));
     }
 
     @Test
     public void verifyExpired() {
         assertThrows(AccountExpiredException.class,
-            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("casexpired", "caspassword")));
+            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("casexpired", "caspassword"), mock(Service.class)));
     }
 
     @Test
     public void verifyLocked() {
         assertThrows(AccountLockedException.class,
-            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("caslocked", "caspassword")));
+            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("caslocked", "caspassword"), mock(Service.class)));
     }
 
     @Test
     public void verifyChangePsw() {
         assertThrows(AccountPasswordMustChangeException.class,
-            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("caschangepsw", "caspassword")));
+            () -> authenticationHandler.authenticate(new UsernamePasswordCredential("caschangepsw", "caspassword"), mock(Service.class)));
     }
 }

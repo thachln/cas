@@ -2,8 +2,9 @@ description = "Apereo CAS SCIM 2 Provisioning Support"
 dependencies {
     api project(":api:cas-server-core-api-webflow")
 
-    implementation libraries.unboundidscim
-
+    implementation libraries.scimsdk
+    implementation libraries.pac4jcore
+    
     implementation project(":core:cas-server-core-util-api")
     implementation project(":core:cas-server-core-web-api")
     implementation project(":core:cas-server-core-web")
@@ -18,6 +19,9 @@ dependencies {
     implementation project(":core:cas-server-core-configuration-api")
     implementation project(":core:cas-server-core-authentication-mfa")
 
+    implementation project(":support:cas-server-support-scim-core")
+    implementation project(":support:cas-server-support-actions-core")
+    
     testImplementation project(":core:cas-server-core-util")
     testImplementation project(":core:cas-server-core")
     testImplementation project(":core:cas-server-core-notifications")
@@ -27,8 +31,11 @@ dependencies {
     testImplementation project(":core:cas-server-core-configuration")
     testImplementation project(":core:cas-server-core-authentication")
 
+    testImplementation project(":support:cas-server-support-pac4j-core")
+
     testImplementation project(path: ":core:cas-server-core-webflow", configuration: "tests")
     testImplementation project(path: ":core:cas-server-core-authentication", configuration: "tests")
+    testImplementation project(path: ":core:cas-server-core-services", configuration: "tests")
     testImplementation project(path: ":core:cas-server-core", configuration: "tests")
     testImplementation project(path: ":core:cas-server-core-authentication-api", configuration: "tests")
     testImplementation project(path: ":core:cas-server-core-util-api", configuration: "tests")

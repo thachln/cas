@@ -6,12 +6,14 @@ import org.apereo.cas.authentication.MultifactorAuthenticationTrigger;
 import org.apereo.cas.authentication.mfa.TestMultifactorAuthenticationProvider;
 import org.apereo.cas.config.CasCoreAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPrincipalConfiguration;
+import org.apereo.cas.config.CasCoreAuthenticationServiceSelectionStrategyConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationSupportConfiguration;
 import org.apereo.cas.config.CasCoreConfiguration;
 import org.apereo.cas.config.CasCoreHttpConfiguration;
 import org.apereo.cas.config.CasCoreMultifactorAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreNotificationsConfiguration;
 import org.apereo.cas.config.CasCoreServicesConfiguration;
+import org.apereo.cas.config.CasCoreTicketCatalogConfiguration;
 import org.apereo.cas.config.CasCoreTicketIdGeneratorsConfiguration;
 import org.apereo.cas.config.CasCoreTicketsConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
@@ -33,10 +35,12 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -49,11 +53,13 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(classes = {
     RadiusConfiguration.class,
     RefreshAutoConfiguration.class,
+    WebMvcAutoConfiguration.class,
     CasCoreAuthenticationPrincipalConfiguration.class,
     CasCoreAuthenticationSupportConfiguration.class,
     CasPersonDirectoryTestConfiguration.class,
     CasCoreMultifactorAuthenticationConfiguration.class,
     CasMultifactorAuthenticationWebflowConfiguration.class,
+    CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
     CasCoreWebConfiguration.class,
     CasCoreAuthenticationConfiguration.class,
     CasCoreWebflowConfiguration.class,
@@ -63,6 +69,7 @@ import static org.junit.jupiter.api.Assertions.*;
     CasCoreNotificationsConfiguration.class,
     CasCoreServicesConfiguration.class,
     CasCoreTicketsConfiguration.class,
+    CasCoreTicketCatalogConfiguration.class,
     CasCoreLogoutConfiguration.class,
     CasCookieConfiguration.class,
     CasCoreHttpConfiguration.class,
@@ -87,9 +94,11 @@ public class RadiusAccessChallengedMultifactorAuthenticationTriggerTests {
     public void verifyTriggerInactive() {
         assertTrue(multifactorAuthenticationTrigger.isActivated(CoreAuthenticationTestUtils.getAuthentication(),
             CoreAuthenticationTestUtils.getRegisteredService(), new MockHttpServletRequest(),
+            new MockHttpServletResponse(),
             CoreAuthenticationTestUtils.getService()).isEmpty());
         assertTrue(multifactorAuthenticationTrigger.isActivated(null,
             CoreAuthenticationTestUtils.getRegisteredService(), new MockHttpServletRequest(),
+            new MockHttpServletResponse(),
             CoreAuthenticationTestUtils.getService()).isEmpty());
     }
 
@@ -101,6 +110,7 @@ public class RadiusAccessChallengedMultifactorAuthenticationTriggerTests {
 
         assertThrows(AuthenticationException.class, () -> multifactorAuthenticationTrigger.isActivated(authn,
             CoreAuthenticationTestUtils.getRegisteredService(), new MockHttpServletRequest(),
+            new MockHttpServletResponse(),
             CoreAuthenticationTestUtils.getService()));
 
         TestMultifactorAuthenticationProvider.registerProviderIntoApplicationContext(applicationContext);
@@ -110,6 +120,7 @@ public class RadiusAccessChallengedMultifactorAuthenticationTriggerTests {
 
         assertTrue(multifactorAuthenticationTrigger.isActivated(authnMfa,
             CoreAuthenticationTestUtils.getRegisteredService(), new MockHttpServletRequest(),
+            new MockHttpServletResponse(),
             CoreAuthenticationTestUtils.getService()).isPresent());
     }
 }

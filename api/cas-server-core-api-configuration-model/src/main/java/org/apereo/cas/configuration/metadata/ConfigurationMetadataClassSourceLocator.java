@@ -1,17 +1,14 @@
 package org.apereo.cas.configuration.metadata;
 
+import org.apereo.cas.util.ReflectionUtils;
+
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import lombok.val;
-import org.reflections.Reflections;
-import org.reflections.scanners.SubTypesScanner;
-import org.reflections.scanners.TypeElementsScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
 
 import java.io.File;
-import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * This is {@link ConfigurationMetadataClassSourceLocator}.
@@ -20,6 +17,8 @@ import java.util.Map;
  * @since 6.0.0
  */
 public class ConfigurationMetadataClassSourceLocator {
+
+    private static final Pattern GENERIC_TYPED_CLASS = Pattern.compile("\\w+<(\\w+)>");
 
     private static ConfigurationMetadataClassSourceLocator INSTANCE;
 
@@ -56,26 +55,19 @@ public class ConfigurationMetadataClassSourceLocator {
      * @return the class
      */
     public Class locatePropertiesClassForType(final ClassOrInterfaceType type) {
-        if (cachedPropertiesClasses.containsKey(type.getNameAsString())) {
-            return cachedPropertiesClasses.get(type.getNameAsString());
+        var typeName = type.getNameAsString();
+        if (cachedPropertiesClasses.containsKey(typeName)) {
+            return cachedPropertiesClasses.get(typeName);
         }
 
-        val packageName = ConfigurationMetadataGenerator.class.getPackage().getName();
-        val reflections =
-            new Reflections(new ConfigurationBuilder()
-                .filterInputsBy(s -> s != null && s.contains(type.getNameAsString()))
-                .setUrls(ClasspathHelper.forPackage(packageName))
-                .setScanners(new TypeElementsScanner()
-                        .includeFields(false)
-                        .includeMethods(false)
-                        .includeAnnotations(false)
-                        .filterResultsBy(s -> s != null && s.endsWith(type.getNameAsString())),
-                    new SubTypesScanner(false)));
-        val clz = reflections.getSubTypesOf(Serializable.class).stream()
-            .filter(c -> c.getSimpleName().equalsIgnoreCase(type.getNameAsString()))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Cant locate class for " + type.getNameAsString()));
-        cachedPropertiesClasses.put(type.getNameAsString(), clz);
+        val matcher = GENERIC_TYPED_CLASS.matcher(type.toString());
+        if (matcher.matches()) {
+            typeName = matcher.group(1);
+        }
+
+        val error = new IllegalArgumentException("Cant locate class for " + typeName);
+        val clz = ReflectionUtils.findClassBySimpleNameInPackage(typeName, "org.apereo.cas").orElseThrow(() -> error);
+        cachedPropertiesClasses.put(typeName, clz);
         return clz;
     }
 }

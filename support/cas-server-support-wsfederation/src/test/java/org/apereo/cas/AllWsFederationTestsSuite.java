@@ -3,6 +3,7 @@ package org.apereo.cas;
 import org.apereo.cas.support.wsfederation.WsFederationAttributeMutatorTests;
 import org.apereo.cas.support.wsfederation.WsFederationHelperTests;
 import org.apereo.cas.support.wsfederation.attributes.GroovyWsFederationAttributeMutatorTests;
+import org.apereo.cas.support.wsfederation.authentication.crypto.WsFederationMetadataCertificateProviderTests;
 import org.apereo.cas.support.wsfederation.authentication.handler.support.WsFederationAuthenticationHandlerTests;
 import org.apereo.cas.support.wsfederation.authentication.principal.WsFederationCredentialTests;
 import org.apereo.cas.support.wsfederation.authentication.principal.WsFederationCredentialsToPrincipalResolverAllResolutionTests;
@@ -11,9 +12,8 @@ import org.apereo.cas.support.wsfederation.authentication.principal.WsFederation
 import org.apereo.cas.support.wsfederation.web.WsFederationCookieManagerTests;
 import org.apereo.cas.support.wsfederation.web.WsFederationNavigationControllerTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * Test suite to run all tests.
@@ -25,6 +25,7 @@ import org.junit.runner.RunWith;
     WsFederationCredentialsToPrincipalResolverAllResolutionTests.class,
     WsFederationCredentialsToPrincipalResolverCasResolutionTests.class,
     WsFederationHelperTests.class,
+    WsFederationMetadataCertificateProviderTests.class,
     WsFederationAuthenticationHandlerTests.class,
     WsFederationNavigationControllerTests.class,
     WsFederationCookieManagerTests.class,
@@ -33,6 +34,6 @@ import org.junit.runner.RunWith;
     WsFederationAttributeMutatorTests.class,
     WsFederationCredentialTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class AllWsFederationTestsSuite {
 }

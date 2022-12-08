@@ -7,13 +7,14 @@ import org.apereo.cas.config.CasCoreUtilConfiguration;
 import org.apereo.cas.config.CasCoreWebConfiguration;
 import org.apereo.cas.config.CasSupportMongoDbAuditConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import org.apereo.inspektr.audit.AuditTrailManager;
 import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 
@@ -30,6 +31,7 @@ import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
     CasCoreHttpConfiguration.class,
     CasWebApplicationServiceFactoryConfiguration.class,
     RefreshAutoConfiguration.class,
+    WebMvcAutoConfiguration.class,
     CasCoreWebConfiguration.class
 },
     properties = {
@@ -44,7 +46,7 @@ import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
     })
 @Tag("MongoDb")
 @Getter
-@EnabledIfPortOpen(port = 27017)
+@EnabledIfListeningOnPort(port = 27017)
 public class MongoDbAuditTrailManagerTests extends BaseAuditConfigurationTests {
 
     @Autowired

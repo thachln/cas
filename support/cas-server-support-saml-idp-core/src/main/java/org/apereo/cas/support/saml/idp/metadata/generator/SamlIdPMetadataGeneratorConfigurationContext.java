@@ -1,14 +1,16 @@
 package org.apereo.cas.support.saml.idp.metadata.generator;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.support.saml.OpenSamlConfigBean;
 import org.apereo.cas.support.saml.idp.metadata.locator.SamlIdPMetadataLocator;
 import org.apereo.cas.support.saml.idp.metadata.writer.SamlIdPCertificateAndKeyWriter;
 import org.apereo.cas.util.crypto.CipherExecutor;
 
-import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
+import org.apache.velocity.app.VelocityEngine;
 import org.springframework.context.ConfigurableApplicationContext;
 
 /**
@@ -20,7 +22,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 @ToString
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 public class SamlIdPMetadataGeneratorConfigurationContext {
     private final SamlIdPMetadataLocator samlIdPMetadataLocator;
 
@@ -31,4 +33,8 @@ public class SamlIdPMetadataGeneratorConfigurationContext {
     private final ConfigurableApplicationContext applicationContext;
 
     private final CasConfigurationProperties casProperties;
+
+    private final OpenSamlConfigBean openSamlConfigBean;
+
+    private final VelocityEngine velocityEngine;
 }

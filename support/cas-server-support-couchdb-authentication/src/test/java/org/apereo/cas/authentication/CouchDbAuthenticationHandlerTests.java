@@ -1,11 +1,13 @@
 package org.apereo.cas.authentication;
 
 import org.apereo.cas.authentication.principal.PrincipalFactory;
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.config.CasCoreAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationHandlersConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationMetadataConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPolicyConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPrincipalConfiguration;
+import org.apereo.cas.config.CasCoreAuthenticationServiceSelectionStrategyConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationSupportConfiguration;
 import org.apereo.cas.config.CasCoreConfiguration;
 import org.apereo.cas.config.CasCoreHttpConfiguration;
@@ -25,10 +27,9 @@ import org.apereo.cas.couchdb.core.CouchDbConnectorFactory;
 import org.apereo.cas.couchdb.core.ProfileCouchDbRepository;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
 import org.apereo.cas.util.CollectionUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
-import lombok.SneakyThrows;
 import lombok.val;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +47,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * This is {@link CouchDbAuthenticationHandlerTests}.
@@ -65,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.*;
     CasCoreAuthenticationMetadataConfiguration.class,
     CasCoreAuthenticationSupportConfiguration.class,
     CasCoreAuthenticationHandlersConfiguration.class,
+    CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
     CasCoreTicketIdGeneratorsConfiguration.class,
     CasCoreHttpConfiguration.class,
     CasCoreTicketCatalogConfiguration.class,
@@ -85,10 +88,10 @@ import static org.junit.jupiter.api.Assertions.*;
         "cas.authn.couch-db.password-attribute=password",
         "cas.authn.couch-db.username=cas",
         "cas.authn.couch-db.password=password",
-        "cas.authn.pac4j.typed-id-used=false"
+        "cas.authn.pac4j.core.typed-id-used=false"
     })
 @Tag("CouchDb")
-@EnabledIfPortOpen(port = 5984)
+@EnabledIfListeningOnPort(port = 5984)
 public class CouchDbAuthenticationHandlerTests {
     @Autowired
     @Qualifier("authenticationCouchDbFactory")
@@ -113,7 +116,7 @@ public class CouchDbAuthenticationHandlerTests {
     @BeforeEach
     public void setUp() {
         couchDbFactory.getCouchDbInstance().createDatabaseIfNotExists(couchDbFactory.getCouchDbConnector().getDatabaseName());
-        couchDbRepository.initStandardDesignDocument();
+        couchDbRepository.initialize();
         RequestContextHolder.setRequestAttributes(
             new ServletRequestAttributes(new MockHttpServletRequest(), new MockHttpServletResponse()));
         val profile = new CouchProfile();
@@ -127,10 +130,9 @@ public class CouchDbAuthenticationHandlerTests {
     }
 
     @Test
-    @SneakyThrows
-    public void verifyAuthentication() {
+    public void verifyAuthentication() throws Exception {
         val result = this.authenticationHandler.authenticate(CoreAuthenticationTestUtils
-            .getCredentialsWithDifferentUsernameAndPassword("u1", "p1"));
+            .getCredentialsWithDifferentUsernameAndPassword("u1", "p1"), mock(Service.class));
         assertEquals("u1", result.getPrincipal().getId());
         assertEquals("Chicago", result.getPrincipal().getAttributes().get("loc").get(0));
         assertEquals("Illinois", result.getPrincipal().getAttributes().get("state").get(0));

@@ -1,8 +1,10 @@
 package org.apereo.cas.adaptors.ldap.services;
 
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
+import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.test.context.TestPropertySource;
 
 /**
@@ -18,7 +20,8 @@ import org.springframework.test.context.TestPropertySource;
     "cas.service-registry.ldap.bind-credential=password",
     "cas.service-registry.ldap.object-class=account"
 })
-@EnabledIfPortOpen(port = 10389)
-@Tag("Ldap")
+@EnabledIfListeningOnPort(port = 10389)
+@Tag("LdapServices")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class LdapServiceRegistryTests extends BaseLdapServiceRegistryTests {
 }

@@ -101,6 +101,11 @@ public class BasicResourceCredentialFactoryBean implements FactoryBean<BasicCred
         return credential;
     }
 
+    /**
+     * Gets public key.
+     *
+     * @return the public key
+     */
     protected PublicKey getPublicKey() {
         if (null == getPublicKeyInfo()) {
             return null;
@@ -109,42 +114,6 @@ public class BasicResourceCredentialFactoryBean implements FactoryBean<BasicCred
             return KeyPairUtil.readPublicKey(is);
         } catch (final Exception e) {
             throw new FatalBeanException("Could not decode public key", e);
-        }
-    }
-
-    private PrivateKey getPrivateKey() {
-        if (null == getPrivateKeyInfo()) {
-            return null;
-        }
-        try (val is = getPrivateKeyInfo().getInputStream()) {
-            return KeySupport.decodePrivateKey(is, getPrivateKeyPassword());
-        } catch (final Exception e) {
-            throw new BeanCreationException("Could not decode private key", e);
-        }
-    }
-
-    private byte[] decodeSecretKey(final byte[] data) {
-        switch (getSecretKeyEncoding()) {
-            case BINARY:
-                return data;
-            case HEX:
-                return Hex.decode(data);
-            case BASE64:
-                return Base64.decodeBase64(data);
-            default:
-                throw new IllegalArgumentException("Unsupported encoding");
-
-        }
-    }
-
-    private SecretKey getSecretKey() {
-        if (null == getSecretKeyInfo()) {
-            return null;
-        }
-        try (val is = getSecretKeyInfo().getInputStream()) {
-            return KeySupport.decodeSecretKey(decodeSecretKey(ByteStreams.toByteArray(is)), getSecretKeyAlgorithm());
-        } catch (final Exception e) {
-            throw new BeanCreationException("Could not decode secret key", e);
         }
     }
 
@@ -164,5 +133,35 @@ public class BasicResourceCredentialFactoryBean implements FactoryBean<BasicCred
          * Base64 encoding.
          */
         BASE64
+    }
+
+    private PrivateKey getPrivateKey() {
+        if (null == getPrivateKeyInfo()) {
+            return null;
+        }
+        try (val is = getPrivateKeyInfo().getInputStream()) {
+            return KeySupport.decodePrivateKey(is, getPrivateKeyPassword());
+        } catch (final Exception e) {
+            throw new BeanCreationException("Could not decode private key", e);
+        }
+    }
+
+    private byte[] decodeSecretKey(final byte[] data) {
+        return switch (getSecretKeyEncoding()) {
+            case BINARY -> data;
+            case HEX -> Hex.decode(data);
+            case BASE64 -> Base64.decodeBase64(data);
+        };
+    }
+
+    private SecretKey getSecretKey() {
+        if (null == getSecretKeyInfo()) {
+            return null;
+        }
+        try (val is = getSecretKeyInfo().getInputStream()) {
+            return KeySupport.decodeSecretKey(decodeSecretKey(ByteStreams.toByteArray(is)), getSecretKeyAlgorithm());
+        } catch (final Exception e) {
+            throw new BeanCreationException("Could not decode secret key", e);
+        }
     }
 }

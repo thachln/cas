@@ -1,21 +1,23 @@
 package org.apereo.cas.support.oauth.web.response.accesstoken.response;
 
+import org.apereo.cas.audit.AuditActionResolvers;
+import org.apereo.cas.audit.AuditResourceResolvers;
+import org.apereo.cas.audit.AuditableActions;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.support.oauth.OAuth20Constants;
 import org.apereo.cas.support.oauth.OAuth20ResponseTypes;
 import org.apereo.cas.ticket.accesstoken.OAuth20AccessToken;
 import org.apereo.cas.token.JwtBuilder;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.val;
 import org.apereo.inspektr.audit.annotation.Audit;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -27,59 +29,38 @@ import java.util.Map;
  */
 @RequiredArgsConstructor
 public class OAuth20DefaultAccessTokenResponseGenerator implements OAuth20AccessTokenResponseGenerator {
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(false).build().toObjectMapper();
 
-    /**
-     * JWT builder.
-     */
     protected final JwtBuilder accessTokenJwtBuilder;
 
     private final CasConfigurationProperties casProperties;
 
-    @Audit(action = "OAUTH2_ACCESS_TOKEN_RESPONSE",
-        actionResolverName = "OAUTH2_ACCESS_TOKEN_RESPONSE_ACTION_RESOLVER",
-        resourceResolverName = "OAUTH2_ACCESS_TOKEN_RESPONSE_RESOURCE_RESOLVER")
-    @Override
-    @SneakyThrows
-    public ModelAndView generate(final HttpServletRequest request, final HttpServletResponse response,
-                                 final OAuth20AccessTokenResponseResult result) {
-        if (shouldGenerateDeviceFlowResponse(result)) {
-            return generateResponseForDeviceToken(request, response, result);
-        }
-
-        return generateResponseForAccessToken(request, response, result);
-    }
-
     private static boolean shouldGenerateDeviceFlowResponse(final OAuth20AccessTokenResponseResult result) {
         val generatedToken = result.getGeneratedToken();
         return OAuth20ResponseTypes.DEVICE_CODE == result.getResponseType()
-            && generatedToken.getDeviceCode().isPresent()
-            && generatedToken.getUserCode().isPresent()
-            && generatedToken.getAccessToken().isEmpty();
+               && generatedToken.getDeviceCode().isPresent()
+               && generatedToken.getUserCode().isPresent()
+               && generatedToken.getAccessToken().isEmpty();
     }
 
-    /**
-     * Generate response for device token model and view.
-     *
-     * @param request  the request
-     * @param response the response
-     * @param result   the result
-     * @return the model and view
-     */
-    @SneakyThrows
-    protected ModelAndView generateResponseForDeviceToken(final HttpServletRequest request,
-                                                          final HttpServletResponse response,
-                                                          final OAuth20AccessTokenResponseResult result) {
+    @Audit(action = AuditableActions.OAUTH2_ACCESS_TOKEN_RESPONSE,
+        actionResolverName = AuditActionResolvers.OAUTH2_ACCESS_TOKEN_RESPONSE_ACTION_RESOLVER,
+        resourceResolverName = AuditResourceResolvers.OAUTH2_ACCESS_TOKEN_RESPONSE_RESOURCE_RESOLVER)
+    @Override
+    public ModelAndView generate(final OAuth20AccessTokenResponseResult result) {
+        if (shouldGenerateDeviceFlowResponse(result)) {
+            return generateResponseForDeviceToken(result);
+        }
+
+        return generateResponseForAccessToken(result);
+    }
+
+    protected ModelAndView generateResponseForDeviceToken(final OAuth20AccessTokenResponseResult result) {
         val model = getDeviceTokenResponseModel(result);
         return new ModelAndView(new MappingJackson2JsonView(MAPPER), model);
     }
 
-    /**
-     * Gets device token response model.
-     *
-     * @param result the result
-     * @return the device token response model
-     */
     protected Map getDeviceTokenResponseModel(final OAuth20AccessTokenResponseResult result) {
         val model = new LinkedHashMap<String, Object>();
         val uri = result.getCasProperties().getServer().getPrefix()
@@ -95,60 +76,45 @@ public class OAuth20DefaultAccessTokenResponseGenerator implements OAuth20Access
         return model;
     }
 
-    /**
-     * Generate response for access token model and view.
-     *
-     * @param request  the request
-     * @param response the response
-     * @param result   the result
-     * @return the model and view
-     */
-    protected ModelAndView generateResponseForAccessToken(final HttpServletRequest request,
-                                                          final HttpServletResponse response,
-                                                          final OAuth20AccessTokenResponseResult result) {
-        val model = getAccessTokenResponseModel(request, response, result);
-        return new ModelAndView(new MappingJackson2JsonView(MAPPER), model);
+    protected ModelAndView generateResponseForAccessToken(final OAuth20AccessTokenResponseResult result) {
+        val model = getAccessTokenResponseModel(result);
+        val mv = new ModelAndView(new MappingJackson2JsonView(MAPPER), model);
+        mv.setStatus(HttpStatus.OK);
+        return mv;
     }
 
-    /**
-     * Generate internal.
-     *
-     * @param request  the request
-     * @param response the response
-     * @param result   the result
-     * @return the access token response model
-     */
-    protected Map<String, Object> getAccessTokenResponseModel(final HttpServletRequest request,
-                                                              final HttpServletResponse response,
-                                                              final OAuth20AccessTokenResponseResult result) {
+    protected Map<String, Object> getAccessTokenResponseModel(final OAuth20AccessTokenResponseResult result) {
         val model = new LinkedHashMap<String, Object>();
         val generatedToken = result.getGeneratedToken();
-        generatedToken.getAccessToken().ifPresent(t -> {
-            model.put(OAuth20Constants.ACCESS_TOKEN, encodeAccessToken(t, result));
-            model.put(OAuth20Constants.SCOPE, String.join(" ", t.getScopes()));
-            model.put(OAuth20Constants.EXPIRES_IN, t.getExpiresIn());
+        generatedToken.getAccessToken().ifPresent(token -> {
+            model.put(OAuth20Constants.ACCESS_TOKEN, encodeAccessToken(token, result));
+            model.put(OAuth20Constants.SCOPE, String.join(" ", token.getScopes()));
+            model.put(OAuth20Constants.EXPIRES_IN, token.getExpiresIn());
         });
         generatedToken.getRefreshToken().ifPresent(t -> model.put(OAuth20Constants.REFRESH_TOKEN, t.getId()));
         model.put(OAuth20Constants.TOKEN_TYPE, OAuth20Constants.TOKEN_TYPE_BEARER);
+
+        generatedToken.getAccessToken().ifPresent(token -> {
+            if (token.getAuthentication().containsAttribute(OAuth20Constants.DPOP_CONFIRMATION)) {
+                model.put(OAuth20Constants.TOKEN_TYPE, OAuth20Constants.TOKEN_TYPE_DPOP);
+            }
+        });
         return model;
     }
 
-    /**
-     * Encode access token string.
-     *
-     * @param accessToken the access token
-     * @param result      the result
-     * @return the string
-     */
     protected String encodeAccessToken(final OAuth20AccessToken accessToken,
                                        final OAuth20AccessTokenResponseResult result) {
+        return getAccessTokenBuilder(accessToken, result).build()
+            .encode(accessToken.getIdToken(), new Object[]{accessToken, result});
+    }
+
+    protected OAuth20JwtAccessTokenEncoder.OAuth20JwtAccessTokenEncoderBuilder getAccessTokenBuilder(
+        final OAuth20AccessToken accessToken, final OAuth20AccessTokenResponseResult result) {
         return OAuth20JwtAccessTokenEncoder.builder()
             .accessToken(accessToken)
             .registeredService(result.getRegisteredService())
             .service(result.getService())
             .accessTokenJwtBuilder(accessTokenJwtBuilder)
-            .casProperties(casProperties)
-            .build()
-            .encode();
+            .casProperties(casProperties);
     }
 }

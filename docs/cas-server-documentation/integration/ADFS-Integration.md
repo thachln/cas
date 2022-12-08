@@ -4,47 +4,56 @@ title: CAS - ADFS Integration
 category: Authentication
 ---
 
+{% include variables.html %}
+
 # Overview
 
 The integration between the CAS Server and ADFS delegates user authentication from CAS Server
-to ADFS, making CAS Server a WS-Federation client. Claims released from ADFS are made available as attributes to CAS Server, and by extension CAS Clients.
+to ADFS, making CAS Server a WS-Federation client. Claims released from ADFS are made 
+available as attributes to CAS Server, and by extension CAS Clients.
 
-<div class="alert alert-info"><strong>Remember</strong><p>The functionality described here allows CAS to use ADFS as an external identity provider. If you wish to do the opposite, allowing ADFS to become a CAS client and using CAS as an identity provider, you may take advantage of <a href="../installation/Configuring-SAML2-Authentication.html">SAML2 support in CAS</a> as one integration option.</p></div>
+<div class="alert alert-info"><strong>Remember</strong><p>The functionality described 
+here allows CAS to use ADFS as an external identity provider. If you wish to do the 
+opposite, allowing ADFS to become a CAS client and using CAS as an identity 
+provider, you may take advantage of 
+<a href="../authentication/Configuring-SAML2-Authentication.html">SAML2 support in CAS</a> 
+as one integration option.</p></div>
 
 Support is enabled by including the following dependency in the WAR overlay:
 
-```xml
-<dependency>
-  <groupId>org.apereo.cas</groupId>
-  <artifactId>cas-server-support-wsfederation-webflow</artifactId>
-  <version>${cas.version}</version>
-</dependency>
-```
+{% include_cached casmodule.html group="org.apereo.cas" module="cas-server-support-wsfederation-webflow" %}
 
 You may also need to declare the following repository in your
 CAS Overlay to be able to resolve dependencies:
 
-```xml
-<repositories>
-    ...
-    <repository>
-        <id>shibboleth-releases</id>
-        <url>https://build.shibboleth.net/nexus/content/repositories/releases</url>
-    </repository>
-    ...
-</repositories>
+```groovy
+repositories {
+    maven { 
+        mavenContent { releasesOnly() }
+        url "https://build.shibboleth.net/maven/releases/" 
+    }
+}
 ```
 
 <div class="alert alert-info"><strong>JCE Requirement</strong><p>It's safe to make sure you have the proper JCE bundle 
 installed in your Java environment that is used by CAS, specially if you need to consume encrypted payloads issued by ADFS. 
-Be sure to pick the right version of the JCE for your Java version. Java versions can be detected via the <code>java -version</code> command.</p></div>
+Be sure to pick the right version of the JCE for your Java version. Java 
+versions can be detected via the <code>java -version</code> command.</p></div>
 
 ## WsFed Configuration
 
-Adjust and provide settings for the ADFS instance, and make sure you have obtained the ADFS signing certificate
-and made it available to CAS at a location that can be resolved at runtime.
+Adjust and provide settings for the ADFS instance, and make sure you have obtained the ADFS 
+signing certificate and made it available to CAS at a location that can be resolved at runtime.
 
-To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#ws-fed-delegated-authentication).
+{% include_cached casproperties.html properties="cas.authn.wsfed[]." %}
+
+## Signed Assertions
+
+CAS is able to ascertain the validity of assertion signatures using dedicated certificate files that are defined
+via CAS settings. Certificate files and resources may be defined statically as file-system resources that are
+available to CAS to load and use, or the signing resource may point to ADFS federation metadata (either as a URL or XML file). 
+When using the federation metadata, the signing certificate is extracted from the `IDPSSODescriptor` key descriptor 
+that is marked for signing.
 
 ## Encrypted Assertions
 
@@ -66,8 +75,10 @@ in ADFS to use the `certificate.crt` file for encryption.
 
 ## Modifying ADFS Claims
 
-The WsFed configuration optionally may allow you to manipulate claims coming from ADFS but before they are inserted into the CAS user principal.
-The manipulation of the attributes is carried out using an *attribute mutator* where its logic may be implemented inside a Groovy script and whose
+The WsFed configuration optionally may allow you to manipulate claims coming 
+from ADFS but before they are inserted into the CAS user principal.
+The manipulation of the attributes is carried out using an *attribute mutator* 
+where its logic may be implemented inside a Groovy script and whose
 path is taught to CAS via settings.
 
 The script may take on the following form:
@@ -77,7 +88,7 @@ import org.apereo.cas.*
 import java.util.*
 import org.apereo.cas.authentication.*
 
-def Map run(final Object... args) {
+Map run(final Object... args) {
     def attributes = args[0]
     def logger = args[1]
     logger.warn("Mutating attributes {}", attributes)
@@ -87,10 +98,10 @@ def Map run(final Object... args) {
 
 The parameters passed to the script are as follows:
 
-| Parameter             | Description
-|-----------------------|-----------------------------------------------------------------------
-| `attributes`          | A current `Map` of attributes provided from ADFS.
-| `logger`              | The object responsible for issuing log messages such as `logger.info(...)`.
+| Parameter    | Description                                                                 |
+|--------------|-----------------------------------------------------------------------------|
+| `attributes` | A current `Map` of attributes provided from ADFS.                           |
+| `logger`     | The object responsible for issuing log messages such as `logger.info(...)`. |
 
 Note that the execution result of the script *MUST* ensure that attributes are collected into a `Map`
 where the attribute name, the key, is a simple `String` and the attribute value is transformed into a collection.
@@ -103,8 +114,9 @@ An optional step, the `casLogoutView.html` can be modified to place a link to AD
 <a href="https://adfs.example.org/adfs/ls/?wa=wsignout1.0">Logout</a>
 ```
 
-Alternatively, you may simply instruct CAS to redirect to the above endpoint after logout operations have executed.
-To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#logout).
+Alternatively, you may instruct CAS to redirect to the above endpoint after logout operations have executed.
+
+{% include_cached casproperties.html properties="cas.logout." %}
 
 ## Per-Service Relying Party Id
 
@@ -113,7 +125,7 @@ registry to match the following:
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "^https://.+",
   "name" : "sample service",
   "id" : 100,
@@ -127,7 +139,20 @@ registry to match the following:
 }
 ```
 
+{% include_cached registeredserviceproperties.html groups="DELEGATED_AUTHN_WSFED" %}
+
 ## Troubleshooting
 
-Be aware of clock drift issues between CAS and the ADFS server. Validation failures of the response do show up in the logs, and the request is routed back to
- ADFS again, causing redirect loops.
+Be aware of clock drift issues between CAS and the ADFS server. Validation failures 
+of the response do show up in the logs, and the request is routed back to ADFS again, causing redirect loops.
+
+To enable additional logging, configure the log4j configuration file to add the following levels:
+
+```xml
+...
+<Logger name="org.apereo.cas.support.wsfederation" level="debug" additivity="false">
+    <AppenderRef ref="console"/>
+    <AppenderRef ref="file"/>
+</Logger>
+...
+```

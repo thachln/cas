@@ -3,12 +3,13 @@ package org.apereo.cas.trusted.web.flow;
 import org.apereo.cas.audit.AuditableExecution;
 import org.apereo.cas.authentication.Authentication;
 import org.apereo.cas.authentication.AuthenticationCredentialsThreadLocalBinder;
-import org.apereo.cas.configuration.model.support.mfa.TrustedDevicesMultifactorProperties;
+import org.apereo.cas.configuration.model.support.mfa.trusteddevice.TrustedDevicesMultifactorProperties;
 import org.apereo.cas.trusted.authentication.MultifactorAuthenticationTrustedDeviceBypassEvaluator;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustRecord;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustStorage;
 import org.apereo.cas.trusted.util.MultifactorAuthenticationTrustUtils;
 import org.apereo.cas.trusted.web.flow.fingerprint.DeviceFingerprintStrategy;
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.support.WebUtils;
 
 import lombok.Getter;
@@ -16,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
 
@@ -31,7 +31,7 @@ import java.time.temporal.ChronoUnit;
 @Slf4j
 @RequiredArgsConstructor
 @Getter
-public class MultifactorAuthenticationSetTrustAction extends AbstractAction {
+public class MultifactorAuthenticationSetTrustAction extends BaseCasWebflowAction {
 
     private final MultifactorAuthenticationTrustStorage storageService;
 
@@ -77,7 +77,7 @@ public class MultifactorAuthenticationSetTrustAction extends AbstractAction {
         LOGGER.debug("Trusted authentication session exists for [{}]", authn.getPrincipal().getId());
         MultifactorAuthenticationTrustUtils.trackTrustedMultifactorAuthenticationAttribute(
             authn,
-            trustedProperties.getAuthenticationContextAttribute());
+            trustedProperties.getCore().getAuthenticationContextAttribute());
         WebUtils.putAuthentication(authn, requestContext);
         return success();
     }
@@ -94,7 +94,10 @@ public class MultifactorAuthenticationSetTrustAction extends AbstractAction {
                                                     final MultifactorAuthenticationTrustBean deviceRecord) {
         val principal = authentication.getPrincipal().getId();
         LOGGER.debug("Attempting to store trusted authentication record for [{}] as device [{}]", principal, deviceRecord.getDeviceName());
-        val fingerprint = deviceFingerprintStrategy.determineFingerprint(principal, requestContext, true);
+
+        val request = WebUtils.getHttpServletRequestFromExternalWebflowContext(requestContext);
+        val response = WebUtils.getHttpServletResponseFromExternalWebflowContext(requestContext);
+        val fingerprint = deviceFingerprintStrategy.determineFingerprintComponent(principal, request, response);
         val record = MultifactorAuthenticationTrustRecord.newInstance(principal,
             MultifactorAuthenticationTrustUtils.generateGeography(), fingerprint);
         record.setName(deviceRecord.getDeviceName());

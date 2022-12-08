@@ -1,9 +1,12 @@
 package org.apereo.cas.aup;
 
-import org.apereo.cas.authentication.Credential;
+import org.apereo.cas.util.spring.beans.BeanCondition;
+import org.apereo.cas.web.support.WebUtils;
 
+import lombok.val;
 import org.springframework.webflow.execution.RequestContext;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Optional;
 
@@ -15,30 +18,64 @@ import java.util.Optional;
  */
 public interface AcceptableUsagePolicyRepository extends Serializable {
     /**
+     * Condition to activate AUP.
+     */
+    BeanCondition CONDITION_AUP_ENABLED = BeanCondition.on("cas.acceptable-usage-policy.core.enabled").isTrue().evenIfMissing();
+
+    /**
+     * Default bean name.
+     */
+    String BEAN_NAME = "acceptableUsagePolicyRepository";
+
+    /**
+     * No op acceptable usage policy repository.
+     *
+     * @return the acceptable usage policy repository
+     */
+    static AcceptableUsagePolicyRepository noOp() {
+        return new AcceptableUsagePolicyRepository() {
+            @Serial
+            private static final long serialVersionUID = 8784500942988440997L;
+
+            @Override
+            public AcceptableUsagePolicyStatus verify(final RequestContext requestContext) {
+                val authn = WebUtils.getAuthentication(requestContext);
+                return AcceptableUsagePolicyStatus.skipped(authn.getPrincipal());
+            }
+
+            @Override
+            public boolean submit(final RequestContext requestContext) {
+                return false;
+            }
+
+            @Override
+            public Optional<AcceptableUsagePolicyTerms> fetchPolicy(final RequestContext requestContext) {
+                return Optional.empty();
+            }
+        };
+    }
+
+    /**
      * Verify whether the policy is accepted.
      *
      * @param requestContext the request context
-     * @param credential     the credential
      * @return result/status if policy is accepted along with principal.
      */
-    AcceptableUsagePolicyStatus verify(RequestContext requestContext, Credential credential);
+    AcceptableUsagePolicyStatus verify(RequestContext requestContext);
 
     /**
      * Record the fact that the policy is accepted..
      *
      * @param requestContext the request context
-     * @param credential     the credential
      * @return true if choice was saved.
      */
-    boolean submit(RequestContext requestContext, Credential credential);
+    boolean submit(RequestContext requestContext);
 
     /**
      * Fetch policy as optional.
      *
      * @param requestContext the request context
-     * @param credential     the credential
      * @return the optional
      */
-    Optional<AcceptableUsagePolicyTerms> fetchPolicy(RequestContext requestContext, Credential credential);
-
+    Optional<AcceptableUsagePolicyTerms> fetchPolicy(RequestContext requestContext);
 }

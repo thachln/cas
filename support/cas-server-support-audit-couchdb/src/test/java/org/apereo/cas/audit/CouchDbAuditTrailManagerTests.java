@@ -9,11 +9,10 @@ import org.apereo.cas.config.CasSupportCouchDbAuditConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.couchdb.audit.AuditActionContextCouchDbRepository;
 import org.apereo.cas.couchdb.core.CouchDbConnectorFactory;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import org.apereo.inspektr.audit.AuditTrailManager;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +43,7 @@ import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
     })
 @Tag("CouchDb")
 @Getter
-@EnabledIfPortOpen(port = 5984)
+@EnabledIfListeningOnPort(port = 5984)
 public class CouchDbAuditTrailManagerTests extends BaseAuditConfigurationTests {
 
     @Autowired
@@ -63,10 +62,6 @@ public class CouchDbAuditTrailManagerTests extends BaseAuditConfigurationTests {
     public void setUp() {
         auditCouchDbFactory.getCouchDbInstance().createDatabaseIfNotExists(auditCouchDbFactory.getCouchDbConnector().getDatabaseName());
         couchDbRepository.initStandardDesignDocument();
-    }
-
-    @AfterEach
-    public void tearDown() {
-        auditCouchDbFactory.getCouchDbInstance().deleteDatabase(auditCouchDbFactory.getCouchDbConnector().getDatabaseName());
+        super.onSetUp();
     }
 }

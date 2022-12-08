@@ -3,6 +3,7 @@ package org.apereo.cas.authentication.policy;
 import org.apereo.cas.CasProtocolConstants;
 import org.apereo.cas.authentication.Authentication;
 import org.apereo.cas.authentication.AuthenticationHandler;
+import org.apereo.cas.authentication.AuthenticationPolicyExecutionResult;
 import org.apereo.cas.authentication.exceptions.UniquePrincipalRequiredException;
 import org.apereo.cas.ticket.registry.TicketRegistry;
 import org.apereo.cas.util.HttpRequestUtils;
@@ -17,6 +18,7 @@ import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Optional;
 import java.util.Set;
@@ -38,15 +40,16 @@ import java.util.Set;
 @Getter
 @RequiredArgsConstructor
 public class UniquePrincipalAuthenticationPolicy extends BaseAuthenticationPolicy {
+    @Serial
     private static final long serialVersionUID = 3974114391376732470L;
 
     private final TicketRegistry ticketRegistry;
 
     @Override
-    public boolean isSatisfiedBy(final Authentication authentication,
-                                 final Set<AuthenticationHandler> authenticationHandlers,
-                                 final ConfigurableApplicationContext applicationContext,
-                                 final Optional<Serializable> assertionResult) {
+    public AuthenticationPolicyExecutionResult isSatisfiedBy(final Authentication authentication,
+                                                             final Set<AuthenticationHandler> authenticationHandlers,
+                                                             final ConfigurableApplicationContext applicationContext,
+                                                             final Optional<Serializable> assertionResult) {
         val request = HttpRequestUtils.getHttpServletRequestFromRequestAttributes();
         val renew = request == null ? StringUtils.EMPTY : request.getParameter(CasProtocolConstants.PARAMETER_RENEW);
 
@@ -59,6 +62,6 @@ public class UniquePrincipalAuthenticationPolicy extends BaseAuthenticationPolic
                 throw new UniquePrincipalRequiredException();
             }
         }
-        return true;
+        return AuthenticationPolicyExecutionResult.success();
     }
 }

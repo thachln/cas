@@ -28,19 +28,21 @@ import java.util.Optional;
 @Slf4j
 public class OidcAccessTokenAuthenticator extends OAuth20AccessTokenAuthenticator {
     private final OAuth20TokenSigningAndEncryptionService idTokenSigningAndEncryptionService;
+
     private final ServicesManager servicesManager;
 
-    public OidcAccessTokenAuthenticator(final TicketRegistry ticketRegistry,
-                                        final OAuth20TokenSigningAndEncryptionService signingAndEncryptionService,
-                                        final ServicesManager servicesManager,
-                                        final JwtBuilder accessTokenJwtBuilder) {
+    public OidcAccessTokenAuthenticator(
+        final TicketRegistry ticketRegistry,
+        final OAuth20TokenSigningAndEncryptionService signingAndEncryptionService,
+        final ServicesManager servicesManager,
+        final JwtBuilder accessTokenJwtBuilder) {
         super(ticketRegistry, accessTokenJwtBuilder);
         this.idTokenSigningAndEncryptionService = signingAndEncryptionService;
         this.servicesManager = servicesManager;
     }
-
     @Override
-    protected CommonProfile buildUserProfile(final TokenCredentials tokenCredentials, final WebContext webContext, final OAuth20AccessToken accessToken) {
+    protected CommonProfile buildUserProfile(final TokenCredentials tokenCredentials,
+                                             final WebContext webContext, final OAuth20AccessToken accessToken) {
         try {
             val profile = super.buildUserProfile(tokenCredentials, webContext, accessToken);
             validateIdTokenIfAny(accessToken, profile);

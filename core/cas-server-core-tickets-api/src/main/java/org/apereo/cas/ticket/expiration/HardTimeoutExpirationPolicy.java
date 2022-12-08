@@ -1,6 +1,8 @@
 package org.apereo.cas.ticket.expiration;
 
-import org.apereo.cas.ticket.TicketState;
+
+import org.apereo.cas.ticket.Ticket;
+import org.apereo.cas.ticket.TicketGrantingTicketAwareTicket;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -12,6 +14,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.val;
 
+import java.io.Serial;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 
@@ -29,9 +32,7 @@ import java.time.temporal.ChronoUnit;
 @Builder
 public class HardTimeoutExpirationPolicy extends AbstractCasExpirationPolicy {
 
-    /**
-     * Serialization support.
-     */
+    @Serial
     private static final long serialVersionUID = 6728077010285422290L;
 
     /**
@@ -50,11 +51,11 @@ public class HardTimeoutExpirationPolicy extends AbstractCasExpirationPolicy {
     }
 
     @Override
-    public boolean isExpired(final TicketState ticketState) {
+    public boolean isExpired(final TicketGrantingTicketAwareTicket ticketState) {
         if (ticketState == null) {
             return true;
         }
-        val expiringTime = ticketState.getCreationTime().plus(this.timeToKillInSeconds, ChronoUnit.SECONDS);
+        val expiringTime = getMaximumExpirationTime(ticketState);
         val expired = expiringTime.isBefore(ZonedDateTime.now(getClock()));
         return expired || super.isExpired(ticketState);
     }
@@ -70,4 +71,10 @@ public class HardTimeoutExpirationPolicy extends AbstractCasExpirationPolicy {
         return 0L;
     }
 
+    @JsonIgnore
+    @Override
+    public ZonedDateTime getMaximumExpirationTime(final Ticket ticketState) {
+        val creationTime = ticketState.getCreationTime();
+        return creationTime.plus(this.timeToKillInSeconds, ChronoUnit.SECONDS);
+    }
 }

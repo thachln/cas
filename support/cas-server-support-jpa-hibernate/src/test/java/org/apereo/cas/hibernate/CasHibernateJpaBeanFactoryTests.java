@@ -21,8 +21,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 import javax.sql.DataSource;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,13 +39,13 @@ import static org.junit.jupiter.api.Assertions.*;
     CasCoreUtilConfiguration.class
 })
 @Tag("JDBC")
-@EnableTransactionManagement(proxyTargetClass = true)
+@EnableTransactionManagement(proxyTargetClass = false)
 public class CasHibernateJpaBeanFactoryTests {
     @Autowired
     private CasConfigurationProperties casProperties;
 
     @Autowired
-    @Qualifier("jpaBeanFactory")
+    @Qualifier(JpaBeanFactory.DEFAULT_BEAN_NAME)
     private JpaBeanFactory jpaBeanFactory;
 
     @SneakyThrows
@@ -54,7 +54,7 @@ public class CasHibernateJpaBeanFactoryTests {
     }
 
     @Test
-    public void verifyOperation() {
+    public void verifyOperation() throws Exception {
         val adapter = jpaBeanFactory.newJpaVendorAdapter();
         assertNotNull(adapter);
 
@@ -62,7 +62,7 @@ public class CasHibernateJpaBeanFactoryTests {
             .jpaVendorAdapter(adapter)
             .persistenceUnitName("sampleContext")
             .dataSource(dataSource())
-            .packagesToScan(CollectionUtils.wrap(SampleEntity.class.getPackage().getName()))
+            .packagesToScan(CollectionUtils.wrapSet(SampleEntity.class.getPackage().getName()))
             .build();
         assertNotNull(jpaBeanFactory.newEntityManagerFactoryBean(ctx, casProperties.getAudit().getJdbc()));
     }
@@ -70,6 +70,7 @@ public class CasHibernateJpaBeanFactoryTests {
     @Entity
     @Getter
     @NoArgsConstructor
+    @SuppressWarnings("UnusedMethod")
     private static class SampleEntity {
         @Id
         private long id;

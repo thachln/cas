@@ -3,8 +3,9 @@ package org.apereo.cas;
 import org.apereo.cas.aws.AmazonEnvironmentAwareClientBuilder;
 import org.apereo.cas.config.AmazonSecretsManagerCloudConfigBootstrapConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -17,6 +18,8 @@ import org.springframework.mock.env.MockEnvironment;
 import software.amazon.awssdk.core.SdkSystemSetting;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import software.amazon.awssdk.services.secretsmanager.model.CreateSecretRequest;
+import software.amazon.awssdk.services.secretsmanager.model.DeleteSecretRequest;
 import software.amazon.awssdk.services.secretsmanager.model.PutSecretValueRequest;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,8 +40,9 @@ import static org.junit.jupiter.api.Assertions.*;
     "cas.spring.cloud.aws.secrets-manager.credential-secret-key=" + AmazonSecretsManagerCloudConfigBootstrapConfigurationTests.CREDENTIAL_SECRET_KEY
 })
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@EnabledIfPortOpen(port = 4566)
+@EnabledIfListeningOnPort(port = 4566)
 @Tag("AmazonWebServices")
+@Slf4j
 public class AmazonSecretsManagerCloudConfigBootstrapConfigurationTests {
 
     static final String ENDPOINT = "http://localhost:4566";
@@ -49,14 +53,14 @@ public class AmazonSecretsManagerCloudConfigBootstrapConfigurationTests {
 
     private static final String STATIC_AUTHN_USERS = "casuser::WHATEVER";
 
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
     static {
         System.setProperty(SdkSystemSetting.AWS_ACCESS_KEY_ID.property(), "AKIAIPPIGGUNIO74C63Z");
         System.setProperty(SdkSystemSetting.AWS_SECRET_ACCESS_KEY.property(), "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");
     }
-    
+
+    @Autowired
+    private CasConfigurationProperties casProperties;
+
     @BeforeAll
     public static void initialize() {
         val environment = new MockEnvironment();
@@ -67,8 +71,16 @@ public class AmazonSecretsManagerCloudConfigBootstrapConfigurationTests {
 
         val builder = new AmazonEnvironmentAwareClientBuilder(AmazonSecretsManagerCloudConfigBootstrapConfiguration.CAS_CONFIGURATION_PREFIX, environment);
         val client = builder.build(SecretsManagerClient.builder(), SecretsManagerClient.class);
-        val request = PutSecretValueRequest.builder().secretId("cas.authn.accept.users").secretString(STATIC_AUTHN_USERS).build();
-        client.putSecretValue(request);
+
+        try {
+            client.deleteSecret(DeleteSecretRequest.builder()
+                .secretId("cas.authn.accept.users")
+                .forceDeleteWithoutRecovery(true).build());
+        } catch (final Exception e) {
+            LOGGER.error(e.getMessage());
+        }
+        client.createSecret(CreateSecretRequest.builder().name("cas.authn.accept.users").secretString(STATIC_AUTHN_USERS).build());
+        client.putSecretValue(PutSecretValueRequest.builder().secretId("cas.authn.accept.users").secretString(STATIC_AUTHN_USERS).build());
     }
 
     @Test

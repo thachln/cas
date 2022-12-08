@@ -1,6 +1,7 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.kafka.KafkaObjectFactory;
 import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.services.RegisteredServiceKafkaDistributedCacheListener;
@@ -9,8 +10,10 @@ import org.apereo.cas.services.util.RegisteredServiceJsonSerializer;
 import org.apereo.cas.util.PublisherIdentifier;
 import org.apereo.cas.util.cache.DistributedCacheManager;
 import org.apereo.cas.util.cache.DistributedCacheObject;
+import org.apereo.cas.util.spring.beans.BeanCondition;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -18,20 +21,20 @@ import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.jooq.lambda.Unchecked;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
-import org.springframework.kafka.core.KafkaAdmin;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.KafkaAdminOperations;
+import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
@@ -44,77 +47,108 @@ import java.util.concurrent.ExecutionException;
  * @author Misagh Moayyed
  * @since 6.3.0
  */
-@Configuration("casServicesStreamingKafkaConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@ConditionalOnProperty(prefix = "cas.service-registry.stream", name = "enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 @EnableKafka
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.ServiceRegistryStreaming, module = "kafka")
+@AutoConfiguration
 public class CasServicesStreamingKafkaConfiguration {
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("casRegisteredServiceStreamPublisherIdentifier")
-    private ObjectProvider<PublisherIdentifier> casRegisteredServiceStreamPublisherIdentifier;
+    private static final BeanCondition CONDITION = BeanCondition.on("cas.service-registry.stream.core.enabled").isTrue().evenIfMissing();
 
     @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @ConditionalOnMissingBean(name = "registeredServiceKafkaListenerContainerFactory")
-    public ConcurrentKafkaListenerContainerFactory<String, DistributedCacheObject> registeredServiceKafkaListenerContainerFactory() {
+    public ConcurrentKafkaListenerContainerFactory<String, DistributedCacheObject> registeredServiceKafkaListenerContainerFactory(
+        @Qualifier("casRegisteredServiceStreamPublisherIdentifier")
+        final PublisherIdentifier casRegisteredServiceStreamPublisherIdentifier,
+        final ConfigurableApplicationContext applicationContext,
+        final CasConfigurationProperties casProperties) {
         val kafka = casProperties.getServiceRegistry().getStream().getKafka();
         val factory = new KafkaObjectFactory<String, DistributedCacheObject>(kafka.getBootstrapAddress());
-        factory.setConsumerGroupId("registeredServices");
-        val mapper = new RegisteredServiceJsonSerializer().getObjectMapper();
-        return factory.getKafkaListenerContainerFactory(new StringDeserializer(),
-            new JsonDeserializer<>(DistributedCacheObject.class, mapper));
+        factory.setConsumerGroupId(casRegisteredServiceStreamPublisherIdentifier.getId());
+        val mapper = new RegisteredServiceJsonSerializer(applicationContext).getObjectMapper();
+        return factory.getKafkaListenerContainerFactory(new StringDeserializer(), new JsonDeserializer<>(DistributedCacheObject.class, mapper));
     }
 
     @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @ConditionalOnMissingBean(name = "registeredServiceKafkaDistributedCacheListener")
-    public RegisteredServiceKafkaDistributedCacheListener registeredServiceKafkaDistributedCacheListener() {
+    public RegisteredServiceKafkaDistributedCacheListener registeredServiceKafkaDistributedCacheListener(
+        @Qualifier("registeredServiceDistributedCacheManager")
+        final DistributedCacheManager<RegisteredService, DistributedCacheObject<RegisteredService>, PublisherIdentifier> registeredServiceDistributedCacheManager,
+        @Qualifier("casRegisteredServiceStreamPublisherIdentifier")
+        final PublisherIdentifier casRegisteredServiceStreamPublisherIdentifier) {
         return new RegisteredServiceKafkaDistributedCacheListener(
-            casRegisteredServiceStreamPublisherIdentifier.getObject(),
-            registeredServiceDistributedCacheManager());
+            casRegisteredServiceStreamPublisherIdentifier, registeredServiceDistributedCacheManager);
     }
 
     @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @ConditionalOnMissingBean(name = "registeredServiceDistributedKafkaAdmin")
-    public KafkaAdmin registeredServiceDistributedKafkaAdmin() {
-        val kafka = casProperties.getServiceRegistry().getStream().getKafka();
-        val factory = new KafkaObjectFactory<String, DistributedCacheObject<RegisteredService>>(kafka.getBootstrapAddress());
-        return factory.getKafkaAdmin();
+    public KafkaAdminOperations registeredServiceDistributedKafkaAdmin(
+        final ConfigurableApplicationContext applicationContext,
+        final CasConfigurationProperties casProperties) {
+        return BeanSupplier.of(KafkaAdminOperations.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(() -> {
+                val kafka = casProperties.getServiceRegistry().getStream().getKafka();
+                val factory = new KafkaObjectFactory<String, DistributedCacheObject<RegisteredService>>(kafka.getBootstrapAddress());
+                return factory.getKafkaAdmin();
+            })
+            .otherwiseProxy()
+            .get();
     }
 
     @Bean
-    public KafkaTemplate<String, DistributedCacheObject<RegisteredService>> registeredServiceDistributedKafkaTemplate() {
-        val kafka = casProperties.getServiceRegistry().getStream().getKafka();
-        val mapper = new RegisteredServiceJsonSerializer().getObjectMapper();
-        val factory = new KafkaObjectFactory<String, DistributedCacheObject<RegisteredService>>(kafka.getBootstrapAddress());
-        return factory.getKafkaTemplate(new StringSerializer(), new JsonSerializer<>(mapper));
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public KafkaOperations<String, DistributedCacheObject<RegisteredService>> registeredServiceDistributedKafkaTemplate(
+        final ConfigurableApplicationContext applicationContext,
+        final CasConfigurationProperties casProperties) {
+        return BeanSupplier.of(KafkaOperations.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(() -> {
+                val kafka = casProperties.getServiceRegistry().getStream().getKafka();
+                val mapper = new RegisteredServiceJsonSerializer(applicationContext).getObjectMapper();
+                val factory = new KafkaObjectFactory<String, DistributedCacheObject<RegisteredService>>(kafka.getBootstrapAddress());
+                return factory.getKafkaTemplate(new StringSerializer(), new JsonSerializer<>(mapper));
+            })
+            .otherwiseProxy()
+            .get();
     }
 
-    @SneakyThrows
     @Bean
-    @RefreshScope
-    public DistributedCacheManager<RegisteredService, DistributedCacheObject<RegisteredService>, PublisherIdentifier>
-        registeredServiceDistributedCacheManager() {
-
-        val kafka = casProperties.getServiceRegistry().getStream().getKafka();
-        val factory = new KafkaObjectFactory<String, DistributedCacheObject<RegisteredService>>(kafka.getBootstrapAddress());
-        try {
-            factory.getKafkaAdminClient().createTopics(List.of(registeredServiceDistributedCacheKafkaTopic())).all().get();
-        } catch (final ExecutionException e) {
-            if (e.getCause() instanceof TopicExistsException) {
-                LOGGER.info(e.getMessage());
-            } else {
-                throw e;
-            }
-        }
-        return new RegisteredServiceKafkaDistributedCacheManager(registeredServiceDistributedKafkaTemplate(), kafka.getTopic().getName());
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public DistributedCacheManager<RegisteredService, DistributedCacheObject<RegisteredService>, PublisherIdentifier> registeredServiceDistributedCacheManager(
+        final ConfigurableApplicationContext applicationContext,
+        final CasConfigurationProperties casProperties,
+        @Qualifier("registeredServiceDistributedCacheKafkaTopic")
+        final NewTopic registeredServiceDistributedCacheKafkaTopic,
+        @Qualifier("registeredServiceDistributedKafkaTemplate")
+        final KafkaOperations<String, DistributedCacheObject<RegisteredService>> registeredServiceDistributedKafkaTemplate) throws Exception {
+        return BeanSupplier.of(DistributedCacheManager.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(Unchecked.supplier(() -> {
+                val kafka = casProperties.getServiceRegistry().getStream().getKafka();
+                val factory = new KafkaObjectFactory<String, DistributedCacheObject<RegisteredService>>(kafka.getBootstrapAddress());
+                try {
+                    factory.getKafkaAdminClient().createTopics(List.of(registeredServiceDistributedCacheKafkaTopic)).all().get();
+                } catch (final ExecutionException e) {
+                    if (e.getCause() instanceof TopicExistsException) {
+                        LOGGER.info(e.getMessage());
+                    } else {
+                        throw e;
+                    }
+                }
+                return new RegisteredServiceKafkaDistributedCacheManager(registeredServiceDistributedKafkaTemplate, kafka.getTopic().getName());
+            }))
+            .otherwiseProxy()
+            .get();
     }
 
     @Bean
     @ConditionalOnMissingBean(name = "registeredServiceDistributedCacheKafkaTopic")
-    public NewTopic registeredServiceDistributedCacheKafkaTopic() {
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public NewTopic registeredServiceDistributedCacheKafkaTopic(final CasConfigurationProperties casProperties) {
         val topic = casProperties.getServiceRegistry().getStream().getKafka().getTopic();
         return TopicBuilder.name(topic.getName())
             .partitions(topic.getPartitions())

@@ -10,7 +10,7 @@ import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.opensaml.saml.common.xml.SAMLConstants;
-import org.opensaml.saml.saml2.core.NameID;
+import org.opensaml.saml.saml2.core.NameIDType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.3.0
  */
-@Tag("SAML")
+@Tag("SAMLLogout")
 @TestPropertySource(properties = {
     "cas.authn.saml-idp.logout.send-logout-response=true",
     "cas.authn.saml-idp.logout.logout-response-binding=" + SAMLConstants.SAML2_REDIRECT_BINDING_URI,
@@ -64,7 +64,7 @@ public class SamlIdPSingleLogoutRedirectionStrategyRedirectBindingTests extends 
             "https://github.com/apereo/cas",
             samlIdPLogoutResponseObjectBuilder.newIssuer(registeredService.getServiceId()),
             UUID.randomUUID().toString(),
-            samlIdPLogoutResponseObjectBuilder.getNameID(NameID.EMAIL, "cas@example.org"));
+            samlIdPLogoutResponseObjectBuilder.getNameID(NameIDType.EMAIL, "cas@example.org"));
         try (val writer = SamlUtils.transformSamlObject(openSamlConfigBean, logoutRequest)) {
             val encodedRequest = EncodingUtils.encodeBase64(writer.toString().getBytes(StandardCharsets.UTF_8));
             WebUtils.putSingleLogoutRequest(request, encodedRequest);
@@ -77,6 +77,7 @@ public class SamlIdPSingleLogoutRedirectionStrategyRedirectBindingTests extends 
 
         samlIdPSingleLogoutRedirectionStrategy.handle(context);
         assertNotNull(WebUtils.getLogoutRedirectUrl(request, String.class));
+        assertNull(WebUtils.getLogoutPostUrl(context));
+        assertNull(WebUtils.getLogoutPostData(context));
     }
-
 }

@@ -1,19 +1,27 @@
 package org.apereo.cas.support.events.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.support.events.CasEventRepository;
 import org.apereo.cas.support.events.dao.NoOpCasEventRepository;
-import org.apereo.cas.support.events.listener.DefaultCasEventListener;
-import org.apereo.cas.support.events.listener.LoggingCasEventListener;
+import org.apereo.cas.support.events.listener.CasAuthenticationAuthenticationEventListener;
+import org.apereo.cas.support.events.listener.CasAuthenticationEventListener;
 import org.apereo.cas.support.events.web.CasEventsReportEndpoint;
+import org.apereo.cas.util.spring.beans.BeanCondition;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
+import org.apereo.cas.util.text.MessageSanitizer;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.actuate.autoconfigure.endpoint.condition.ConditionalOnAvailableEndpoint;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 /**
  * This is {@link CasCoreEventsConfiguration}.
@@ -21,35 +29,58 @@ import org.springframework.context.annotation.Configuration;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration("casCoreEventsConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@ConditionalOnProperty(prefix = "cas.events", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.Events)
+@AutoConfiguration
 public class CasCoreEventsConfiguration {
+    private static final BeanCondition CONDITION = BeanCondition.on("cas.events.core.enabled").isTrue().evenIfMissing();
 
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @ConditionalOnMissingBean(name = "defaultCasEventListener")
-    @Bean
-    public DefaultCasEventListener defaultCasEventListener() {
-        return new DefaultCasEventListener(casEventRepository());
+    @Configuration(value = "CasCoreEventsListenerConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreEventsListenerConfiguration {
+        @ConditionalOnMissingBean(name = "defaultCasEventListener")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public CasAuthenticationEventListener defaultCasEventListener(
+            @Qualifier(MessageSanitizer.BEAN_NAME) final MessageSanitizer messageSanitizer,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(CasEventRepository.BEAN_NAME) final CasEventRepository casEventRepository) throws Exception {
+            return BeanSupplier.of(CasAuthenticationEventListener.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> new CasAuthenticationAuthenticationEventListener(casEventRepository, messageSanitizer))
+                .otherwiseProxy()
+                .get();
+        }
     }
 
-    @ConditionalOnMissingBean(name = "casEventRepository")
-    @Bean
-    public CasEventRepository casEventRepository() {
-        return NoOpCasEventRepository.INSTANCE;
+    @Configuration(value = "CasCoreEventsWebConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreEventsWebConfiguration {
+
+        @Bean
+        @ConditionalOnAvailableEndpoint
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public CasEventsReportEndpoint casEventsReportEndpoint(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext) {
+            return new CasEventsReportEndpoint(casProperties, applicationContext);
+        }
     }
 
-    @Bean
-    @ConditionalOnAvailableEndpoint
-    public CasEventsReportEndpoint casEventsReportEndpoint() {
-        return new CasEventsReportEndpoint(casProperties, casEventRepository());
+    @Configuration(value = "CasCoreEventsRepositoryConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreEventsRepositoryConfiguration {
+        @ConditionalOnMissingBean(name = CasEventRepository.BEAN_NAME)
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public CasEventRepository casEventRepository(
+            final ConfigurableApplicationContext applicationContext) throws Exception {
+            return BeanSupplier.of(CasEventRepository.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> NoOpCasEventRepository.INSTANCE)
+                .otherwiseProxy()
+                .get();
+        }
     }
 
-    @ConditionalOnMissingBean(name = "loggingCasEventListener")
-    @Bean
-    public LoggingCasEventListener loggingCasEventListener() {
-        return new LoggingCasEventListener();
-    }
 }

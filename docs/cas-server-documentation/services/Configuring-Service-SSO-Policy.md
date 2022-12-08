@@ -4,10 +4,30 @@ title: CAS - Configuring Service SSO Policy
 category: Services
 ---
 
+{% include variables.html %}
+
 # Configuring Service SSO Policy
 
 Single Sign-on participation policies designed on a per-service basis should override the global SSO behavior. Such policies generally are applicable
 to participation in single sign-on sessions, creating SSO cookies, etc. 
+
+## Disable Service SSO Access
+
+Participation in existing single signon sessions can be disabled on a per-application basis. For example,
+the following service will be challenged to present credentials every time, thereby not using SSO:
+
+```json
+{
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
+  "serviceId" : "...",
+  "name" : "...",
+  "id" : 1,
+  "accessStrategy" : {
+    "@class" : "org.apereo.cas.services.DefaultRegisteredServiceAccessStrategy",
+    "ssoEnabled" : false
+  }
+}
+```
 
 ## Single Sign-on Cookie
 
@@ -17,7 +37,7 @@ to an SSO-participating application. This behavior can be defined on a per-servi
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "...",
   "name" : "...",
   "id" : 1,
@@ -43,7 +63,7 @@ the user for credentials and ignore the existing session.
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "...",
   "name" : "...",
   "id" : 1,
@@ -74,7 +94,7 @@ the ticket continues to actively issue service tickets, etc.
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "...",
   "name" : "...",
   "id" : 1,

@@ -15,6 +15,40 @@ public interface RegisteredServiceCipherExecutor {
     String CUSTOM_HEADER_REGISTERED_SERVICE_ID = RegisteredService.class.getName();
 
     /**
+     * Default bean name.
+     */
+    String DEFAULT_BEAN_NAME = "registeredServiceCipherExecutor";
+
+    /**
+     * Factory method.
+     *
+     * @return the registered service cipher executor
+     */
+    static RegisteredServiceCipherExecutor noOp() {
+        return new RegisteredServiceCipherExecutor() {
+            @Override
+            public String encode(final String data, final Optional<RegisteredService> service) {
+                return data;
+            }
+
+            @Override
+            public String decode(final String data, final Optional<RegisteredService> service) {
+                return data;
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return false;
+            }
+
+            @Override
+            public boolean supports(final RegisteredService registeredService) {
+                return false;
+            }
+        };
+    }
+
+    /**
      * Encode string.
      *
      * @param data    the data
@@ -59,34 +93,5 @@ public interface RegisteredServiceCipherExecutor {
      */
     default boolean supports(final RegisteredService registeredService) {
         return true;
-    }
-
-    /**
-     * Factory method.
-     *
-     * @return the registered service cipher executor
-     */
-    static RegisteredServiceCipherExecutor noOp() {
-        return new RegisteredServiceCipherExecutor() {
-            @Override
-            public String encode(final String data, final Optional<RegisteredService> service) {
-                return data;
-            }
-
-            @Override
-            public String decode(final String data, final Optional<RegisteredService> service) {
-                return data;
-            }
-
-            @Override
-            public boolean supports(final RegisteredService registeredService) {
-                return false;
-            }
-
-            @Override
-            public boolean isEnabled() {
-                return false;
-            }
-        };
     }
 }

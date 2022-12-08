@@ -1,14 +1,19 @@
 package org.apereo.cas.configuration.model.support.pac4j.oidc;
 
 import org.apereo.cas.configuration.model.support.pac4j.Pac4jIdentifiableClientProperties;
+import org.apereo.cas.configuration.support.DurationCapable;
 import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -21,8 +26,10 @@ import java.util.Map;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("BasePac4jOidcClientProperties")
 public abstract class BasePac4jOidcClientProperties extends Pac4jIdentifiableClientProperties {
 
+    @Serial
     private static final long serialVersionUID = 3359382317533639638L;
 
     /**
@@ -61,7 +68,8 @@ public abstract class BasePac4jOidcClientProperties extends Pac4jIdentifiableCli
     /**
      * Clock skew in order to account for drift, when validating id tokens.
      */
-    private int maxClockSkew;
+    @DurationCapable
+    private String maxClockSkew = "PT5S";
 
     /**
      * Custom parameters to send along in authZ requests, etc.
@@ -70,26 +78,29 @@ public abstract class BasePac4jOidcClientProperties extends Pac4jIdentifiableCli
 
     /**
      * The response mode specifies how the result of the authorization request is formatted.
-     * For backward compatibility the default value is empty, which means the default pac4j (empty) response mode is used. 
-     * Possible values includes "query", "fragment", "form_post", or "web_message" 
+     * For backward compatibility the default value is empty, which means the default pac4j (empty) response mode is used.
+     * Possible values includes "query", "fragment", "form_post", or "web_message"
      */
     private String responseMode;
 
     /**
      * The response type tells the authorization server which grant to execute.
      * For backward compatibility the default value is empty, which means the default pac4j ("code") response type is used.
-     * Possibles values includes "code", "token" or "id_token".     
+     * Possibles values includes "code", "token" or "id_token".
      */
     private String responseType;
 
     /**
      * Read timeout of the OIDC client.
      */
+    @DurationCapable
     private String connectTimeout = "PT5S";
+
     /**
      * Connect timeout of the OIDC client.
      */
-    private String readTimeout= "PT5S";
+    @DurationCapable
+    private String readTimeout = "PT5S";
 
     /**
      * Checks if sessions expire with token expiration.
@@ -99,6 +110,25 @@ public abstract class BasePac4jOidcClientProperties extends Pac4jIdentifiableCli
     /**
      * Default time period advance (in seconds) for considering an access token expired.
      */
+    @DurationCapable
     private String tokenExpirationAdvance;
 
+    /**
+     * List arbitrary mappings of claims when fetching user profiles.
+     * Uses a "directed list" where the allowed
+     * syntax would be {@code claim->attribute}.
+     */
+    private List<String> mappedClaims = new ArrayList<>();
+
+    /**
+     * Whether unsigned id tokens issued as plain JWTs are accepted.
+     */
+    private boolean allowUnsignedIdTokens;
+
+    /**
+     * If enabled, try to process the access token as a JWT and include its claims in the profile.
+     * Only enable this if there is an agreement between the IdP and CAS about the format of
+     * the access token. If not, the token format could change at any time.
+     */
+    private boolean includeAccessTokenClaims;
 }

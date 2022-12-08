@@ -2,6 +2,7 @@ package org.apereo.cas.support.saml.web.idp.profile.slo;
 
 import org.apereo.cas.logout.LogoutRedirectionStrategy;
 import org.apereo.cas.support.saml.BaseSamlIdPConfigurationTests;
+import org.apereo.cas.support.saml.SamlProtocolConstants;
 import org.apereo.cas.support.saml.SamlUtils;
 import org.apereo.cas.util.EncodingUtils;
 import org.apereo.cas.web.support.WebUtils;
@@ -10,7 +11,7 @@ import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.opensaml.saml.common.xml.SAMLConstants;
-import org.opensaml.saml.saml2.core.NameID;
+import org.opensaml.saml.saml2.core.NameIDType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -35,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.3.0
  */
-@Tag("SAML")
+@Tag("SAMLLogout")
 @TestPropertySource(properties = {
     "cas.authn.saml-idp.logout.send-logout-response=true",
     "cas.authn.saml-idp.logout.logout-response-binding=" + SAMLConstants.SAML2_POST_BINDING_URI,
@@ -54,6 +55,7 @@ public class SamlIdPSingleLogoutRedirectionStrategyPostBindingTests extends Base
     public void verifyOperationForPostBinding() throws Exception {
         val context = new MockRequestContext();
         val request = new MockHttpServletRequest();
+        request.addParameter(SamlProtocolConstants.PARAMETER_SAML_RELAY_STATE, "CasRelayState");
         val registeredService = getSamlRegisteredServiceFor(false, false,
             false, "https://mockypost.io");
         WebUtils.putRegisteredService(request, registeredService);
@@ -64,7 +66,7 @@ public class SamlIdPSingleLogoutRedirectionStrategyPostBindingTests extends Base
             "https://github.com/apereo/cas",
             samlIdPLogoutResponseObjectBuilder.newIssuer(registeredService.getServiceId()),
             UUID.randomUUID().toString(),
-            samlIdPLogoutResponseObjectBuilder.getNameID(NameID.EMAIL, "cas@example.org"));
+            samlIdPLogoutResponseObjectBuilder.getNameID(NameIDType.EMAIL, "cas@example.org"));
         try (val writer = SamlUtils.transformSamlObject(openSamlConfigBean, logoutRequest)) {
             val encodedRequest = EncodingUtils.encodeBase64(writer.toString().getBytes(StandardCharsets.UTF_8));
             WebUtils.putSingleLogoutRequest(request, encodedRequest);
@@ -80,5 +82,7 @@ public class SamlIdPSingleLogoutRedirectionStrategyPostBindingTests extends Base
 
         samlIdPSingleLogoutRedirectionStrategy.handle(context);
         assertNull(WebUtils.getLogoutRedirectUrl(request, String.class));
+        assertNotNull(WebUtils.getLogoutPostUrl(context));
+        assertNotNull(WebUtils.getLogoutPostData(context));
     }
 }

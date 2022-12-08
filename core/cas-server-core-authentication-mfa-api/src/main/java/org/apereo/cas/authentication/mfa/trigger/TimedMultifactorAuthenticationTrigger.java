@@ -18,7 +18,9 @@ import lombok.val;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -26,7 +28,6 @@ import java.time.format.TextStyle;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * This is {@link TimedMultifactorAuthenticationTrigger}.
@@ -40,6 +41,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TimedMultifactorAuthenticationTrigger implements MultifactorAuthenticationTrigger {
     private final CasConfigurationProperties casProperties;
+
     private final ApplicationContext applicationContext;
 
     private int order = Ordered.LOWEST_PRECEDENCE;
@@ -48,9 +50,10 @@ public class TimedMultifactorAuthenticationTrigger implements MultifactorAuthent
     public Optional<MultifactorAuthenticationProvider> isActivated(final Authentication authentication,
                                                                    final RegisteredService registeredService,
                                                                    final HttpServletRequest httpServletRequest,
+                                                                   final HttpServletResponse response,
                                                                    final Service service) {
 
-        val timedMultifactor = casProperties.getAuthn().getAdaptive().getRequireTimedMultifactor();
+        val timedMultifactor = casProperties.getAuthn().getAdaptive().getPolicy().getRequireTimedMultifactor();
         if (service == null || authentication == null) {
             LOGGER.trace("No service or authentication is available to determine event for principal");
             return Optional.empty();
@@ -73,24 +76,19 @@ public class TimedMultifactorAuthenticationTrigger implements MultifactorAuthent
     /**
      * Check timed multifactor providers for request optional.
      *
-     * @param service        the service
+     * @param service the service
      * @return the provider
      */
     protected Optional<MultifactorAuthenticationProvider> checkTimedMultifactorProvidersForRequest(final RegisteredService service) {
-
-        val timedMultifactor = casProperties.getAuthn().getAdaptive().getRequireTimedMultifactor();
+        val timedMultifactor = casProperties.getAuthn().getAdaptive().getPolicy().getRequireTimedMultifactor();
         val now = LocalDateTime.now(ZoneId.systemDefault());
         val dow = DayOfWeek.from(now);
         val dayNamesForToday = Arrays.stream(TextStyle.values())
-            .map(style -> dow.getDisplayName(style, Locale.getDefault()))
-            .collect(Collectors.toList());
+            .map(style -> dow.getDisplayName(style, Locale.getDefault())).toList();
 
         val timed = timedMultifactor.stream()
             .filter(t -> {
-                var providerEvent = false;
-                if (!t.getOnDays().isEmpty()) {
-                    providerEvent = t.getOnDays().stream().anyMatch(dayNamesForToday::contains);
-                }
+                var providerEvent = !t.getOnDays().isEmpty() && t.getOnDays().stream().anyMatch(dayNamesForToday::contains);
                 if (t.getOnOrAfterHour() >= 0) {
                     providerEvent = now.getHour() >= t.getOnOrAfterHour();
                 }

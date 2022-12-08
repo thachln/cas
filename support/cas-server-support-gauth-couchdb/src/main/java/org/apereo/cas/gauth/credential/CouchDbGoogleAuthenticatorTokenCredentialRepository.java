@@ -24,8 +24,9 @@ public class CouchDbGoogleAuthenticatorTokenCredentialRepository extends BaseGoo
 
     public CouchDbGoogleAuthenticatorTokenCredentialRepository(final IGoogleAuthenticator googleAuthenticator,
                                                                final GoogleAuthenticatorAccountCouchDbRepository couchDbRepository,
-                                                               final CipherExecutor<String, String> tokenCredentialCipher) {
-        super(tokenCredentialCipher, googleAuthenticator);
+                                                               final CipherExecutor<String, String> tokenCredentialCipher,
+                                                               final CipherExecutor<Number, Number> scratchCodesCipher) {
+        super(tokenCredentialCipher, scratchCodesCipher, googleAuthenticator);
         this.couchDbRepository = couchDbRepository;
     }
 
@@ -83,6 +84,12 @@ public class CouchDbGoogleAuthenticatorTokenCredentialRepository extends BaseGoo
     @Override
     public void delete(final String username) {
         couchDbRepository.findByUsername(username).forEach(couchDbRepository::deleteTokenAccount);
+    }
+
+    @Override
+    public void delete(final long id) {
+        val entity = (CouchDbGoogleAuthenticatorAccount) couchDbRepository.findById(id);
+        couchDbRepository.deleteTokenAccount(entity);
     }
 
     @Override

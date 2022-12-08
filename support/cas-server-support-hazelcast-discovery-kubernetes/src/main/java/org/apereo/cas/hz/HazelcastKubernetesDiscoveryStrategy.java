@@ -12,6 +12,7 @@ import lombok.val;
 import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
+import java.util.Optional;
 
 /**
  * This is {@link HazelcastKubernetesDiscoveryStrategy}.
@@ -22,8 +23,8 @@ import java.util.HashMap;
 public class HazelcastKubernetesDiscoveryStrategy implements HazelcastDiscoveryStrategy {
 
     @Override
-    public DiscoveryStrategyConfig get(final HazelcastClusterProperties cluster, final JoinConfig joinConfig,
-                                       final Config configuration, final NetworkConfig networkConfig) {
+    public Optional<DiscoveryStrategyConfig> get(final HazelcastClusterProperties cluster, final JoinConfig joinConfig,
+                                                 final Config configuration, final NetworkConfig networkConfig) {
         val kube = cluster.getDiscovery().getKubernetes();
         val properties = new HashMap<String, Comparable>();
 
@@ -31,7 +32,9 @@ public class HazelcastKubernetesDiscoveryStrategy implements HazelcastDiscoveryS
             properties.put(KubernetesProperties.SERVICE_DNS.key(), kube.getServiceDns());
         }
         if (kube.getServiceDnsTimeout() > 0) {
-            properties.put(KubernetesProperties.SERVICE_DNS_TIMEOUT.key(), kube.getServiceDnsTimeout());
+            properties.put(
+                KubernetesProperties.SERVICE_DNS_TIMEOUT.key(),
+                Integer.toString(kube.getServiceDnsTimeout()));
         }
         if (StringUtils.hasText(kube.getServiceName())) {
             properties.put(KubernetesProperties.SERVICE_NAME.key(), kube.getServiceName());
@@ -45,15 +48,33 @@ public class HazelcastKubernetesDiscoveryStrategy implements HazelcastDiscoveryS
         if (StringUtils.hasText(kube.getNamespace())) {
             properties.put(KubernetesProperties.NAMESPACE.key(), kube.getNamespace());
         }
+        if (StringUtils.hasText(kube.getPodLabelName())) {
+            properties.put(KubernetesProperties.POD_LABEL_NAME.key(), kube.getPodLabelName());
+        }
+        if (StringUtils.hasText(kube.getPodLabelValue())) {
+            properties.put(KubernetesProperties.POD_LABEL_NAME.key(), kube.getPodLabelValue());
+        }
+        properties.put(KubernetesProperties.RESOLVE_NOT_READY_ADDRESSES.key(), kube.isResolveNotReadyAddresses());
+        properties.put(KubernetesProperties.USE_NODE_NAME_AS_EXTERNAL_ADDRESS.key(), kube.isUseNodeNameAsExternalAddress());
+        if (kube.getApiRetries() > 0) {
+            properties.put(
+                KubernetesProperties.KUBERNETES_API_RETIRES.key(),
+                Integer.toString(kube.getApiRetries()));
+        }
+
         if (StringUtils.hasText(kube.getKubernetesMaster())) {
             properties.put(KubernetesProperties.KUBERNETES_MASTER_URL.key(), kube.getKubernetesMaster());
         }
         if (StringUtils.hasText(kube.getApiToken())) {
             properties.put(KubernetesProperties.KUBERNETES_API_TOKEN.key(), kube.getApiToken());
         }
-        properties.put(KubernetesProperties.RESOLVE_NOT_READY_ADDRESSES.key(), kube.isResolveNotReadyAddresses());
-
-        return new DiscoveryStrategyConfig(new HazelcastKubernetesDiscoveryStrategyFactory(), properties);
+        if (StringUtils.hasText(kube.getCaCertificate())) {
+            properties.put(KubernetesProperties.KUBERNETES_CA_CERTIFICATE.key(), kube.getCaCertificate());
+        }
+        if (kube.getServicePort() > 0) {
+            properties.put(KubernetesProperties.SERVICE_PORT.key(), Integer.toString(kube.getServicePort()));
+        }
+        return Optional.of(new DiscoveryStrategyConfig(new HazelcastKubernetesDiscoveryStrategyFactory(), properties));
     }
 
 }

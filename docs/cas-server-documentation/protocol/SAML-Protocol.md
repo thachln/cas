@@ -1,55 +1,48 @@
 ---
 layout: default
-title: CAS - CAS SAML Protocol
+title: CAS - SAML v1.1 Protocol
 category: Protocols
 ---
 
-# SAML Protocol
+{% include variables.html %}
 
-CAS has support for versions 1.1 and 2 of the SAML protocol to a specific extent.
-This document deals with CAS-specific concerns.
-
-## SAML2
-
-CAS provides support for [SAML2 Authentication](../installation/Configuring-SAML2-Authentication.html), allowing CAS to act
-as a SAML2 identity provider.
-
-## Google Apps
-
-<div class="alert alert-warning"><strong>Usage</strong>
-<p><strong>This feature is deprecated and is scheduled to be removed in the future.</strong></p>
-</div>
-
-CAS provides support for [Google Apps Integration](../integration/Google-Apps-Integration.html).
-
-## SAML 1.1
+# SAML v1.1 Protocol
 
 CAS supports the [standardized SAML 1.1 protocol](http://en.wikipedia.org/wiki/SAML_1.1) primarily to:
 
-- Support a method of [attribute release](../integration/Attribute-Release.html)
-- [Single Logout](../installation/Logout-Single-Signout.html)
+- Support a method of [attribute release](../integration/Attribute-Release.html).
+- [Single Logout](../installation/Logout-Single-Signout.html).
 
-A SAML 1.1 ticket validation response is obtained by validating a ticket via POST at the `/samlValidate URI`.
+A SAML 1.1 ticket validation response is obtained by validating a ticket via POST at the `/samlValidate` URI.
 
 Support is enabled by including the following dependency in the WAR overlay:
 
-```xml
-<dependency>
-  <groupId>org.apereo.cas</groupId>
-  <artifactId>cas-server-support-saml</artifactId>
-  <version>${cas.version}</version>
-</dependency>
+{% include_cached casmodule.html group="org.apereo.cas" module="cas-server-support-saml" %}
+ 
+## Applications
+
+Registering SAML v1.1 applications with CAS is similar to any other CAS applications:
+
+```json
+{
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
+  "serviceId" : "^https://app.example.org.+",
+  "name" : "App",
+  "id" : 1,
+  "supportedProtocols": [ "java.util.HashSet", [ "SAML1" ] ]
+}
 ```
 
-### Administrative Endpoints
+Please note that there is no dedicated separate application type in CAS for SAML v1.1 applications. As the example indicates,
+you should register your SAML v1.1 applications with CAS using the `CasRegisteredService` type.
 
+## Actuator Endpoints
+           
 The following endpoints are provided by CAS:
- 
-| Endpoint          | Description
-|-------------------|---------------------------------------------------------------------------------------------------
-| `samlValidate`    | Obtain a SAML 1.1 validation payload by supplying a `username`, `password` and `service` as parameters.
 
-### Sample Request
+{% include_cached actuators.html endpoints="samlValidate" %}
+
+## Sample Request
 
 ```xml
 POST /cas/samlValidate?ticket=
@@ -71,7 +64,7 @@ Content-Type: text/xml
 </SOAP-ENV:Envelope>
 ```
 
-### Sample Response
+## Sample Response
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -122,21 +115,18 @@ Content-Type: text/xml
 </SOAP-ENV:Envelope>
 ```
 
-
 ## Configuration
 
-To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#saml-core).
+{% include_cached casproperties.html properties="cas.saml-core" %}
 
 You may also need to declare the following repository in
 your CAS Overlay to be able to resolve dependencies:
 
-```xml
-<repositories>
-    ...
-    <repository>
-        <id>shibboleth-releases</id>
-        <url>https://build.shibboleth.net/nexus/content/repositories/releases</url>
-    </repository>
-    ...
-</repositories>
+```groovy
+repositories {
+    maven { 
+        mavenContent { releasesOnly() }
+        url "https://build.shibboleth.net/maven/releases/" 
+    }
+}
 ```

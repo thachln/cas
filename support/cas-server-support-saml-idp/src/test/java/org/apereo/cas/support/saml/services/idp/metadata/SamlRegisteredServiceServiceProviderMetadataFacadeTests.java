@@ -2,6 +2,7 @@ package org.apereo.cas.support.saml.services.idp.metadata;
 
 import org.apereo.cas.support.saml.BaseSamlIdPConfigurationTests;
 import org.apereo.cas.support.saml.services.SamlRegisteredService;
+import org.apereo.cas.support.saml.services.idp.metadata.cache.CachedMetadataResolverResult;
 import org.apereo.cas.support.saml.services.idp.metadata.cache.SamlRegisteredServiceCachingMetadataResolver;
 
 import lombok.val;
@@ -14,6 +15,7 @@ import org.opensaml.saml.saml2.metadata.SPSSODescriptor;
 
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -24,7 +26,7 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 6.2.0
  */
-@Tag("SAML")
+@Tag("SAMLMetadata")
 public class SamlRegisteredServiceServiceProviderMetadataFacadeTests extends BaseSamlIdPConfigurationTests {
 
     @Test
@@ -43,7 +45,11 @@ public class SamlRegisteredServiceServiceProviderMetadataFacadeTests extends Bas
         assertNotNull(adaptor.getExtensions());
         assertNotNull(adaptor.getSupportedProtocols());
         assertNotNull(adaptor.getSingleLogoutService());
-        assertNotNull(adaptor.getAssertionConsumerServiceForPostBinding());
+        assertNotNull(adaptor.getAssertionConsumerServiceLocations());
+        assertNull(adaptor.getAssertionConsumerServiceForPaosBinding());
+        val acs = adaptor.getAssertionConsumerServiceForPostBinding();
+        assertNotNull(acs);
+        assertEquals(7, acs.getIndex());
         assertNotNull(adaptor.getAssertionConsumerServiceForArtifactBinding());
         assertTrue(adaptor.assertionConsumerServicesSize() > 0);
         assertFalse(adaptor.isWantAssertionsSigned());
@@ -58,7 +64,22 @@ public class SamlRegisteredServiceServiceProviderMetadataFacadeTests extends Bas
         val mdr = mock(MetadataResolver.class);
         when(mdr.resolve(any())).thenReturn(null);
         val resolver = mock(SamlRegisteredServiceCachingMetadataResolver.class);
-        when(resolver.resolve(any(SamlRegisteredService.class), any())).thenReturn(mdr);
+        when(resolver.resolve(any(SamlRegisteredService.class), any()))
+            .thenReturn(CachedMetadataResolverResult.builder().metadataResolver(mdr).build());
+        val service = getSamlRegisteredServiceForTestShib();
+        val authnRequest = getAuthnRequestFor(service);
+        assertTrue(SamlRegisteredServiceServiceProviderMetadataFacade.get(resolver, service, authnRequest).isEmpty());
+    }
+
+    @Test
+    public void verifyNoSsoDescriptor() throws Exception {
+        val mdr = mock(MetadataResolver.class);
+        val entityDesc = mock(EntityDescriptor.class);
+        when(mdr.resolve(any())).thenReturn(List.of(entityDesc));
+        when(mdr.resolveSingle(any())).thenReturn(entityDesc);
+        val resolver = mock(SamlRegisteredServiceCachingMetadataResolver.class);
+        when(resolver.resolve(any(SamlRegisteredService.class), any()))
+            .thenReturn(CachedMetadataResolverResult.builder().metadataResolver(mdr).build());
         val service = getSamlRegisteredServiceForTestShib();
         val authnRequest = getAuthnRequestFor(service);
         assertTrue(SamlRegisteredServiceServiceProviderMetadataFacade.get(resolver, service, authnRequest).isEmpty());
@@ -71,7 +92,8 @@ public class SamlRegisteredServiceServiceProviderMetadataFacadeTests extends Bas
         val mdr = mock(MetadataResolver.class);
         when(mdr.resolveSingle(any())).thenReturn(entityDesc);
         val resolver = mock(SamlRegisteredServiceCachingMetadataResolver.class);
-        when(resolver.resolve(any(SamlRegisteredService.class), any())).thenReturn(mdr);
+        when(resolver.resolve(any(SamlRegisteredService.class), any()))
+            .thenReturn(CachedMetadataResolverResult.builder().metadataResolver(mdr).build());
         val service = getSamlRegisteredServiceForTestShib();
         val authnRequest = getAuthnRequestFor(service);
         assertTrue(SamlRegisteredServiceServiceProviderMetadataFacade.get(resolver, service, authnRequest).isEmpty());
@@ -87,7 +109,8 @@ public class SamlRegisteredServiceServiceProviderMetadataFacadeTests extends Bas
         val mdr = mock(MetadataResolver.class);
         when(mdr.resolveSingle(any())).thenReturn(entityDesc);
         val resolver = mock(SamlRegisteredServiceCachingMetadataResolver.class);
-        when(resolver.resolve(any(SamlRegisteredService.class), any())).thenReturn(mdr);
+        when(resolver.resolve(any(SamlRegisteredService.class), any()))
+            .thenReturn(CachedMetadataResolverResult.builder().metadataResolver(mdr).build());
         val service = getSamlRegisteredServiceForTestShib();
         val authnRequest = getAuthnRequestFor(service);
         assertTrue(SamlRegisteredServiceServiceProviderMetadataFacade.get(resolver, service, authnRequest).isEmpty());

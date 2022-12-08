@@ -50,12 +50,24 @@ public class MultifactorAuthenticationTests extends BaseCasWebflowMultifactorAut
     private static final String PASSWORD_31415 = "31415";
 
     @Autowired
-    @Qualifier("defaultAuthenticationSystemSupport")
+    @Qualifier(AuthenticationSystemSupport.BEAN_NAME)
     private AuthenticationSystemSupport authenticationSystemSupport;
 
     @Autowired
-    @Qualifier("centralAuthenticationService")
+    @Qualifier(CentralAuthenticationService.BEAN_NAME)
     private CentralAuthenticationService cas;
+
+    private static UsernamePasswordCredential newUserPassCredentials(final String user,
+                                                                     final String pass) {
+        val userpass = new UsernamePasswordCredential();
+        userpass.setUsername(user);
+        userpass.assignPassword(pass);
+        return userpass;
+    }
+
+    private static Service newService(final String id) {
+        return RegisteredServiceTestUtils.getService(id);
+    }
 
     @Test
     public void verifyAllowsAccessToNormalSecurityServiceWithPassword() {
@@ -119,25 +131,14 @@ public class MultifactorAuthenticationTests extends BaseCasWebflowMultifactorAut
          * is the one that satisfies security policy
          */
         val assertion = cas.validateServiceTicket(st.getId(), HIGH_SERVICE);
-        val authn = assertion.getPrimaryAuthentication();
+        val authn = assertion.primaryAuthentication();
         assertEquals(2, authn.getSuccesses().size());
         assertTrue(authn.getSuccesses().containsKey(AcceptUsersAuthenticationHandler.class.getSimpleName()));
         assertTrue(authn.getSuccesses().containsKey(TestOneTimePasswordAuthenticationHandler.class.getSimpleName()));
         assertTrue(authn.getAttributes().containsKey(AuthenticationHandler.SUCCESSFUL_AUTHENTICATION_HANDLERS));
     }
 
-    private static UsernamePasswordCredential newUserPassCredentials(final String user, final String pass) {
-        val userpass = new UsernamePasswordCredential();
-        userpass.setUsername(user);
-        userpass.setPassword(pass);
-        return userpass;
-    }
-
-    private static Service newService(final String id) {
-        return RegisteredServiceTestUtils.getService(id);
-    }
-
     private AuthenticationResult processAuthenticationAttempt(final Service service, final Credential... credential) throws AuthenticationException {
-        return this.authenticationSystemSupport.handleAndFinalizeSingleAuthenticationTransaction(service, credential);
+        return this.authenticationSystemSupport.finalizeAuthenticationTransaction(service, credential);
     }
 }

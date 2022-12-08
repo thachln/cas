@@ -4,6 +4,8 @@ title: CAS - Logback Configuration
 category: Logs & Audits
 ---
 
+{% include variables.html %}
+
 # Logback Logging
 
 CAS does also support [Logback](https://logback.qos.ch/) as an alternative logging engine. At a high level, 
@@ -16,22 +18,18 @@ Refer to the [Logback documentation](https://logback.qos.ch/documentation.html) 
 
 Support is enabled by including the following dependency in the WAR overlay:
 
-```xml
-<dependency>
-  <groupId>org.apereo.cas</groupId>
-  <artifactId>cas-server-support-logback</artifactId>
-  <version>${cas.version}</version>
-</dependency>
-```
+{% include_cached casmodule.html group="org.apereo.cas" module="cas-server-support-logback" %}
 
 You must also make sure the following modules and dependencies are excluded from the WAR overlay:
 
 ```groovy
 configurations.all {
     exclude(group: "org.apache.logging.log4j", module: "log4j-api")
+    exclude(group: "org.apache.logging.log4j", module: "log4j-jakarta-web")
     exclude(group: "org.apache.logging.log4j", module: "log4j-web")
     exclude(group: "org.apache.logging.log4j", module: "log4j-jcl")
     exclude(group: "org.apache.logging.log4j", module: "log4j-slf4j-impl")
+    exclude(group: "org.apache.logging.log4j", module: "log4j-slf4j2-impl")
     
     exclude(group: "org.apereo.cas", module: "cas-server-core-logging")
 }
@@ -39,7 +37,7 @@ configurations.all {
 
 <div class="alert alert-warning"><strong>YMMV</strong><p>
 Logback support for Java 9 and above is still not quite finalized and released. In the WAR overlay, you may need to strictly <i>force</i>
-the Logback and Slf4j module versions to <code>1.2.3</code> and <code>1.7.5</code> respectively to get around JDK compatibility issues.
+the Logback and Slf4j module versions to <code>1.2.10</code> and <code>1.7.32</code> respectively to get around JDK compatibility issues.
 This is expected to be fixed in future CAS releases once Logback is officially released and you should keep an eye out for related changes and fixes in the CAS release notes.
 </p></div>
 
@@ -67,4 +65,4 @@ Sanitizing log data to remove sensitive ticket ids such as ticket-granting ticke
 may be worked out in future releases, you should be extra careful to cleanse log data prior to sharing it with external systems such as Splunk or Syslog, etc. 
 </p></div>
 
-To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#logging).
+{% include_cached casproperties.html properties="cas.logging" thirdPartyStartsWith="logging." %}

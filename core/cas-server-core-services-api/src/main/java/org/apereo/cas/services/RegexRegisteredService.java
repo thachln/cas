@@ -1,13 +1,11 @@
 package org.apereo.cas.services;
 
-import org.apereo.cas.authentication.principal.Service;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
-import org.apache.commons.lang3.StringUtils;
+import lombok.extern.slf4j.Slf4j;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
+import java.io.Serial;
 
 /**
  * Mutable registered service that uses Java regular expressions for service matching.
@@ -17,47 +15,27 @@ import javax.persistence.Entity;
  * @author Marvin S. Addison
  * @author Misagh Moayyed
  * @since 3.4
+ * @deprecated This class is scheduled to be replaced with {@code CasRegi}
  */
-@Entity
-@DiscriminatorValue("regex")
 @EqualsAndHashCode(callSuper = true)
-public class RegexRegisteredService extends AbstractRegisteredService {
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
+@Deprecated(since = "6.6.0")
+@Slf4j
+public class RegexRegisteredService extends BaseWebBasedRegisteredService {
+    @Serial
     private static final long serialVersionUID = -8258660210826975771L;
 
-    @Override
-    public void setServiceId(final String id) {
-        this.serviceId = id;
-    }
-
-    @Override
-    public boolean matches(final Service service) {
-        return service != null && matches(service.getId());
-    }
-
-    @Override
-    public boolean matches(final String serviceId) {
-        configureMatchingStrategy();
-        return !StringUtils.isBlank(serviceId) && getMatchingStrategy().matches(this, serviceId);
+    public RegexRegisteredService() {
+        LOGGER.warn("CAS has located a service definition type that is now tagged as [RegexRegisteredService]. "
+                    + "This registered service definition type is scheduled for removal and should no longer be "
+                    + "used for CAS-enabled applications, and MUST be replaced with [{}] instead. We STRONGLY advise "
+                    + "that you update your service definitions and make the replacement to faciliate future CAS upgrades.",
+            CasRegisteredService.class.getName());
     }
 
     @JsonIgnore
     @Override
     public String getFriendlyName() {
-        return "CAS Client";
-    }
-
-    /**
-     * Configure matching strategy.
-     * If the strategy is undefined, it will default to {@link FullRegexRegisteredServiceMatchingStrategy}.
-     */
-    protected void configureMatchingStrategy() {
-        if (getMatchingStrategy() == null) {
-            setMatchingStrategy(new FullRegexRegisteredServiceMatchingStrategy());
-        }
-    }
-
-    @Override
-    protected AbstractRegisteredService newInstance() {
-        return new RegexRegisteredService();
+        return CasRegisteredService.FRIENDLY_NAME;
     }
 }

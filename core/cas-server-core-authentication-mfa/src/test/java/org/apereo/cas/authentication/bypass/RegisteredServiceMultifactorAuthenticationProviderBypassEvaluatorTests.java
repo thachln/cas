@@ -22,14 +22,14 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 6.2.0
  */
-@Tag("MFA")
+@Tag("MFATrigger")
 public class RegisteredServiceMultifactorAuthenticationProviderBypassEvaluatorTests {
 
     @Test
     public void verifyOperation() {
         val applicationContext = new StaticApplicationContext();
         applicationContext.refresh();
-        
+
         val provider = TestMultifactorAuthenticationProvider.registerProviderIntoApplicationContext(applicationContext);
 
         val eval = new DefaultChainingMultifactorAuthenticationBypassProvider();
@@ -41,7 +41,7 @@ public class RegisteredServiceMultifactorAuthenticationProviderBypassEvaluatorTe
         val registeredService = CoreAuthenticationTestUtils.getRegisteredService();
         val policy = new DefaultRegisteredServiceMultifactorPolicy();
         policy.setBypassEnabled(true);
-        when(registeredService.getMultifactorPolicy()).thenReturn(policy);
+        when(registeredService.getMultifactorAuthenticationPolicy()).thenReturn(policy);
         assertFalse(eval.shouldMultifactorAuthenticationProviderExecute(authentication, registeredService, provider, new MockHttpServletRequest()));
     }
 }

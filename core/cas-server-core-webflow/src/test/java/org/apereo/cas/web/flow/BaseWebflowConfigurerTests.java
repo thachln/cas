@@ -35,10 +35,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
+import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
+import org.springframework.boot.autoconfigure.mail.MailSenderValidatorAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.webflow.definition.registry.FlowDefinitionRegistry;
@@ -51,26 +54,36 @@ import org.springframework.webflow.definition.registry.FlowDefinitionRegistry;
  */
 @SpringBootTest(classes = BaseWebflowConfigurerTests.SharedTestConfiguration.class)
 @TestPropertySource(properties = {
+    "spring.main.allow-bean-definition-overriding=true",
+
+    "cas.tgc.crypto.encryption.key=u696jJnPvm1DHLR7yVCSKMMzzoPoFxJZW4-MP1CkM5w",
+    "cas.tgc.crypto.signing.key=zPdNCd0R1oMR0ClzEqZzapkte8rO0tNvygYjmHoUhitAu6CBscwMC3ZTKy8tleTKiQ6GVcuiQQgxfd1nSKxf7w",
+
     "cas.webflow.crypto.encryption.key=qLhvLuaobvfzMmbo9U_bYA",
     "cas.webflow.crypto.signing.key=oZeAR5pEXsolruu4OQYsQKxf-FCvFzSsKlsVaKmfIl6pNzoPm6zPW94NRS1af7vT-0bb3DpPBeksvBXjloEsiA"
 })
 public class BaseWebflowConfigurerTests {
     @Autowired
-    @Qualifier("casWebflowExecutionPlan")
+    protected ConfigurableApplicationContext applicationContext;
+
+    @Autowired
+    @Qualifier(CasWebflowExecutionPlan.BEAN_NAME)
     protected CasWebflowExecutionPlan casWebflowExecutionPlan;
 
     @Autowired
-    @Qualifier("loginFlowRegistry")
+    @Qualifier(CasWebflowConstants.BEAN_NAME_LOGIN_FLOW_DEFINITION_REGISTRY)
     protected FlowDefinitionRegistry loginFlowDefinitionRegistry;
 
     @Autowired
-    @Qualifier("logoutFlowRegistry")
+    @Qualifier(CasWebflowConstants.BEAN_NAME_LOGOUT_FLOW_DEFINITION_REGISTRY)
     protected FlowDefinitionRegistry logoutFlowDefinitionRegistry;
 
     @ImportAutoConfiguration({
         RefreshAutoConfiguration.class,
         SecurityAutoConfiguration.class,
         WebMvcAutoConfiguration.class,
+        MailSenderAutoConfiguration.class,
+        MailSenderValidatorAutoConfiguration.class,
         AopAutoConfiguration.class
     })
     @SpringBootConfiguration

@@ -2,12 +2,12 @@ package org.apereo.cas.authentication.handler.support;
 
 import org.apereo.cas.authentication.AuthenticationHandlerExecutionResult;
 import org.apereo.cas.authentication.DefaultAuthenticationHandlerExecutionResult;
+import org.apereo.cas.authentication.MessageDescriptor;
 import org.apereo.cas.authentication.PreventedException;
 import org.apereo.cas.authentication.credential.UsernamePasswordCredential;
 import org.apereo.cas.authentication.exceptions.AccountDisabledException;
 import org.apereo.cas.authentication.exceptions.InvalidLoginLocationException;
 import org.apereo.cas.authentication.exceptions.InvalidLoginTimeException;
-import org.apereo.cas.authentication.metadata.BasicCredentialMetaData;
 import org.apereo.cas.authentication.principal.PrincipalFactoryUtils;
 
 import lombok.extern.slf4j.Slf4j;
@@ -17,8 +17,11 @@ import org.apache.commons.lang3.StringUtils;
 import javax.security.auth.login.AccountLockedException;
 import javax.security.auth.login.CredentialExpiredException;
 import javax.security.auth.login.FailedLoginException;
+
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -51,6 +54,8 @@ public class SimpleTestUsernamePasswordAuthenticationHandler extends AbstractUse
      */
     private final Map<String, Exception> usernameErrorMap = DEFAULT_USERNAME_ERROR_MAP;
 
+    private final List<MessageDescriptor> warnings = new ArrayList<>();
+
     public SimpleTestUsernamePasswordAuthenticationHandler() {
         this(StringUtils.EMPTY);
     }
@@ -59,13 +64,17 @@ public class SimpleTestUsernamePasswordAuthenticationHandler extends AbstractUse
         super(name, null, PrincipalFactoryUtils.newPrincipalFactory(), null);
     }
 
+    public void addMessageDescriptor(final MessageDescriptor msg) {
+        this.warnings.add(msg);
+    }
+
     @Override
-    protected AuthenticationHandlerExecutionResult authenticateUsernamePasswordInternal(final UsernamePasswordCredential credential,
-                                                                                        final String originalPassword)
+    protected AuthenticationHandlerExecutionResult authenticateUsernamePasswordInternal(
+        final UsernamePasswordCredential credential, final String originalPassword)
         throws GeneralSecurityException, PreventedException {
 
         val username = credential.getUsername();
-        val password = credential.getPassword();
+        val password = credential.toPassword();
 
         val exception = this.usernameErrorMap.get(username);
         if (exception instanceof GeneralSecurityException) {
@@ -86,8 +95,8 @@ public class SimpleTestUsernamePasswordAuthenticationHandler extends AbstractUse
         if (StringUtils.isNotBlank(username) && StringUtils.isNotBlank(password)
             && (username.equals(password) || password.equals(StringUtils.reverse(username)))) {
             LOGGER.debug("User [{}] was successfully authenticated.", username);
-            return new DefaultAuthenticationHandlerExecutionResult(this, new BasicCredentialMetaData(credential),
-                this.principalFactory.createPrincipal(username));
+            return new DefaultAuthenticationHandlerExecutionResult(this,
+                credential, principalFactory.createPrincipal(username), this.warnings);
         }
         LOGGER.debug("User [{}] failed authentication", username);
         throw new FailedLoginException();

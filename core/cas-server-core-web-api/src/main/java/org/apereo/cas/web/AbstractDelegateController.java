@@ -6,8 +6,8 @@ import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.servlet.ModelAndView;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Abstract class to be extended by all controllers that may become a delegate.
@@ -26,7 +26,7 @@ public abstract class AbstractDelegateController implements ApplicationContextAw
     protected ApplicationContext applicationContext;
 
     /**
-     * Determine if a AbstractDelegateController subclass can handle the current request.
+     * Determine if a {@link AbstractDelegateController} subclass can handle the current request.
      *
      * @param request  the current request
      * @param response the response

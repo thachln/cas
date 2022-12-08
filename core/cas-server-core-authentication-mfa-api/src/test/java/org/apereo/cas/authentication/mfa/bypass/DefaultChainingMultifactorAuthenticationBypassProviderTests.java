@@ -4,6 +4,7 @@ import org.apereo.cas.authentication.Authentication;
 import org.apereo.cas.authentication.bypass.DefaultChainingMultifactorAuthenticationBypassProvider;
 import org.apereo.cas.authentication.bypass.HttpRequestMultifactorAuthenticationProviderBypassEvaluator;
 import org.apereo.cas.authentication.bypass.MultifactorAuthenticationProviderBypassEvaluator;
+import org.apereo.cas.authentication.bypass.NeverAllowMultifactorAuthenticationProviderBypassEvaluator;
 import org.apereo.cas.authentication.mfa.MultifactorAuthenticationTestUtils;
 import org.apereo.cas.authentication.mfa.TestMultifactorAuthenticationProvider;
 import org.apereo.cas.configuration.model.support.mfa.MultifactorAuthenticationProviderBypassProperties;
@@ -26,9 +27,39 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 6.1.0
  */
-@Tag("MFA")
+@Tag("MFATrigger")
 public class DefaultChainingMultifactorAuthenticationBypassProviderTests {
 
+    private static void mockRememberBypass(final TestMultifactorAuthenticationProvider provider, final Authentication authentication) {
+        val authnAttributes = new HashMap<String, List<Object>>();
+        authnAttributes.put(MultifactorAuthenticationProviderBypassEvaluator.AUTHENTICATION_ATTRIBUTE_BYPASS_MFA, List.of(Boolean.TRUE));
+        authnAttributes.put(MultifactorAuthenticationProviderBypassEvaluator.AUTHENTICATION_ATTRIBUTE_BYPASS_MFA_PROVIDER, List.of(provider.getId()));
+        when(authentication.getAttributes()).thenReturn(authnAttributes);
+    }
+
+    @Test
+    public void verifyChain() {
+        val p = new DefaultChainingMultifactorAuthenticationBypassProvider();
+        p.addMultifactorAuthenticationProviderBypassEvaluator(
+            new MultifactorAuthenticationProviderBypassEvaluator[]{NeverAllowMultifactorAuthenticationProviderBypassEvaluator.getInstance()});
+        assertFalse(p.isEmpty());
+    }
+
+    @Test
+    public void verifyEmptyChainOperation() {
+        val applicationContext = new StaticApplicationContext();
+        applicationContext.refresh();
+
+        val p = new DefaultChainingMultifactorAuthenticationBypassProvider();
+        val res = p.filterMultifactorAuthenticationProviderBypassEvaluatorsBy("unknown");
+
+        val provider = TestMultifactorAuthenticationProvider.registerProviderIntoApplicationContext(applicationContext);
+        val principal = MultifactorAuthenticationTestUtils.getPrincipal("casuser");
+        val authentication = MultifactorAuthenticationTestUtils.getAuthentication(principal);
+        val service = MultifactorAuthenticationTestUtils.getRegisteredService();
+        assertTrue(res.shouldMultifactorAuthenticationProviderExecute(authentication, service,
+            provider, new MockHttpServletRequest()));
+    }
 
     @Test
     public void verifyOperation() {
@@ -45,7 +76,8 @@ public class DefaultChainingMultifactorAuthenticationBypassProviderTests {
         val authentication = MultifactorAuthenticationTestUtils.getAuthentication(principal);
 
         val p = new DefaultChainingMultifactorAuthenticationBypassProvider();
-        p.addMultifactorAuthenticationProviderBypassEvaluator(new HttpRequestMultifactorAuthenticationProviderBypassEvaluator(props, provider.getId()));
+        p.addMultifactorAuthenticationProviderBypassEvaluator(
+            new HttpRequestMultifactorAuthenticationProviderBypassEvaluator(props, provider.getId()));
         assertFalse(p.isEmpty());
         assertNotNull(p.getId());
         assertNotNull(p.getProviderId());
@@ -64,12 +96,5 @@ public class DefaultChainingMultifactorAuthenticationBypassProviderTests {
 
         assertTrue(p.belongsToMultifactorAuthenticationProvider(provider.getId()).isPresent());
         assertFalse(p.filterMultifactorAuthenticationProviderBypassEvaluatorsBy(provider.getId()).isEmpty());
-    }
-
-    private static void mockRememberBypass(final TestMultifactorAuthenticationProvider provider, final Authentication authentication) {
-        val authnAttributes = new HashMap<String, List<Object>>();
-        authnAttributes.put(MultifactorAuthenticationProviderBypassEvaluator.AUTHENTICATION_ATTRIBUTE_BYPASS_MFA, List.of(Boolean.TRUE));
-        authnAttributes.put(MultifactorAuthenticationProviderBypassEvaluator.AUTHENTICATION_ATTRIBUTE_BYPASS_MFA_PROVIDER, List.of(provider.getId()));
-        when(authentication.getAttributes()).thenReturn(authnAttributes);
     }
 }

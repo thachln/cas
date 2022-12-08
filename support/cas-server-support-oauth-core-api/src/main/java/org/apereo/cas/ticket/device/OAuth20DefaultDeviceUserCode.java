@@ -6,8 +6,7 @@ import org.apereo.cas.ticket.ExpirationPolicy;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
+import java.io.Serial;
 
 /**
  * This is {@link OAuth20DefaultDeviceUserCode}.
@@ -15,11 +14,10 @@ import javax.persistence.Entity;
  * @author Misagh Moayyed
  * @since 6.0.0
  */
-@Entity
-@DiscriminatorValue(OAuth20DeviceUserCode.PREFIX)
 @NoArgsConstructor(force = true)
 @Getter
 public class OAuth20DefaultDeviceUserCode extends AbstractTicket implements OAuth20DeviceUserCode {
+    @Serial
     private static final long serialVersionUID = 2339545346159721563L;
 
     private final String deviceCode;

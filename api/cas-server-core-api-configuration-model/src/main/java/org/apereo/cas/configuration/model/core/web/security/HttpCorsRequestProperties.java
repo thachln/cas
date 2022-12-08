@@ -1,11 +1,14 @@
 package org.apereo.cas.configuration.model.core.web.security;
 
+import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,13 +23,16 @@ import java.util.List;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("HttpCorsRequestProperties")
 public class HttpCorsRequestProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 5938828345939769185L;
 
     /**
      * Whether CORS should be enabled for http requests.
      */
+    @RequiredProperty
     private boolean enabled;
 
     /**
@@ -45,9 +51,18 @@ public class HttpCorsRequestProperties implements Serializable {
     /**
      * The Origin header indicates the origin of the cross-site access request or preflight request.
      * The origin is a URI indicating the server from which the request initiated.
+     * When credentials are allowed, '*' cannot be used and origin patterns should be configured instead.
      * It does not include any path information, but only the server name.
      */
     private List<String> allowOrigins = new ArrayList<>(0);
+
+    /**
+     * Comma-separated list of origin patterns to allow. Unlike allowed origins which only
+     * supports {@code *}, origin patterns are more flexible (for example
+     * {@code https://*.example.com}) and can be used when credentials are allowed. When no
+     * allowed origin patterns or allowed origins are set, CORS support is disabled.
+     */
+    private List<String> allowOriginPatterns = new ArrayList<>(0);
 
     /**
      * The Access-Control-Allow-Methods header specifies the method or methods allowed when accessing the resource.

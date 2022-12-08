@@ -1,8 +1,10 @@
 package org.apereo.cas.ws.idp.services;
 
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.services.RegisteredServiceAttributeReleasePolicyContext;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
 import org.apereo.cas.util.CollectionUtils;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 import org.apereo.cas.ws.idp.WSFederationClaims;
 import org.apereo.cas.ws.idp.WSFederationConstants;
 
@@ -26,7 +28,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @Tag("WSFederation")
 public class CustomNamespaceWSFederationClaimsReleasePolicyTests {
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "verifyWsFedCustomSerializePolicyToJson.json");
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
     @Test
     public void verifyAttributeRelease() {
@@ -36,7 +39,12 @@ public class CustomNamespaceWSFederationClaimsReleasePolicyTests {
                 WSFederationClaims.EMAIL_ADDRESS.getClaim(), "email"));
         val principal = CoreAuthenticationTestUtils.getPrincipal("casuser",
             CollectionUtils.wrap("cn", "casuser", "email", "cas@example.org"));
-        val results = policy.getAttributes(principal, CoreAuthenticationTestUtils.getService(), service);
+        val releasePolicyContext = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(service)
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(principal)
+            .build();
+        var results = policy.getAttributes(releasePolicyContext);
         assertSame(2, results.size());
         assertTrue(results.containsKey(WSFederationConstants.HTTP_SCHEMAS_APEREO_CAS.concat(WSFederationClaims.COMMON_NAME.getClaim())));
         assertTrue(results.containsKey(WSFederationConstants.HTTP_SCHEMAS_APEREO_CAS.concat(WSFederationClaims.EMAIL_ADDRESS.getClaim())));

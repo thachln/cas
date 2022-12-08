@@ -2,9 +2,12 @@ package org.apereo.cas.configuration.model.support.cookie;
 
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+
+import java.io.Serial;
 
 /**
  * Configuration properties class for warn.cookie.
@@ -16,7 +19,9 @@ import lombok.experimental.Accessors;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("WarningCookieProperties")
 public class WarningCookieProperties extends CookieProperties {
+    @Serial
     private static final long serialVersionUID = -266090748600049578L;
 
     /**
@@ -27,6 +32,6 @@ public class WarningCookieProperties extends CookieProperties {
     private boolean autoConfigureCookiePath = true;
 
     public WarningCookieProperties() {
-        super.setName("CASPRIVACY");
+        setName("CASPRIVACY");
     }
 }

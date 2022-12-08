@@ -3,8 +3,12 @@ package org.apereo.cas;
 import org.apereo.cas.configuration.model.support.ldap.AbstractLdapAuthenticationProperties;
 import org.apereo.cas.configuration.model.support.ldap.AbstractLdapProperties;
 import org.apereo.cas.configuration.model.support.ldap.LdapSearchEntryHandlersProperties;
+import org.apereo.cas.util.LdapConnectionFactory;
 import org.apereo.cas.util.LdapUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
+import org.apereo.cas.util.scripting.GroovyScriptResourceCacheManager;
+import org.apereo.cas.util.scripting.ScriptResourceCacheManager;
+import org.apereo.cas.util.spring.ApplicationContextProvider;
 
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
@@ -18,8 +22,10 @@ import org.ldaptive.handler.CaseChangeEntryHandler;
 import org.ldaptive.sasl.Mechanism;
 import org.ldaptive.sasl.QualityOfProtection;
 import org.ldaptive.sasl.SecurityStrength;
+import org.springframework.context.support.StaticApplicationContext;
 
 import java.io.File;
+import java.io.Serial;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
@@ -37,7 +43,7 @@ import static org.mockito.Mockito.*;
  * @since 6.2.0
  */
 @Tag("Ldap")
-@EnabledIfPortOpen(port = 10389)
+@EnabledIfListeningOnPort(port = 10389)
 public class LdapUtilsTests {
 
     @Test
@@ -51,6 +57,7 @@ public class LdapUtilsTests {
         input = LdapUtils.getBoolean(entry, "attr2", Boolean.TRUE);
         assertTrue(input);
     }
+
 
     @Test
     public void verifyGetLong() {
@@ -80,12 +87,38 @@ public class LdapUtilsTests {
     @Test
     public void verifyFailsOp() throws Exception {
         val factory = mock(ConnectionFactory.class);
+        val wrapper = new LdapConnectionFactory(factory);
         when(factory.getConnectionConfig()).thenThrow(new IllegalArgumentException("fails"));
         when(factory.getConnection()).thenThrow(new IllegalArgumentException("fails"));
-        assertFalse(LdapUtils.executePasswordModifyOperation(null, factory, null, null, AbstractLdapProperties.LdapType.GENERIC));
-        assertFalse(LdapUtils.executeModifyOperation(null, factory, Map.of()));
-        assertFalse(LdapUtils.executeAddOperation(factory, new LdapEntry()));
-        assertFalse(LdapUtils.executeDeleteOperation(factory, new LdapEntry()));
+        assertFalse(wrapper.executePasswordModifyOperation(null, null, null, AbstractLdapProperties.LdapType.GENERIC));
+        assertFalse(wrapper.executeModifyOperation(null, Map.of()));
+        assertFalse(wrapper.executeAddOperation(new LdapEntry()));
+        assertFalse(wrapper.executeDeleteOperation(new LdapEntry()));
+        wrapper.close();
+    }
+
+    @Test
+    public void verifyScriptedFilter() {
+        val appCtx = new StaticApplicationContext();
+        appCtx.refresh();
+        ApplicationContextProvider.holdApplicationContext(appCtx);
+        assertThrows(RuntimeException.class,
+            () -> LdapUtils.newLdaptiveSearchFilter("classpath:LdapFilterQuery.groovy",
+                List.of("p1", "p2"), List.of("v1", "v2")));
+
+        val cacheMgr = new GroovyScriptResourceCacheManager();
+        ApplicationContextProvider.registerBeanIntoApplicationContext(appCtx, cacheMgr, ScriptResourceCacheManager.BEAN_NAME);
+        var filter = LdapUtils.newLdaptiveSearchFilter("classpath:LdapFilterQuery.groovy",
+            List.of("p1", "p2"), List.of("v1", "v2"));
+        assertNotNull(filter);
+        assertNotNull(filter.getFilter());
+        filter = LdapUtils.newLdaptiveSearchFilter("classpath:LdapFilterQuery.groovy",
+            List.of("p1", "p2"), List.of("v1", "v2"));
+        assertNotNull(filter);
+        assertNotNull(filter.getFilter());
+        filter = LdapUtils.newLdaptiveSearchFilter("classpath:UnknownLdapFilterQuery.groovy",
+            List.of("p1", "p2"), List.of("v1", "v2"));
+        assertNotNull(filter);
     }
 
     @Test
@@ -154,18 +187,20 @@ public class LdapUtilsTests {
         ldap.setBindCredential("password");
         ldap.setSearchFilter("cn=invalid-user");
 
-        var factory = LdapUtils.newLdaptiveConnectionFactory(ldap);
-        var response = LdapUtils.executeSearchOperation(factory, ldap.getBaseDn(),
+        var factory = new LdapConnectionFactory(LdapUtils.newLdaptiveConnectionFactory(ldap));
+        var response = factory.executeSearchOperation(ldap.getBaseDn(),
             LdapUtils.newLdaptiveSearchFilter(ldap.getSearchFilter()), 10, "cn");
         assertNotNull(response);
         assertFalse(LdapUtils.containsResultEntry(response));
+        factory.close();
 
         ldap.setDisablePooling(true);
-        factory = LdapUtils.newLdaptiveConnectionFactory(ldap);
-        response = LdapUtils.executeSearchOperation(factory, ldap.getBaseDn(),
+        factory = new LdapConnectionFactory(LdapUtils.newLdaptiveConnectionFactory(ldap));
+        response = factory.executeSearchOperation(ldap.getBaseDn(),
             LdapUtils.newLdaptiveSearchFilter(ldap.getSearchFilter()), 10, "cn");
         assertNotNull(response);
         assertFalse(LdapUtils.containsResultEntry(response));
+        factory.close();
     }
 
     @Test
@@ -178,12 +213,12 @@ public class LdapUtilsTests {
         ldap.setSearchFilter("cn=invalid-user");
         ldap.getValidator().setType("compare");
 
-        val factory = LdapUtils.newLdaptivePooledConnectionFactory(ldap);
-        val response = LdapUtils.executeSearchOperation(factory, ldap.getBaseDn(),
+        val factory = new LdapConnectionFactory(LdapUtils.newLdaptivePooledConnectionFactory(ldap));
+        val response = factory.executeSearchOperation(ldap.getBaseDn(),
             LdapUtils.newLdaptiveSearchFilter(ldap.getSearchFilter()), 10, "cn");
         assertNotNull(response);
         assertFalse(LdapUtils.containsResultEntry(response));
-        
+
         val config1 = LdapUtils.newLdaptiveConnectionConfig(ldap);
         assertNotNull(config1);
         Arrays.stream(LdapSearchEntryHandlersProperties.SearchEntryHandlerTypes.values())
@@ -194,10 +229,10 @@ public class LdapUtilsTests {
                 props.getCaseChange().setDnCaseChange(CaseChangeEntryHandler.CaseChange.UPPER.name());
                 props.getCaseChange().setAttributeValueCaseChange(CaseChangeEntryHandler.CaseChange.UPPER.name());
                 ldap.getSearchEntryHandlers().add(props);
-                val resolver = LdapUtils.newLdaptiveSearchEntryResolver(ldap, factory);
+                val resolver = LdapUtils.newLdaptiveSearchEntryResolver(ldap, factory.getConnectionFactory());
                 assertNotNull(resolver);
             });
-
+        factory.close();
     }
 
     @Test
@@ -236,6 +271,7 @@ public class LdapUtilsTests {
     }
 
     private static class Ldap extends AbstractLdapAuthenticationProperties {
+        @Serial
         private static final long serialVersionUID = 7979417317490698363L;
     }
 }

@@ -4,6 +4,8 @@ title: CAS - Swagger API Integration
 category: Integration
 ---
 
+{% include variables.html %}
+
 # Overview
 
 CAS takes advantages of [Swagger](https://swagger.io/) to produce API documentation automatically. 
@@ -12,19 +14,15 @@ application context and are present in the overlay.
 
 Support is enabled by including the following dependency in the overlay:
 
-```xml
-<dependency>
-  <groupId>org.apereo.cas</groupId>
-  <artifactId>cas-server-support-swagger</artifactId>
-  <version>${cas.version}</version>
-</dependency>
-```
+{% include_cached casmodule.html group="org.apereo.cas" module="cas-server-support-swagger" %}
+
+{% include_cached casproperties.html thirdPartyStartsWith="springdoc." %}
 
 ## Endpoints
 
 The following Swagger endpoints may be used to analyze and test the APIs: 
 
-| Description                 | URL              
-|-----------------------------|-------------------------------------------------
-| Swagger API Specification   | `https://sso.example.org/cas/v3/api-docs`       
-| Swagger UI                  | `https://sso.example.org/cas/swagger-ui.html`       
+| Description               | URL                                           |
+|---------------------------|-----------------------------------------------|
+| Swagger API Specification | `https://sso.example.org/cas/v3/api-docs`     |
+| Swagger UI                | `https://sso.example.org/cas/swagger-ui.html` |

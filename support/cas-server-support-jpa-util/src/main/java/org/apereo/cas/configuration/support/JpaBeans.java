@@ -2,9 +2,11 @@ package org.apereo.cas.configuration.support;
 
 import org.apereo.cas.configuration.model.support.jpa.AbstractJpaProperties;
 import org.apereo.cas.configuration.model.support.jpa.JpaConfigurationContext;
+import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.function.FunctionUtils;
+import org.apereo.cas.util.spring.SpringExpressionLanguageValueResolver;
 
 import com.zaxxer.hikari.HikariDataSource;
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -17,6 +19,7 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 
 import javax.sql.DataSource;
 import java.sql.Driver;
+import java.util.Properties;
 
 /**
  * This is {@link JpaBeans}.
@@ -37,15 +40,16 @@ public class JpaBeans {
      * @param url         the url
      * @return the data source
      */
-    @SneakyThrows
-    public static DataSource newDataSource(final String driverClass, final String username,
-                                           final String password, final String url) {
-        val ds = new SimpleDriverDataSource();
-        ds.setDriverClass((Class<Driver>) Class.forName(driverClass));
-        ds.setUsername(username);
-        ds.setPassword(password);
-        ds.setUrl(url);
-        return ds;
+    public DataSource newDataSource(final String driverClass, final String username,
+                                    final String password, final String url) {
+        return FunctionUtils.doUnchecked(() -> {
+            val ds = new SimpleDriverDataSource();
+            ds.setDriverClass((Class<Driver>) Class.forName(driverClass));
+            ds.setUsername(username);
+            ds.setPassword(password);
+            ds.setUrl(url);
+            return ds;
+        });
     }
 
     /**
@@ -69,22 +73,17 @@ public class JpaBeans {
      * @param jpaProperties the jpa properties
      * @return the data source
      */
-    @SneakyThrows
-    public static DataSource newDataSource(final AbstractJpaProperties jpaProperties) {
+    public CloseableDataSource newDataSource(final AbstractJpaProperties jpaProperties) {
         val dataSourceName = jpaProperties.getDataSourceName();
 
         if (StringUtils.isNotBlank(dataSourceName)) {
-            val proxyDataSource = jpaProperties.isDataSourceProxy();
             try {
                 val dsLookup = new JndiDataSourceLookup();
                 dsLookup.setResourceRef(false);
                 val containerDataSource = dsLookup.getDataSource(dataSourceName);
-                if (!proxyDataSource) {
-                    return containerDataSource;
-                }
-                return new DataSourceProxy(containerDataSource);
+                return new DefaultCloseableDataSource(containerDataSource);
             } catch (final DataSourceLookupFailureException e) {
-                LOGGER.warn("Lookup of datasource [{}] failed due to [{}] falling back to configuration via JPA properties.", dataSourceName, e.getMessage());
+                LOGGER.warn("Lookup of datasource [{}] failed due to [{}]. Back to JPA properties.", dataSourceName, e.getMessage());
             }
         }
 
@@ -92,13 +91,14 @@ public class JpaBeans {
         if (StringUtils.isNotBlank(jpaProperties.getDriverClass())) {
             bean.setDriverClassName(jpaProperties.getDriverClass());
         }
-        bean.setJdbcUrl(jpaProperties.getUrl());
+        val url = SpringExpressionLanguageValueResolver.getInstance().resolve(jpaProperties.getUrl());
+        bean.setJdbcUrl(url);
         bean.setUsername(jpaProperties.getUser());
         bean.setPassword(jpaProperties.getPassword());
-        bean.setLoginTimeout((int) Beans.newDuration(jpaProperties.getPool().getMaxWait()).getSeconds());
+        FunctionUtils.doUnchecked(__ -> bean.setLoginTimeout((int) Beans.newDuration(jpaProperties.getPool().getMaxWait()).getSeconds()));
         bean.setMaximumPoolSize(jpaProperties.getPool().getMaxSize());
         bean.setMinimumIdle(jpaProperties.getPool().getMinSize());
-        bean.setIdleTimeout((int) Beans.newDuration(jpaProperties.getIdleTimeout()).toMillis());
+        bean.setIdleTimeout(Beans.newDuration(jpaProperties.getIdleTimeout()).toMillis());
         bean.setLeakDetectionThreshold(jpaProperties.getLeakThreshold());
         bean.setInitializationFailTimeout(jpaProperties.getFailFastTimeout());
         bean.setIsolateInternalQueries(jpaProperties.isIsolateInternalQueries());
@@ -106,7 +106,15 @@ public class JpaBeans {
         bean.setAllowPoolSuspension(jpaProperties.getPool().isSuspension());
         bean.setAutoCommit(jpaProperties.isAutocommit());
         bean.setValidationTimeout(jpaProperties.getPool().getTimeoutMillis());
-        return bean;
+        bean.setReadOnly(jpaProperties.isReadOnly());
+        bean.setPoolName(jpaProperties.getPool().getName());
+        bean.setKeepaliveTime(Beans.newDuration(jpaProperties.getPool().getKeepAliveTime()).toMillis());
+        bean.setMaxLifetime(Beans.newDuration(jpaProperties.getPool().getMaximumLifetime()).toMillis());
+        bean.setSchema(jpaProperties.getDefaultSchema());
+        val dataSourceProperties = new Properties();
+        dataSourceProperties.putAll(jpaProperties.getProperties());
+        bean.setDataSourceProperties(dataSourceProperties);
+        return new DefaultCloseableDataSource(bean);
     }
 
     /**
@@ -115,7 +123,7 @@ public class JpaBeans {
      * @param config the config
      * @return the local container entity manager factory bean
      */
-    public static LocalContainerEntityManagerFactoryBean newEntityManagerFactoryBean(final JpaConfigurationContext config) {
+    public LocalContainerEntityManagerFactoryBean newEntityManagerFactoryBean(final JpaConfigurationContext config) {
         val bean = new LocalContainerEntityManagerFactoryBean();
         bean.setJpaVendorAdapter(config.getJpaVendorAdapter());
 
@@ -133,5 +141,21 @@ public class JpaBeans {
         }
         bean.getJpaPropertyMap().putAll(config.getJpaProperties());
         return bean;
+    }
+
+    /**
+     * Is valid data source connection.
+     *
+     * @param ds      the ds
+     * @param timeout the timeout
+     * @return true/false
+     */
+    public boolean isValidDataSourceConnection(final CloseableDataSource ds, final int timeout) {
+        try (val con = ds.getConnection()) {
+            return con.isValid(timeout);
+        } catch (final Exception e) {
+            LoggingUtils.error(LOGGER, e);
+        }
+        return false;
     }
 }

@@ -4,12 +4,15 @@ import org.apereo.cas.CasProtocolConstants;
 import org.apereo.cas.oidc.AbstractOidcTests;
 import org.apereo.cas.oidc.OidcConstants;
 import org.apereo.cas.support.oauth.web.views.OAuth20UserProfileViewRenderer;
+import org.apereo.cas.token.JwtBuilder;
+import org.apereo.cas.util.CollectionUtils;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -26,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Tag("OIDC")
 public class OidcUserProfileViewRendererDefaultTests extends AbstractOidcTests {
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(false).build().toObjectMapper();
 
     @Test
     public void verifyOperation() throws Exception {
@@ -46,11 +50,11 @@ public class OidcUserProfileViewRendererDefaultTests extends AbstractOidcTests {
         assertTrue(result.containsKey(CasProtocolConstants.PARAMETER_SERVICE));
         val attrs = (Map) result.get(OAuth20UserProfileViewRenderer.MODEL_ATTRIBUTE_ATTRIBUTES);
         assertTrue(attrs.containsKey("email"));
-        assertEquals("casuser@example.org", attrs.get("email"));
+        assertEquals("casuser@example.org", CollectionUtils.firstElement(attrs.get("email")).get());
     }
 
     @Test
-    public void verifyOperationOAuth() {
+    public void verifyOperationOAuth() throws Exception {
         val clientId = UUID.randomUUID().toString();
         val response = new MockHttpServletResponse();
         val context = new JEEContext(new MockHttpServletRequest(), response);
@@ -66,7 +70,7 @@ public class OidcUserProfileViewRendererDefaultTests extends AbstractOidcTests {
     }
 
     @Test
-    public void verifyOperationSigned() {
+    public void verifyOperationEncryptedAndSigned() throws Exception {
         val clientId = UUID.randomUUID().toString();
         val response = new MockHttpServletResponse();
         val context = new JEEContext(new MockHttpServletRequest(), response);
@@ -83,5 +87,28 @@ public class OidcUserProfileViewRendererDefaultTests extends AbstractOidcTests {
         val entity = oidcUserProfileViewRenderer.render(data, accessToken, response);
         assertNotNull(entity);
         assertNotNull(entity.getBody());
+    }
+
+    @Test
+    public void verifyOperationSigned() throws Exception {
+        val clientId = UUID.randomUUID().toString();
+        val response = new MockHttpServletResponse();
+        val context = new JEEContext(new MockHttpServletRequest(), response);
+        val accessToken = getAccessToken(clientId);
+        val service = getOidcRegisteredService(clientId);
+        service.setUserInfoSigningAlg("RS256");
+        service.setSignIdToken(true);
+        service.setEncryptIdToken(false);
+        servicesManager.save(service);
+
+        val data = oidcUserProfileDataCreator.createFrom(accessToken, context);
+        val entity = oidcUserProfileViewRenderer.render(data, accessToken, response);
+        assertNotNull(entity);
+        val body = (String) entity.getBody();
+        assertNotNull(body);
+        val claims = JwtBuilder.parse(body);
+        assertNotNull(claims);
+        assertEquals("casuser@example.org", ((Map<String, Object>) claims.getClaim("attributes")).get("email"));
+        assertEquals("https://sso.example.org/cas/oidc", claims.getIssuer());
     }
 }

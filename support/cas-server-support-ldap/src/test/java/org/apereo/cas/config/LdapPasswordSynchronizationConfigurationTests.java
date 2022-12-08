@@ -2,11 +2,11 @@ package org.apereo.cas.config;
 
 import org.apereo.cas.authentication.AuthenticationEventExecutionPlan;
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
-import org.apereo.cas.authentication.DefaultAuthenticationTransaction;
+import org.apereo.cas.authentication.DefaultAuthenticationTransactionFactory;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
 import org.junit.jupiter.api.Tag;
@@ -57,15 +57,16 @@ import static org.junit.jupiter.api.Assertions.*;
     })
 @Tag("Ldap")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@EnabledIfPortOpen(port = 10389)
+@EnabledIfListeningOnPort(port = 10389)
 public class LdapPasswordSynchronizationConfigurationTests {
     @Autowired
-    @Qualifier("authenticationEventExecutionPlan")
+    @Qualifier(AuthenticationEventExecutionPlan.DEFAULT_BEAN_NAME)
     private AuthenticationEventExecutionPlan authenticationEventExecutionPlan;
 
     @Test
     public void verifyOperation() {
-        val transaction = DefaultAuthenticationTransaction.of(CoreAuthenticationTestUtils.getCredentialsWithSameUsernameAndPassword());
+        val transaction = new DefaultAuthenticationTransactionFactory()
+            .newTransaction(CoreAuthenticationTestUtils.getCredentialsWithSameUsernameAndPassword());
         assertFalse(authenticationEventExecutionPlan.getAuthenticationPostProcessors(transaction).isEmpty());
 
     }

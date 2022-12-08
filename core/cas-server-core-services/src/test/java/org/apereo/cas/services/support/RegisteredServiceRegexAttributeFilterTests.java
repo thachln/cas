@@ -1,11 +1,14 @@
 package org.apereo.cas.services.support;
 
 import org.apereo.cas.authentication.principal.Principal;
-import org.apereo.cas.services.RegisteredService;
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.services.RegisteredServiceAttributeFilter;
+import org.apereo.cas.services.RegisteredServiceAttributeReleasePolicyContext;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
 import org.apereo.cas.services.ReturnAllowedAttributeReleasePolicy;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 import org.apereo.cas.util.serialization.SerializationUtils;
+import org.apereo.cas.util.spring.ApplicationContextProvider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.val;
@@ -13,8 +16,8 @@ import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.core.Ordered;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,7 +40,8 @@ public class RegisteredServiceRegexAttributeFilterTests {
 
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "registeredServiceRegexAttributeFilter.json");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
     private static final String PHONE = "phone";
 
@@ -50,9 +54,6 @@ public class RegisteredServiceRegexAttributeFilterTests {
     private final RegisteredServiceAttributeFilter filter;
 
     private final Map<String, List<Object>> givenAttributesMap;
-
-    @Mock
-    private RegisteredService registeredService;
 
     public RegisteredServiceRegexAttributeFilterTests() {
         this.filter = new RegisteredServiceRegexAttributeFilter("^.{5,}$");
@@ -69,10 +70,11 @@ public class RegisteredServiceRegexAttributeFilterTests {
 
     @BeforeEach
     public void initialize() {
-        MockitoAnnotations.initMocks(this);
-
-        when(this.registeredService.getName()).thenReturn("sample test service");
-        when(this.registeredService.getServiceId()).thenReturn("https://www.jasig.org");
+        val applicationContext = new StaticApplicationContext();
+        applicationContext.refresh();
+        ApplicationContextProvider.registerBeanIntoApplicationContext(applicationContext, CasConfigurationProperties.class,
+            CasConfigurationProperties.class.getSimpleName());
+        ApplicationContextProvider.holdApplicationContext(applicationContext);
     }
 
     @Test
@@ -110,7 +112,12 @@ public class RegisteredServiceRegexAttributeFilterTests {
         when(p.getAttributes()).thenReturn(map);
         when(p.getId()).thenReturn("principalId");
 
-        val attr = policy.getAttributes(p, RegisteredServiceTestUtils.getService(), RegisteredServiceTestUtils.getRegisteredService("test"));
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(RegisteredServiceTestUtils.getRegisteredService("test"))
+            .service(RegisteredServiceTestUtils.getService())
+            .principal(p)
+            .build();
+        val attr = policy.getAttributes(context);
         assertEquals(1, attr.size());
         assertTrue(attr.containsKey("attr3"));
 
@@ -126,6 +133,13 @@ public class RegisteredServiceRegexAttributeFilterTests {
         val data = SerializationUtils.serialize(this.filter);
         val secondFilter = SerializationUtils.deserializeAndCheckObject(data, RegisteredServiceAttributeFilter.class);
         assertEquals(secondFilter, this.filter);
+    }
+
+    @Test
+    public void verifyDefault() {
+        val data = mock(RegisteredServiceAttributeFilter.class);
+        when(data.getOrder()).thenCallRealMethod();
+        assertEquals(Ordered.HIGHEST_PRECEDENCE, data.getOrder());
     }
 
     @Test

@@ -1,25 +1,30 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.adaptors.u2f.storage.U2FDeviceRepository;
+import org.apereo.cas.authentication.CasSSLContext;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.redis.core.CasRedisTemplate;
 import org.apereo.cas.redis.core.RedisObjectFactory;
 import org.apereo.cas.u2f.redis.U2FRedisDeviceRepository;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.spring.beans.BeanCondition;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
 
 /**
  * This is {@link U2FRedisConfiguration}.
@@ -27,40 +32,66 @@ import org.springframework.data.redis.core.RedisTemplate;
  * @author Misagh Moayyed
  * @since 5.2.0
  */
-@Configuration("u2fRedisConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.U2F, module = "redis")
+@AutoConfiguration
 public class U2FRedisConfiguration {
+    private static final BeanCondition CONDITION = BeanCondition.on("cas.authn.mfa.u2f.redis.enabled").isTrue().evenIfMissing();
 
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("u2fRegistrationRecordCipherExecutor")
-    private ObjectProvider<CipherExecutor> u2fRegistrationRecordCipherExecutor;
-
-    @RefreshScope
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @Bean
     @ConditionalOnMissingBean(name = "u2fRedisTemplate")
-    public RedisTemplate u2fRedisTemplate() {
-        return RedisObjectFactory.newRedisTemplate(u2fRedisConnectionFactory());
+    public CasRedisTemplate u2fRedisTemplate(
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier("u2fRedisConnectionFactory")
+        final RedisConnectionFactory u2fRedisConnectionFactory) throws Exception {
+        return BeanSupplier.of(CasRedisTemplate.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(() -> RedisObjectFactory.newRedisTemplate(u2fRedisConnectionFactory))
+            .otherwiseProxy()
+            .get();
     }
 
     @Bean
     @ConditionalOnMissingBean(name = "u2fRedisConnectionFactory")
-    @RefreshScope
-    public RedisConnectionFactory u2fRedisConnectionFactory() {
-        val redis = casProperties.getAuthn().getMfa().getU2f().getRedis();
-        return RedisObjectFactory.newRedisConnectionFactory(redis);
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public RedisConnectionFactory u2fRedisConnectionFactory(
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier(CasSSLContext.BEAN_NAME)
+        final CasSSLContext casSslContext,
+        final CasConfigurationProperties casProperties) throws Exception {
+
+        return BeanSupplier.of(RedisConnectionFactory.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(() -> {
+                val redis = casProperties.getAuthn().getMfa().getU2f().getRedis();
+                return RedisObjectFactory.newRedisConnectionFactory(redis, casSslContext);
+            })
+            .otherwiseProxy()
+            .get();
     }
 
     @Bean
-    @RefreshScope
-    public U2FDeviceRepository u2fDeviceRepository() {
-        val u2f = casProperties.getAuthn().getMfa().getU2f();
-        final LoadingCache<String, String> requestStorage = Caffeine.newBuilder()
-            .expireAfterWrite(u2f.getExpireRegistrations(), u2f.getExpireRegistrationsTimeUnit())
-            .build(key -> StringUtils.EMPTY);
-        return new U2FRedisDeviceRepository(requestStorage, u2fRedisTemplate(), u2f.getExpireDevices(),
-            u2f.getExpireDevicesTimeUnit(), u2fRegistrationRecordCipherExecutor.getObject());
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public U2FDeviceRepository u2fDeviceRepository(
+        final ConfigurableApplicationContext applicationContext,
+        final CasConfigurationProperties casProperties,
+        @Qualifier("u2fRedisTemplate")
+        final CasRedisTemplate u2fRedisTemplate,
+        @Qualifier("u2fRegistrationRecordCipherExecutor")
+        final CipherExecutor u2fRegistrationRecordCipherExecutor) throws Exception {
+
+        return BeanSupplier.of(U2FDeviceRepository.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(() -> {
+                val u2f = casProperties.getAuthn().getMfa().getU2f();
+                final LoadingCache<String, String> requestStorage =
+                    Caffeine.newBuilder().expireAfterWrite(u2f.getCore().getExpireRegistrations(),
+                        u2f.getCore().getExpireRegistrationsTimeUnit()).build(key -> StringUtils.EMPTY);
+                return new U2FRedisDeviceRepository(requestStorage, u2fRedisTemplate,
+                    u2fRegistrationRecordCipherExecutor, casProperties);
+            })
+            .otherwiseProxy()
+            .get();
     }
 }

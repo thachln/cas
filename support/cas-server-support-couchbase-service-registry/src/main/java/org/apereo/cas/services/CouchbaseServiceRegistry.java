@@ -1,15 +1,11 @@
 package org.apereo.cas.services;
 
 import org.apereo.cas.couchbase.core.CouchbaseClientFactory;
-import org.apereo.cas.couchbase.core.CouchbaseException;
 import org.apereo.cas.support.events.service.CasRegisteredServiceLoadedEvent;
-import org.apereo.cas.util.LoggingUtils;
 import org.apereo.cas.util.serialization.StringSerializer;
 
 import com.couchbase.client.core.error.DocumentNotFoundException;
 import com.couchbase.client.java.query.QueryResult;
-import com.couchbase.client.java.query.QueryStatus;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.beans.factory.DisposableBean;
@@ -54,7 +50,7 @@ public class CouchbaseServiceRegistry extends AbstractServiceRegistry implements
     @Override
     public RegisteredService save(final RegisteredService service) {
         LOGGER.trace("Saving service [{}]:[{}]", service.getClass().getName(), service.getName());
-        if (service.getId() == AbstractRegisteredService.INITIAL_IDENTIFIER_VALUE) {
+        if (service.getId() == RegisteredService.INITIAL_IDENTIFIER_VALUE) {
             service.setId(UUID.randomUUID().getLeastSignificantBits());
         }
         val stringWriter = new StringWriter();
@@ -75,26 +71,26 @@ public class CouchbaseServiceRegistry extends AbstractServiceRegistry implements
     }
 
     @Override
+    public void deleteAll() {
+        this.couchbase.removeAll();
+    }
+
+    @Override
     public Collection<RegisteredService> load() {
-        try {
-            val allServices = queryForAllServices().rowsAsObject();
-            val spliterator = Spliterators.spliteratorUnknownSize(allServices.iterator(), Spliterator.ORDERED);
-            return StreamSupport.stream(spliterator, false)
-                .filter(document -> document.containsKey(couchbase.getBucket()))
-                .map(document -> {
-                    val json = document.getString(couchbase.getBucket());
-                    LOGGER.trace("Found service: [{}]", json);
-                    return this.registeredServiceJsonSerializer.from(json);
-                })
-                .filter(Objects::nonNull)
-                .map(this::invokeServiceRegistryListenerPostLoad)
-                .filter(Objects::nonNull)
-                .peek(service -> publishEvent(new CasRegisteredServiceLoadedEvent(this, service)))
-                .collect(Collectors.toList());
-        } catch (final Exception e) {
-            LoggingUtils.error(LOGGER, e);
-            throw new IllegalArgumentException(e.getMessage(), e);
-        }
+        val allServices = queryForAllServices().rowsAsObject();
+        val spliterator = Spliterators.spliteratorUnknownSize(allServices.iterator(), Spliterator.ORDERED);
+        return StreamSupport.stream(spliterator, false)
+            .filter(document -> document.containsKey(couchbase.getBucket()))
+            .map(document -> {
+                val json = document.getString(couchbase.getBucket());
+                LOGGER.trace("Found service: [{}]", json);
+                return this.registeredServiceJsonSerializer.from(json);
+            })
+            .filter(Objects::nonNull)
+            .map(this::invokeServiceRegistryListenerPostLoad)
+            .filter(Objects::nonNull)
+            .peek(service -> publishEvent(new CasRegisteredServiceLoadedEvent(this, service)))
+            .collect(Collectors.toList());
     }
 
     @Override
@@ -109,13 +105,10 @@ public class CouchbaseServiceRegistry extends AbstractServiceRegistry implements
             }
         } catch (final DocumentNotFoundException e) {
             LOGGER.debug(e.getMessage(), e);
-        } catch (final Exception e) {
-            LoggingUtils.error(LOGGER, e);
         }
         return null;
     }
 
-    @SneakyThrows
     @Override
     public void destroy() {
         this.couchbase.shutdown();
@@ -129,9 +122,7 @@ public class CouchbaseServiceRegistry extends AbstractServiceRegistry implements
     private QueryResult queryForAllServices() {
         val query = String.format("REGEX_CONTAINS(%s, \"@class.*:.*RegisteredService\")", couchbase.getBucket());
         val queryResult = couchbase.select(query);
-        if (!queryResult.metaData().status().equals(QueryStatus.SUCCESS)) {
-            throw new CouchbaseException(queryResult.metaData().toString());
-        }
+        LOGGER.trace("Couchbase query [{}] produced status [{}]", query, queryResult.metaData().status());
         return queryResult;
     }
 }

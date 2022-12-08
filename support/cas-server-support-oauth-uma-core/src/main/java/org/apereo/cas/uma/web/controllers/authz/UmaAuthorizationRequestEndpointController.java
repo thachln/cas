@@ -1,11 +1,10 @@
 package org.apereo.cas.uma.web.controllers.authz;
 
-import org.apereo.cas.configuration.support.Beans;
 import org.apereo.cas.support.oauth.OAuth20Constants;
 import org.apereo.cas.support.oauth.OAuth20GrantTypes;
 import org.apereo.cas.support.oauth.OAuth20ResponseTypes;
 import org.apereo.cas.support.oauth.util.OAuth20Utils;
-import org.apereo.cas.support.oauth.web.response.accesstoken.ext.AccessTokenRequestDataHolder;
+import org.apereo.cas.support.oauth.web.response.accesstoken.ext.AccessTokenRequestContext;
 import org.apereo.cas.support.oauth.web.response.accesstoken.response.OAuth20JwtAccessTokenEncoder;
 import org.apereo.cas.ticket.accesstoken.OAuth20AccessToken;
 import org.apereo.cas.uma.UmaConfigurationContext;
@@ -16,21 +15,20 @@ import org.apereo.cas.uma.web.controllers.BaseUmaEndpointController;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.LoggingUtils;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.hjson.JsonValue;
-import org.pac4j.core.profile.CommonProfile;
+import org.pac4j.core.profile.UserProfile;
+import org.pac4j.jee.context.JEEContext;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -58,11 +56,12 @@ public class UmaAuthorizationRequestEndpointController extends BaseUmaEndpointCo
      * @param response the response
      * @return the response entity
      */
-    @PostMapping(value = '/' + OAuth20Constants.BASE_OAUTH20_URL + '/' + OAuth20Constants.UMA_AUTHORIZATION_REQUEST_URL,
-        consumes = MediaType.APPLICATION_JSON_VALUE,
-        produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity handleAuthorizationRequest(@RequestBody final String body,
-                                                     final HttpServletRequest request, final HttpServletResponse response) {
+    @PostMapping(OAuth20Constants.BASE_OAUTH20_URL + '/' + OAuth20Constants.UMA_AUTHORIZATION_REQUEST_URL)
+    public ResponseEntity handleAuthorizationRequest(
+        @RequestBody
+        final String body,
+        final HttpServletRequest request,
+        final HttpServletResponse response) {
         try {
             val profileResult = getAuthenticatedProfile(request, response, OAuth20Constants.UMA_AUTHORIZATION_SCOPE);
             val umaRequest = MAPPER.readValue(JsonValue.readHjson(body).toString(), UmaAuthorizationRequest.class);
@@ -72,7 +71,7 @@ public class UmaAuthorizationRequestEndpointController extends BaseUmaEndpointCo
             }
             if (!umaRequest.getGrantType().equalsIgnoreCase(OAuth20GrantTypes.UMA_TICKET.getType())) {
                 return new ResponseEntity("Unable to accept authorization request; need grant type "
-                    + OAuth20GrantTypes.UMA_TICKET.getType(), HttpStatus.BAD_REQUEST);
+                                          + OAuth20GrantTypes.UMA_TICKET.getType(), HttpStatus.BAD_REQUEST);
             }
 
             if (StringUtils.isBlank(umaRequest.getTicket())) {
@@ -80,9 +79,6 @@ public class UmaAuthorizationRequestEndpointController extends BaseUmaEndpointCo
             }
             val permissionTicket = getUmaConfigurationContext().getTicketRegistry()
                 .getTicket(umaRequest.getTicket(), UmaPermissionTicket.class);
-            if (permissionTicket == null || permissionTicket.isExpired()) {
-                return new ResponseEntity("Permission ticket is invalid or has expired", HttpStatus.BAD_REQUEST);
-            }
             val resourceSet = permissionTicket.getResourceSet();
             if (resourceSet == null || resourceSet.getPolicies() == null || resourceSet.getPolicies().isEmpty()) {
                 return new ResponseEntity("resource-set or linked policies are undefined", HttpStatus.BAD_REQUEST);
@@ -94,7 +90,6 @@ public class UmaAuthorizationRequestEndpointController extends BaseUmaEndpointCo
             }
 
             return handleMismatchedClaims(request, response, resourceSet, profileResult, results, permissionTicket);
-
         } catch (final Exception e) {
             LoggingUtils.error(LOGGER, e);
         }
@@ -112,13 +107,13 @@ public class UmaAuthorizationRequestEndpointController extends BaseUmaEndpointCo
      * @param permissionTicket the permission ticket
      * @return the response entity
      */
-    @SneakyThrows
-    protected ResponseEntity handleMismatchedClaims(final HttpServletRequest request,
-                                                    final HttpServletResponse response,
-                                                    final ResourceSet resourceSet,
-                                                    final CommonProfile profileResult,
-                                                    final UmaResourceSetClaimPermissionResult analysisResult,
-                                                    final UmaPermissionTicket permissionTicket) {
+    protected ResponseEntity handleMismatchedClaims(
+        final HttpServletRequest request,
+        final HttpServletResponse response,
+        final ResourceSet resourceSet,
+        final UserProfile profileResult,
+        final UmaResourceSetClaimPermissionResult analysisResult,
+        final UmaPermissionTicket permissionTicket) {
 
         val model = new LinkedHashMap<String, Object>();
         model.put(OAuth20Constants.ERROR, OAuth20Constants.NEED_INFO);
@@ -159,19 +154,21 @@ public class UmaAuthorizationRequestEndpointController extends BaseUmaEndpointCo
      * @param permissionTicket the permission ticket
      * @param resourceSet      the resource set
      * @return the response entity
+     * @throws Exception the exception
      */
-    protected ResponseEntity generateRequestingPartyToken(final HttpServletRequest request, final HttpServletResponse response,
-                                                          final CommonProfile profileResult, final UmaAuthorizationRequest umaRequest,
-                                                          final UmaPermissionTicket permissionTicket, final ResourceSet resourceSet) {
-        val currentAat = profileResult.getAttribute(OAuth20AccessToken.class.getName(), OAuth20AccessToken.class);
+    protected ResponseEntity generateRequestingPartyToken(
+        final HttpServletRequest request, final HttpServletResponse response,
+        final UserProfile profileResult, final UmaAuthorizationRequest umaRequest,
+        final UmaPermissionTicket permissionTicket, final ResourceSet resourceSet) throws Exception {
+        val currentAat = (OAuth20AccessToken) profileResult.getAttribute(OAuth20AccessToken.class.getName());
         val registeredService = OAuth20Utils.getRegisteredOAuthServiceByClientId(getUmaConfigurationContext().getServicesManager(),
             OAuth20Utils.getClientIdFromAuthenticatedProfile(profileResult));
 
-        val scopes = new LinkedHashSet<String>(permissionTicket.getScopes());
+        val scopes = new LinkedHashSet<>(permissionTicket.getScopes());
         scopes.add(OAuth20Constants.UMA_AUTHORIZATION_SCOPE);
         scopes.addAll(resourceSet.getScopes());
 
-        val holder = AccessTokenRequestDataHolder.builder()
+        val holder = AccessTokenRequestContext.builder()
             .authentication(currentAat.getAuthentication())
             .ticketGrantingTicket(currentAat.getTicketGrantingTicket())
             .grantType(OAuth20GrantTypes.UMA_TICKET)
@@ -183,10 +180,6 @@ public class UmaAuthorizationRequestEndpointController extends BaseUmaEndpointCo
             .build();
 
         val result = getUmaConfigurationContext().getAccessTokenGenerator().generate(holder);
-        if (result.getAccessToken().isEmpty()) {
-            return new ResponseEntity<>("Unable to generate access token", HttpStatus.BAD_REQUEST);
-        }
-
         val accessToken = result.getAccessToken().get();
 
         val encodedAccessToken = OAuth20JwtAccessTokenEncoder.builder()
@@ -196,14 +189,15 @@ public class UmaAuthorizationRequestEndpointController extends BaseUmaEndpointCo
             .accessTokenJwtBuilder(getUmaConfigurationContext().getAccessTokenJwtBuilder())
             .casProperties(getUmaConfigurationContext().getCasProperties())
             .build()
-            .encode();
+            .encode(accessToken.getId());
+        
+        val userProfile = OAuth20Utils.getAuthenticatedUserProfile(new JEEContext(request, response),
+            getUmaConfigurationContext().getSessionStore());
+        userProfile.addAttribute(UmaPermissionTicket.class.getName(), permissionTicket);
+        userProfile.addAttribute(ResourceSet.class.getName(), resourceSet);
 
-        val timeout = Beans.newDuration(getUmaConfigurationContext().getCasProperties()
-            .getAuthn().getUma().getRequestingPartyToken().getMaxTimeToLiveInSeconds()).getSeconds();
-        request.setAttribute(UmaPermissionTicket.class.getName(), permissionTicket);
-        request.setAttribute(ResourceSet.class.getName(), resourceSet);
-        val idToken = getUmaConfigurationContext().getRequestingPartyTokenGenerator().generate(request, response,
-            accessToken, timeout, OAuth20ResponseTypes.CODE, registeredService);
+        val idToken = getUmaConfigurationContext().getRequestingPartyTokenGenerator()
+            .generate(accessToken, userProfile, OAuth20ResponseTypes.CODE, OAuth20GrantTypes.UMA_TICKET, registeredService);
         accessToken.setIdToken(idToken);
         getUmaConfigurationContext().getTicketRegistry().updateTicket(accessToken);
 

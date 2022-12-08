@@ -6,6 +6,7 @@ import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +29,7 @@ public class WsFederationAttributeMutatorTests extends AbstractWsFederationTests
     public void verifyModifyAttributes() {
         val attributes = new HashMap<String, List<Object>>();
 
-        val values = new ArrayList<Object>();
+        val values = new ArrayList<>();
         values.add("test@example.com");
         attributes.put(UPN_PARAM, values);
 
@@ -42,6 +43,7 @@ public class WsFederationAttributeMutatorTests extends AbstractWsFederationTests
     }
 
     private static class TestWsFederationAttributeMutator implements WsFederationAttributeMutator {
+        @Serial
         private static final long serialVersionUID = -1858140387002752668L;
 
         @Override

@@ -1,23 +1,22 @@
 package org.apereo.cas.adaptors.u2f.storage;
 
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.util.ResourceUtils;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.function.FunctionUtils;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.LoadingCache;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.core.io.Resource;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * This is {@link U2FJsonResourceDeviceRepository}.
@@ -28,29 +27,27 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class U2FJsonResourceDeviceRepository extends BaseResourceU2FDeviceRepository {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules()
-        .enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
-    private final Resource jsonResource;
-
-    @SneakyThrows
     public U2FJsonResourceDeviceRepository(final LoadingCache<String, String> requestStorage,
-                                           final Resource jsonResource,
-                                           final long expirationTime,
-                                           final TimeUnit expirationTimeUnit,
+                                           final CasConfigurationProperties casProperties,
                                            final CipherExecutor<Serializable, String> cipherExecutor) {
-        super(requestStorage, expirationTime, expirationTimeUnit, cipherExecutor);
-        this.jsonResource = jsonResource;
-        if (!ResourceUtils.doesResourceExist(this.jsonResource)) {
-            if (this.jsonResource.getFile().createNewFile()) {
-                LOGGER.debug("Created JSON resource [{}] for U2F device registrations", jsonResource);
-            }
+        super(requestStorage, casProperties, cipherExecutor);
+        val jsonResource = casProperties.getAuthn().getMfa().getU2f().getJson().getLocation();
+        if (!ResourceUtils.doesResourceExist(jsonResource)) {
+            FunctionUtils.doUnchecked(__ -> {
+                if (jsonResource.getFile().createNewFile()) {
+                    LOGGER.debug("Created JSON resource [{}] for U2F device registrations", jsonResource);
+                }
+            });
         }
     }
 
     @Override
     public Map<String, List<U2FDeviceRegistration>> readDevicesFromResource() throws Exception {
-        if (!ResourceUtils.doesResourceExist(this.jsonResource)) {
+        val jsonResource = casProperties.getAuthn().getMfa().getU2f().getJson().getLocation();
+        if (!ResourceUtils.doesResourceExist(jsonResource)) {
             LOGGER.debug("JSON resource [{}] does not exist or is empty", jsonResource);
             return new HashMap<>(0);
         }
@@ -61,6 +58,7 @@ public class U2FJsonResourceDeviceRepository extends BaseResourceU2FDeviceReposi
 
     @Override
     public void writeDevicesBackToResource(final List<U2FDeviceRegistration> list) throws Exception {
+        val jsonResource = casProperties.getAuthn().getMfa().getU2f().getJson().getLocation();
         val newDevices = new HashMap<String, List<U2FDeviceRegistration>>();
         newDevices.put(MAP_KEY_DEVICES, list);
         MAPPER.writerWithDefaultPrettyPrinter().writeValue(jsonResource.getFile(), newDevices);
@@ -69,6 +67,7 @@ public class U2FJsonResourceDeviceRepository extends BaseResourceU2FDeviceReposi
 
     @Override
     public void removeAll() throws Exception {
+        val jsonResource = casProperties.getAuthn().getMfa().getU2f().getJson().getLocation();
         val newDevices = new HashMap<String, List<U2FDeviceRegistration>>();
         newDevices.put(MAP_KEY_DEVICES, new ArrayList<>(0));
         MAPPER.writerWithDefaultPrettyPrinter().writeValue(jsonResource.getFile(), newDevices);

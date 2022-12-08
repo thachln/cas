@@ -1,8 +1,12 @@
 package org.apereo.cas.services;
 
 import org.apereo.cas.CoreAttributesTestUtils;
+import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.authentication.principal.DefaultPrincipalAttributesRepository;
 import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.authentication.principal.PrincipalFactoryUtils;
+import org.apereo.cas.authentication.principal.PrincipalResolver;
+import org.apereo.cas.authentication.principal.RegisteredServicePrincipalAttributesRepository;
 import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.authentication.principal.cache.CachingPrincipalAttributesRepository;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
@@ -22,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -77,11 +82,22 @@ public class RegisteredServiceAttributeReleasePolicyTests {
         when(p.getAttributes()).thenReturn(map);
         when(p.getId()).thenReturn(PRINCIPAL_ID);
 
-        val attr = policy.getAttributes(p,
-            CoreAttributesTestUtils.getService(),
-            CoreAttributesTestUtils.getRegisteredService());
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAttributesTestUtils.getRegisteredService())
+            .service(CoreAttributesTestUtils.getService())
+            .principal(p)
+            .build();
+        val attr = policy.getAttributes(context);
         assertEquals(1, attr.size());
         assertTrue(attr.containsKey(NEW_ATTR_1_VALUE));
+
+        val releasePolicyContext = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAuthenticationTestUtils.getRegisteredService())
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(p)
+            .build();
+        val definitions = policy.determineRequestedAttributeDefinitions(releasePolicyContext);
+        assertTrue(definitions.containsAll(policy.getAllowedAttributes().keySet()));
     }
 
     @Test
@@ -100,11 +116,16 @@ public class RegisteredServiceAttributeReleasePolicyTests {
         when(p.getAttributes()).thenReturn(map);
         when(p.getId()).thenReturn(PRINCIPAL_ID);
 
-        val attr = policy.getAttributes(p, CoreAttributesTestUtils.getService(),
-            CoreAttributesTestUtils.getRegisteredService());
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAttributesTestUtils.getRegisteredService())
+            .service(CoreAttributesTestUtils.getService())
+            .principal(p)
+            .build();
+        val attr = policy.getAttributes(context);
         assertEquals(2, attr.size());
         assertTrue(attr.containsKey(ATTR_1));
         assertTrue(attr.containsKey(ATTR_2));
+        assertTrue(policy.determineRequestedAttributeDefinitions(context).containsAll(policy.getAllowedAttributes()));
     }
 
     @Test
@@ -124,8 +145,12 @@ public class RegisteredServiceAttributeReleasePolicyTests {
         when(p.getAttributes()).thenReturn(map);
         when(p.getId()).thenReturn(PRINCIPAL_ID);
 
-        val attr = policy.getAttributes(p, CoreAttributesTestUtils.getService(),
-            CoreAttributesTestUtils.getRegisteredService());
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAttributesTestUtils.getRegisteredService())
+            .service(CoreAttributesTestUtils.getService())
+            .principal(p)
+            .build();
+        val attr = policy.getAttributes(context);
         assertEquals(1, attr.size());
         assertTrue(attr.containsKey(NEW_ATTR_1_VALUE));
 
@@ -149,8 +174,12 @@ public class RegisteredServiceAttributeReleasePolicyTests {
         when(p.getAttributes()).thenReturn(map);
         when(p.getId()).thenReturn(PRINCIPAL_ID);
 
-        val attr = policy.getAttributes(p, CoreAttributesTestUtils.getService(),
-            CoreAttributesTestUtils.getRegisteredService());
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAttributesTestUtils.getRegisteredService())
+            .service(CoreAttributesTestUtils.getService())
+            .principal(p)
+            .build();
+        val attr = policy.getAttributes(context);
         assertEquals(2, attr.size());
         assertTrue(attr.containsKey(ATTR_1));
         assertTrue(attr.containsKey(ATTR_3));
@@ -171,8 +200,12 @@ public class RegisteredServiceAttributeReleasePolicyTests {
         map.put("ATTR2", List.of(VALUE_2));
         when(p.getAttributes()).thenReturn(map);
         when(p.getId()).thenReturn(PRINCIPAL_ID);
-
-        val attr = policy.getAttributes(p, CoreAttributesTestUtils.getService(), CoreAttributesTestUtils.getRegisteredService());
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAttributesTestUtils.getRegisteredService())
+            .service(CoreAttributesTestUtils.getService())
+            .principal(p)
+            .build();
+        val attr = policy.getAttributes(context);
         assertTrue(attr.isEmpty());
     }
 
@@ -192,13 +225,20 @@ public class RegisteredServiceAttributeReleasePolicyTests {
 
         val registeredService = CoreAttributesTestUtils.getRegisteredService();
         when(registeredService.getUsernameAttributeProvider()).thenReturn(new RegisteredServiceUsernameAttributeProvider() {
+            @Serial
             private static final long serialVersionUID = 771643288929352964L;
+
             @Override
             public String resolveUsername(final Principal principal, final Service service, final RegisteredService registeredService) {
-                    return principal.getId();
+                return principal.getId();
             }
         });
-        val attr = policy.getAttributes(p, CoreAttributesTestUtils.getService(), registeredService);
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(registeredService)
+            .service(CoreAttributesTestUtils.getService())
+            .principal(p)
+            .build();
+        val attr = policy.getAttributes(context);
         assertEquals(attr.size(), map.size() + 1);
 
         val data = SerializationUtils.serialize(policy);
@@ -226,7 +266,7 @@ public class RegisteredServiceAttributeReleasePolicyTests {
         val dao = new MergingPersonAttributeDaoImpl();
         dao.setPersonAttributeDaos(List.of(stub));
 
-        ApplicationContextProvider.registerBeanIntoApplicationContext(this.applicationContext, dao, "attributeRepository");
+        ApplicationContextProvider.registerBeanIntoApplicationContext(this.applicationContext, dao, PrincipalResolver.BEAN_NAME_ATTRIBUTE_REPOSITORY);
 
         val repository = new CachingPrincipalAttributesRepository(TimeUnit.MILLISECONDS.name(), 100);
         repository.setAttributeRepositoryIds(Set.of(stub.getId()));
@@ -234,9 +274,12 @@ public class RegisteredServiceAttributeReleasePolicyTests {
 
         policy.setPrincipalAttributesRepository(repository);
 
-        val service = CoreAttributesTestUtils.getService();
-        val registeredService = CoreAttributesTestUtils.getRegisteredService();
-        val attr = policy.getAttributes(p, service, registeredService);
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAttributesTestUtils.getRegisteredService())
+            .service(CoreAttributesTestUtils.getService())
+            .principal(p)
+            .build();
+        val attr = policy.getAttributes(context);
         assertEquals(attributes.size() + 1, attr.size());
     }
 
@@ -259,42 +302,61 @@ public class RegisteredServiceAttributeReleasePolicyTests {
         val dao = new MergingPersonAttributeDaoImpl();
         dao.setPersonAttributeDaos(List.of(stub));
 
-        ApplicationContextProvider.registerBeanIntoApplicationContext(this.applicationContext, dao, "attributeRepository");
+        ApplicationContextProvider.registerBeanIntoApplicationContext(this.applicationContext, dao, PrincipalResolver.BEAN_NAME_ATTRIBUTE_REPOSITORY);
         val repository = new CachingPrincipalAttributesRepository(TimeUnit.MILLISECONDS.name(), 0);
         val p = PrincipalFactoryUtils.newPrincipalFactory().createPrincipal("uid",
             Collections.singletonMap("mail", List.of("final@example.com")));
 
         repository.setAttributeRepositoryIds(CollectionUtils.wrapSet("SampleStubRepository".toUpperCase()));
         policy.setPrincipalAttributesRepository(repository);
-        var attr = policy.getAttributes(p, CoreAttributesTestUtils.getService(), CoreAttributesTestUtils.getRegisteredService());
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAttributesTestUtils.getRegisteredService())
+            .service(CoreAttributesTestUtils.getService())
+            .principal(p)
+            .build();
+        var attr = policy.getAttributes(context);
         assertEquals(attr.size(), attributes.size() + 1);
 
         repository.setAttributeRepositoryIds(CollectionUtils.wrapSet("DoesNotExist"));
         policy.setPrincipalAttributesRepository(repository);
-        attr = policy.getAttributes(p, CoreAttributesTestUtils.getService(), CoreAttributesTestUtils.getRegisteredService());
+        attr = policy.getAttributes(context);
         assertEquals(1, attr.size());
     }
 
     @Test
     public void verifyDefaults() {
         val policy = new RegisteredServiceAttributeReleasePolicy() {
+            @Serial
             private static final long serialVersionUID = 6118477243447737445L;
 
             @Override
-            public Map<String, List<Object>> getAttributes(final Principal p, final Service selectedService, final RegisteredService service) {
-                return p.getAttributes();
+            public RegisteredServicePrincipalAttributesRepository getPrincipalAttributesRepository() {
+                return new DefaultPrincipalAttributesRepository();
+            }
+
+            @Override
+            public Map<String, List<Object>> getAttributes(final RegisteredServiceAttributeReleasePolicyContext context) {
+                return context.getPrincipal().getAttributes();
             }
         };
         assertNull(policy.getConsentPolicy());
-        assertNull(policy.getPrincipalAttributesRepository());
+        assertNotNull(policy.getPrincipalAttributesRepository());
         assertTrue(policy.isAuthorizedToReleaseAuthenticationAttributes());
         assertFalse(policy.isAuthorizedToReleaseCredentialPassword());
         assertFalse(policy.isAuthorizedToReleaseProxyGrantingTicket());
+        assertEquals(0, policy.getOrder());
 
-        val p = PrincipalFactoryUtils.newPrincipalFactory()
+        val principal = PrincipalFactoryUtils.newPrincipalFactory()
             .createPrincipal("uid", Collections.singletonMap("mail", List.of("final@example.com")));
-        val attrs = policy.getConsentableAttributes(p, CoreAttributesTestUtils.getService(), CoreAttributesTestUtils.getRegisteredService());
-        assertEquals(p.getAttributes(), attrs);
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAttributesTestUtils.getRegisteredService())
+            .service(CoreAttributesTestUtils.getService())
+            .principal(principal)
+            .build();
+        val attrs = policy.getConsentableAttributes(context);
+        assertEquals(principal.getAttributes(), attrs);
+
+        assertDoesNotThrow(() -> policy.setAttributeFilter(null));
 
     }
 }

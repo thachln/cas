@@ -3,11 +3,12 @@ package org.apereo.cas;
 
 import org.apereo.cas.web.flow.CheckConsentRequiredActionTests;
 import org.apereo.cas.web.flow.ConfirmConsentActionTests;
+import org.apereo.cas.web.flow.ConsentAccountProfilePrepareActionTests;
+import org.apereo.cas.web.flow.ConsentAccountProfileWebflowConfigurerTests;
 import org.apereo.cas.web.flow.ConsentWebflowConfigurerTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * This is {@link AllTestsSuite}.
@@ -16,10 +17,12 @@ import org.junit.runner.RunWith;
  * @since 6.0.0-RC3
  */
 @SelectClasses({
+    ConsentAccountProfileWebflowConfigurerTests.class,
+    ConsentAccountProfilePrepareActionTests.class,
     ConfirmConsentActionTests.class,
     ConsentWebflowConfigurerTests.class,
     CheckConsentRequiredActionTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class AllTestsSuite {
 }

@@ -24,7 +24,7 @@ import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguratio
 import org.apereo.cas.config.support.authentication.GoogleAuthenticatorAuthenticationEventExecutionPlanConfiguration;
 import org.apereo.cas.config.support.authentication.GoogleAuthenticatorAuthenticationMultifactorProviderBypassConfiguration;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 import org.apereo.cas.web.config.CasCookieConfiguration;
 import org.apereo.cas.web.flow.config.CasCoreWebflowConfiguration;
 import org.apereo.cas.web.flow.config.CasMultifactorAuthenticationWebflowConfiguration;
@@ -34,6 +34,7 @@ import lombok.Getter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
@@ -72,6 +73,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     GoogleAuthenticatorAuthenticationMultifactorProviderBypassConfiguration.class,
     GoogleAuthenticatorAuthenticationEventExecutionPlanConfiguration.class,
     AopAutoConfiguration.class,
+    WebMvcAutoConfiguration.class,
     CasCookieConfiguration.class,
     CasCoreConfiguration.class,
     CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
@@ -82,15 +84,17 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     "cas.authn.mfa.gauth.redis.host=localhost",
     "cas.authn.mfa.gauth.redis.port=6379"
 })
-@EnableTransactionManagement(proxyTargetClass = true)
-@EnableAspectJAutoProxy(proxyTargetClass = true)
+@EnableTransactionManagement(proxyTargetClass = false)
+@EnableAspectJAutoProxy(proxyTargetClass = false)
 @EnableScheduling
 @Getter
-@EnabledIfPortOpen(port = 6379)
+@EnabledIfListeningOnPort(port = 6379)
 public class GoogleAuthenticatorRedisTokenRepositoryTests extends BaseOneTimeTokenRepositoryTests {
 
+    @Override
     @BeforeEach
     public void initialize() {
+        super.initialize();
         oneTimeTokenAuthenticatorTokenRepository.removeAll();
     }
 }

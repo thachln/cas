@@ -1,9 +1,10 @@
 package org.apereo.cas.adaptors.u2f.storage;
 
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.function.FunctionUtils;
 
 import com.github.benmanes.caffeine.cache.LoadingCache;
-import lombok.SneakyThrows;
 import lombok.val;
 
 import java.io.Serializable;
@@ -24,8 +25,9 @@ public class U2FInMemoryDeviceRepository extends BaseU2FDeviceRepository {
 
     public U2FInMemoryDeviceRepository(final LoadingCache<String, List<U2FDeviceRegistration>> userStorage,
                                        final LoadingCache<String, String> requestStorage,
-                                       final CipherExecutor<Serializable, String> cipherExecutor) {
-        super(requestStorage, cipherExecutor);
+                                       final CipherExecutor<Serializable, String> cipherExecutor,
+                                       final CasConfigurationProperties casProperties) {
+        super(casProperties, requestStorage, cipherExecutor);
         this.userStorage = userStorage;
     }
 
@@ -35,32 +37,21 @@ public class U2FInMemoryDeviceRepository extends BaseU2FDeviceRepository {
     }
 
     @Override
-    @SneakyThrows
-    public Collection<? extends U2FDeviceRegistration> getRegisteredDevices(final String username) {
-        val values = userStorage.get(username);
-        if (values == null) {
-            return new ArrayList<>(0);
-        }
-        return values;
+    public List<U2FDeviceRegistration> getRegisteredDevices(final String username) {
+        return FunctionUtils.doUnchecked(() -> {
+            val values = userStorage.get(username);
+            if (values == null) {
+                return new ArrayList<>(0);
+            }
+            return values;
+        });
     }
 
     @Override
     public U2FDeviceRegistration registerDevice(final U2FDeviceRegistration registration) {
-        val values = userStorage.get(registration.getUsername());
-        if (values != null) {
-            values.add(registration);
-            userStorage.put(registration.getUsername(), values);
-        }
-        return registration;
-    }
-
-    @Override
-    public U2FDeviceRegistration verifyRegisteredDevice(final U2FDeviceRegistration registration) {
-        val values = userStorage.get(registration.getUsername());
-        if (values != null && values.isEmpty()) {
-            values.add(registration);
-            userStorage.put(registration.getUsername(), values);
-        }
+        val values = getRegisteredDevices(registration.getUsername());
+        values.add(registration);
+        userStorage.put(registration.getUsername(), new ArrayList<>(values));
         return registration;
     }
 

@@ -10,15 +10,14 @@ import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.MockWebServer;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -31,7 +30,7 @@ import java.time.ZonedDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.http.HttpStatus.OK;
+import static org.springframework.http.HttpStatus.*;
 
 /**
  * This is {@link RestfulYubiKeyAccountRegistryTests}.
@@ -39,7 +38,7 @@ import static org.springframework.http.HttpStatus.OK;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@Tag("RestfulApi")
+@Tag("RestfulApiAuthentication")
 @Getter
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 @SpringBootTest(classes = BaseYubiKeyTests.SharedTestConfiguration.class,
@@ -49,8 +48,8 @@ import static org.springframework.http.HttpStatus.OK;
         "cas.authn.mfa.yubikey.rest.url=http://localhost:6591"
     })
 public class RestfulYubiKeyAccountRegistryTests {
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules()
-        .enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
     @Autowired
     @Qualifier("yubiKeyAccountRegistry")
@@ -61,21 +60,16 @@ public class RestfulYubiKeyAccountRegistryTests {
     private CipherExecutor yubikeyAccountCipherExecutor;
 
     @Test
-    public void verifyRegistration() throws Exception {
+    public void verifyRegistration() {
         try (val webServer = new MockWebServer(6591,
             new ByteArrayResource(StringUtils.EMPTY.getBytes(StandardCharsets.UTF_8), "Output"), OK)) {
             webServer.start();
-
             val request = YubiKeyDeviceRegistrationRequest.builder().username("casuser")
                 .token(AbstractYubiKeyAccountRegistryTests.OTP).name(UUID.randomUUID().toString()).build();
             assertTrue(getYubiKeyAccountRegistry().registerAccountFor(request));
-
-            assertDoesNotThrow(new Executable() {
-                @Override
-                public void execute() throws Throwable {
-                    getYubiKeyAccountRegistry().delete(request.getUsername());
-                    getYubiKeyAccountRegistry().deleteAll();
-                }
+            assertDoesNotThrow(() -> {
+                getYubiKeyAccountRegistry().delete(request.getUsername());
+                getYubiKeyAccountRegistry().deleteAll();
             });
         }
     }
@@ -101,12 +95,7 @@ public class RestfulYubiKeyAccountRegistryTests {
                 .token(AbstractYubiKeyAccountRegistryTests.OTP).name(UUID.randomUUID().toString()).build();
             assertTrue(getYubiKeyAccountRegistry().isYubiKeyRegisteredFor(request.getUsername()));
 
-            assertDoesNotThrow(new Executable() {
-                @Override
-                public void execute() throws Throwable {
-                    getYubiKeyAccountRegistry().delete(account.getUsername(), registeredDevice.getId());
-                }
-            });
+            assertDoesNotThrow(() -> getYubiKeyAccountRegistry().delete(account.getUsername(), registeredDevice.getId()));
         }
     }
 
@@ -128,6 +117,15 @@ public class RestfulYubiKeyAccountRegistryTests {
                 .getBytes(StandardCharsets.UTF_8), "Output"), OK)) {
             webServer.start();
             assertFalse(getYubiKeyAccountRegistry().getAccounts().isEmpty());
+        }
+    }
+
+    @Test
+    public void verifyFailsAccount() {
+        try (val webServer = new MockWebServer(6591,
+            new ByteArrayResource("...".getBytes(StandardCharsets.UTF_8), "Output"), OK)) {
+            webServer.start();
+            assertTrue(getYubiKeyAccountRegistry().getAccounts().isEmpty());
         }
     }
 }

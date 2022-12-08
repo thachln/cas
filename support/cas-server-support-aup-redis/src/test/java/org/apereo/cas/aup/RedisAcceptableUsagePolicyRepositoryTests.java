@@ -2,7 +2,7 @@ package org.apereo.cas.aup;
 
 import org.apereo.cas.config.CasAcceptableUsagePolicyRedisConfiguration;
 import org.apereo.cas.util.CollectionUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import org.junit.jupiter.api.Tag;
@@ -24,20 +24,20 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Tag("Redis")
 @Import(CasAcceptableUsagePolicyRedisConfiguration.class)
-@EnabledIfPortOpen(port = 6379)
+@EnabledIfListeningOnPort(port = 6379)
 @TestPropertySource(properties = {
     "cas.acceptable-usage-policy.redis.host=localhost",
     "cas.acceptable-usage-policy.redis.port=6379",
-    "cas.acceptable-usage-policy.aup-attribute-name=accepted"
+    "cas.acceptable-usage-policy.core.aup-attribute-name=accepted"
 })
 @Getter
 public class RedisAcceptableUsagePolicyRepositoryTests extends BaseAcceptableUsagePolicyRepositoryTests {
     @Autowired
-    @Qualifier("acceptableUsagePolicyRepository")
+    @Qualifier(AcceptableUsagePolicyRepository.BEAN_NAME)
     protected AcceptableUsagePolicyRepository acceptableUsagePolicyRepository;
 
     @Test
-    public void verifyOperation() {
+    public void verifyOperation() throws Exception {
         assertNotNull(acceptableUsagePolicyRepository);
         verifyRepositoryAction("casuser",
             CollectionUtils.wrap("accepted", List.of("false"), "email", List.of("CASuser@example.org")));

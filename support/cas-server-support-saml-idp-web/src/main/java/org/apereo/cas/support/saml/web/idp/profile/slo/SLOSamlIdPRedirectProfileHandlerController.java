@@ -7,8 +7,8 @@ import lombok.val;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * This is {@link SLOSamlIdPRedirectProfileHandlerController}, responsible for
@@ -32,7 +32,7 @@ public class SLOSamlIdPRedirectProfileHandlerController extends AbstractSamlSLOP
     @GetMapping(path = SamlIdPConstants.ENDPOINT_SAML2_SLO_PROFILE_REDIRECT)
     protected void handleSaml2ProfileSLORedirectRequest(final HttpServletResponse response,
                                                         final HttpServletRequest request) throws Exception {
-        val decoder = getSamlProfileHandlerConfigurationContext().getSamlMessageDecoders().getInstance(HttpMethod.GET);
+        val decoder = getConfigurationContext().getSamlMessageDecoders().getInstance(HttpMethod.GET);
         handleSloProfileRequest(response, request, decoder);
     }
 }

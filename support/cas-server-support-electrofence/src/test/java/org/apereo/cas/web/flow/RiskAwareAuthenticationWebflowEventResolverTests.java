@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -39,11 +38,11 @@ import static org.junit.jupiter.api.Assertions.*;
     CasCoreMultifactorAuthenticationConfiguration.class,
     CasMultifactorAuthenticationWebflowConfiguration.class,
     ElectronicFenceConfiguration.class,
-    ElectronicFenceWebflowConfiguration.class,
-    BaseWebflowConfigurerTests.SharedTestConfiguration.class
+    ElectronicFenceWebflowConfiguration.class
 })
 @Tag("WebflowEvents")
 @TestPropertySource(properties = {
+    "cas.authn.adaptive.risk.ip.enabled=true",
     "cas.authn.adaptive.risk.response.sms.text=Message",
     "cas.authn.adaptive.risk.response.sms.from=3487244312"
 })
@@ -51,10 +50,7 @@ public class RiskAwareAuthenticationWebflowEventResolverTests extends BaseWebflo
     @Autowired
     @Qualifier("riskAwareAuthenticationWebflowEventResolver")
     private CasWebflowEventResolver riskAwareAuthenticationWebflowEventResolver;
-
-    @Autowired
-    private ConfigurableApplicationContext applicationContext;
-
+    
     @Test
     public void verifyNoResolution() {
         assertNotNull(riskAwareAuthenticationWebflowEventResolver);

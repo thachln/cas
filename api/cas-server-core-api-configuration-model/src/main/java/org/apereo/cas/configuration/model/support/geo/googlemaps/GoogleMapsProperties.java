@@ -1,12 +1,15 @@
 package org.apereo.cas.configuration.model.support.geo.googlemaps;
 
 import org.apereo.cas.configuration.model.support.geo.BaseGeoLocationProperties;
+import org.apereo.cas.configuration.support.DurationCapable;
 import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+
+import java.io.Serial;
 
 /**
  * This is {@link GoogleMapsProperties}.
@@ -20,6 +23,7 @@ import lombok.experimental.Accessors;
 @Setter
 public class GoogleMapsProperties extends BaseGeoLocationProperties {
 
+    @Serial
     private static final long serialVersionUID = 4661113818711911462L;
 
     /**
@@ -43,6 +47,7 @@ public class GoogleMapsProperties extends BaseGeoLocationProperties {
     /**
      * The connection timeout when reaching out to google maps.
      */
+    @DurationCapable
     private String connectTimeout = "PT3S";
 
     /**

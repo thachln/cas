@@ -1,7 +1,6 @@
 package org.apereo.cas.web.flow;
 
 import org.apereo.cas.api.PasswordlessUserAccount;
-import org.apereo.cas.web.support.WebUtils;
 
 import lombok.val;
 import org.junit.jupiter.api.Tag;
@@ -26,11 +25,11 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@Tag("WebflowActions")
+@Tag("WebflowAuthenticationActions")
 public class PrepareForPasswordlessAuthenticationActionTests extends BasePasswordlessAuthenticationActionTests {
     @Autowired
-    @Qualifier(CasWebflowConstants.ACTION_ID_INIT_LOGIN_ACTION)
-    private Action initializeLoginAction;
+    @Qualifier(CasWebflowConstants.ACTION_ID_PASSWORDLESS_PREPARE_LOGIN)
+    private Action prepareLoginAction;
 
     @Test
     public void verifyAction() throws Exception {
@@ -39,15 +38,15 @@ public class PrepareForPasswordlessAuthenticationActionTests extends BasePasswor
 
         val request = new MockHttpServletRequest();
         context.setExternalContext(new ServletExternalContext(new MockServletContext(), request, new MockHttpServletResponse()));
-        assertEquals(PasswordlessAuthenticationWebflowConfigurer.TRANSITION_ID_PASSWORDLESS_GET_USERID, initializeLoginAction.execute(context).getId());
+        assertEquals(CasWebflowConstants.TRANSITION_ID_PASSWORDLESS_GET_USERID, prepareLoginAction.execute(context).getId());
+
         val account = PasswordlessUserAccount.builder()
             .email("email")
             .phone("phone")
             .username("casuser")
             .name("casuser")
             .build();
-        WebUtils.putPasswordlessAuthenticationAccount(context, account);
-
-        assertEquals(CasWebflowConstants.TRANSITION_ID_SUCCESS, initializeLoginAction.execute(context).getId());
+        PasswordlessWebflowUtils.putPasswordlessAuthenticationAccount(context, account);
+        assertNull(prepareLoginAction.execute(context));
     }
 }

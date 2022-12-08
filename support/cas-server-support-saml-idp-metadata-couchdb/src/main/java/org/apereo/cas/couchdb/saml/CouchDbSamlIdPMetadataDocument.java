@@ -4,8 +4,12 @@ import org.apereo.cas.support.saml.services.idp.metadata.SamlIdPMetadataDocument
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
+
+import java.io.Serial;
 
 /**
  * This is {@link CouchDbSamlIdPMetadataDocument}.
@@ -15,7 +19,11 @@ import lombok.NoArgsConstructor;
  */
 @NoArgsConstructor
 @Getter
+@SuperBuilder
 public class CouchDbSamlIdPMetadataDocument extends SamlIdPMetadataDocument {
+    @Serial
+    private static final long serialVersionUID = 915217132219326234L;
+
     @JsonProperty("_id")
     private String cid;
 
@@ -47,6 +55,7 @@ public class CouchDbSamlIdPMetadataDocument extends SamlIdPMetadataDocument {
      * @param doc other doc
      * @return this
      */
+    @CanIgnoreReturnValue
     public CouchDbSamlIdPMetadataDocument merge(final SamlIdPMetadataDocument doc) {
         setId(doc.getId());
         setMetadata(doc.getMetadata());

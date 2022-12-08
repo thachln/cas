@@ -5,10 +5,13 @@ import org.apereo.cas.configuration.model.support.jpa.AbstractJpaProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 import org.apereo.cas.util.crypto.CipherExecutor;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
+
+import java.io.Serial;
 
 /**
  * Configuration properties class for saml metadata based on JPA.
@@ -20,8 +23,10 @@ import org.springframework.boot.context.properties.NestedConfigurationProperty;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("JpaSamlMetadataProperties")
 public class JpaSamlMetadataProperties extends AbstractJpaProperties {
 
+    @Serial
     private static final long serialVersionUID = 352435146313504995L;
 
     /**

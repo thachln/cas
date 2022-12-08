@@ -1,9 +1,11 @@
 package org.apereo.cas.support.saml.services;
 
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.services.RegisteredServiceAttributeReleasePolicyContext;
 import org.apereo.cas.support.saml.BaseSamlIdPConfigurationTests;
 import org.apereo.cas.support.saml.SamlIdPTestUtils;
 import org.apereo.cas.util.CollectionUtils;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.val;
@@ -23,24 +25,30 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.1.0
  */
-@Tag("SAML")
+@Tag("SAML2")
 @TestPropertySource(properties = {
-    "cas.authn.saml-idp.entity-id=https://cas.example.org/idp",
-    "cas.authn.saml-idp.metadata.location=${#systemProperties['java.io.tmpdir']}/idp-metadata"
+    "cas.authn.saml-idp.core.entity-id=https://cas.example.org/idp",
+    "cas.authn.saml-idp.metadata.file-system.location=${#systemProperties['java.io.tmpdir']}/idp-metadata1"
 })
 public class RefedsRSAttributeReleasePolicyTests extends BaseSamlIdPConfigurationTests {
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "RefedsRSAttributeReleasePolicyTests.json");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
     @Test
     public void verifyMatch() {
         val filter = new RefedsRSAttributeReleasePolicy();
         val registeredService = SamlIdPTestUtils.getSamlRegisteredService();
         registeredService.setAttributeReleasePolicy(filter);
-        val attributes = filter.getAttributes(CoreAuthenticationTestUtils.getPrincipal("casuser",
-            CollectionUtils.wrap("eduPersonPrincipalName", "cas-eduPerson-user")),
-            CoreAuthenticationTestUtils.getService(), registeredService);
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(registeredService)
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(CoreAuthenticationTestUtils.getPrincipal("casuser",
+                CollectionUtils.wrap("eduPersonPrincipalName", "cas-eduPerson-user")))
+            .build();
+        val attributes = filter.getAttributes(context);
+
         assertFalse(attributes.isEmpty());
         assertTrue(attributes.containsKey("eduPersonPrincipalName"));
     }

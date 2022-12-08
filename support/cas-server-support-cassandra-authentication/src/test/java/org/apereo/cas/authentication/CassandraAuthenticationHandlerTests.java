@@ -1,7 +1,9 @@
 package org.apereo.cas.authentication;
 
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.config.CasCoreAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPrincipalConfiguration;
+import org.apereo.cas.config.CasCoreAuthenticationServiceSelectionStrategyConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationSupportConfiguration;
 import org.apereo.cas.config.CasCoreConfiguration;
 import org.apereo.cas.config.CasCoreHttpConfiguration;
@@ -17,9 +19,8 @@ import org.apereo.cas.config.CassandraAuthenticationConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
-import lombok.SneakyThrows;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ import javax.security.auth.login.AccountNotFoundException;
 import javax.security.auth.login.FailedLoginException;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * This is {@link CassandraAuthenticationHandlerTests}.
@@ -49,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.*;
     CasCoreAuthenticationConfiguration.class,
     CasCoreAuthenticationSupportConfiguration.class,
     CasCoreAuthenticationPrincipalConfiguration.class,
+    CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
     CasWebApplicationServiceFactoryConfiguration.class,
     CasCoreTicketIdGeneratorsConfiguration.class,
     CasCoreTicketCatalogConfiguration.class,
@@ -63,11 +66,15 @@ import static org.junit.jupiter.api.Assertions.*;
     "cas.authn.cassandra.local-dc=datacenter1",
     "cas.authn.cassandra.username-attribute=user_attr",
     "cas.authn.cassandra.password-attribute=pwd_attr",
-    "cas.authn.cassandra.keyspace=cas"
+    "cas.authn.cassandra.keyspace=cas",
+    "cas.authn.cassandra.username=casuser",
+    "cas.authn.cassandra.password=password",
+    "cas.authn.cassandra.ssl-protocols=TLSv1.2",
+    "cas.http-client.host-name-verifier=none"
 })
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 @Tag("Cassandra")
-@EnabledIfPortOpen(port = 9042)
+@EnabledIfListeningOnPort(port = 9042)
 public class CassandraAuthenticationHandlerTests {
     @Autowired
     @Qualifier("cassandraAuthenticationHandler")
@@ -76,20 +83,19 @@ public class CassandraAuthenticationHandlerTests {
     @Test
     public void verifyUserNotFound() {
         val c = CoreAuthenticationTestUtils.getCredentialsWithDifferentUsernameAndPassword("baduser", "Mellon");
-        assertThrows(AccountNotFoundException.class, () -> cassandraAuthenticationHandler.authenticate(c));
+        assertThrows(AccountNotFoundException.class, () -> cassandraAuthenticationHandler.authenticate(c, mock(Service.class)));
     }
 
     @Test
     public void verifyUserBadPassword() {
         val c = CoreAuthenticationTestUtils.getCredentialsWithDifferentUsernameAndPassword("casuser", "bad");
-        assertThrows(FailedLoginException.class, () -> cassandraAuthenticationHandler.authenticate(c));
+        assertThrows(FailedLoginException.class, () -> cassandraAuthenticationHandler.authenticate(c, mock(Service.class)));
     }
 
     @Test
-    @SneakyThrows
-    public void verifyUser() {
+    public void verifyUser() throws Exception {
         val c = CoreAuthenticationTestUtils.getCredentialsWithDifferentUsernameAndPassword("casuser", "Mellon");
-        val result = cassandraAuthenticationHandler.authenticate(c);
+        val result = cassandraAuthenticationHandler.authenticate(c, mock(Service.class));
         assertNotNull(result);
         assertEquals("casuser", result.getPrincipal().getId());
     }

@@ -1,6 +1,8 @@
 package org.apereo.cas.ticket.refreshtoken;
 
-import org.apereo.cas.ticket.TicketState;
+
+import org.apereo.cas.ticket.Ticket;
+import org.apereo.cas.ticket.TicketGrantingTicketAwareTicket;
 import org.apereo.cas.ticket.expiration.AbstractCasExpirationPolicy;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -12,6 +14,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.val;
 
+import java.io.Serial;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -28,6 +31,7 @@ import java.time.temporal.ChronoUnit;
 @ToString(callSuper = true)
 public class OAuth20RefreshTokenExpirationPolicy extends AbstractCasExpirationPolicy {
 
+    @Serial
     private static final long serialVersionUID = -7144233906843566234L;
 
     /**
@@ -41,17 +45,16 @@ public class OAuth20RefreshTokenExpirationPolicy extends AbstractCasExpirationPo
      * @param timeToKillInSeconds the time to kill in seconds
      */
     @JsonCreator
-    public OAuth20RefreshTokenExpirationPolicy(@JsonProperty("timeToLive") final long timeToKillInSeconds) {
+    public OAuth20RefreshTokenExpirationPolicy(
+        @JsonProperty("timeToLive")
+        final long timeToKillInSeconds) {
         this.timeToKillInSeconds = timeToKillInSeconds;
     }
 
     @Override
-    public boolean isExpired(final TicketState ticketState) {
+    public boolean isExpired(final TicketGrantingTicketAwareTicket ticketState) {
         val expired = isRefreshTokenExpired(ticketState);
-        if (!expired) {
-            return super.isExpired(ticketState);
-        }
-        return expired;
+        return expired || super.isExpired(ticketState);
     }
 
     @Override
@@ -72,12 +75,19 @@ public class OAuth20RefreshTokenExpirationPolicy extends AbstractCasExpirationPo
      * @return true/false
      */
     @JsonIgnore
-    protected boolean isRefreshTokenExpired(final TicketState ticketState) {
+    protected boolean isRefreshTokenExpired(final Ticket ticketState) {
         if (ticketState == null) {
             return true;
         }
-        val expiringTime = ticketState.getCreationTime().plus(this.timeToKillInSeconds, ChronoUnit.SECONDS);
+        val expiringTime = getMaximumExpirationTime(ticketState);
         return expiringTime.isBefore(ZonedDateTime.now(ZoneOffset.UTC));
+    }
+
+    @JsonIgnore
+    @Override
+    public ZonedDateTime getMaximumExpirationTime(final Ticket ticketState) {
+        val creationTime = ticketState.getCreationTime();
+        return creationTime.plus(this.timeToKillInSeconds, ChronoUnit.SECONDS);
     }
 
     /**
@@ -91,15 +101,18 @@ public class OAuth20RefreshTokenExpirationPolicy extends AbstractCasExpirationPo
     @EqualsAndHashCode(callSuper = true)
     @ToString(callSuper = true)
     public static class OAuthRefreshTokenStandaloneExpirationPolicy extends OAuth20RefreshTokenExpirationPolicy {
+        @Serial
         private static final long serialVersionUID = -7768661082888351104L;
 
         @JsonCreator
-        public OAuthRefreshTokenStandaloneExpirationPolicy(@JsonProperty("timeToLive") final long timeToKillInSeconds) {
+        public OAuthRefreshTokenStandaloneExpirationPolicy(
+            @JsonProperty("timeToLive")
+            final long timeToKillInSeconds) {
             super(timeToKillInSeconds);
         }
 
         @Override
-        public boolean isExpired(final TicketState ticketState) {
+        public boolean isExpired(final TicketGrantingTicketAwareTicket ticketState) {
             return isRefreshTokenExpired(ticketState);
         }
     }

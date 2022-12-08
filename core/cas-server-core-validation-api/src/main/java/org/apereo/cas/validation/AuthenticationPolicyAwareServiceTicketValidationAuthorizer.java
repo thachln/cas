@@ -15,7 +15,7 @@ import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ConfigurableApplicationContext;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -34,14 +34,14 @@ public class AuthenticationPolicyAwareServiceTicketValidationAuthorizer implemen
     private final AuthenticationEventExecutionPlan authenticationEventExecutionPlan;
 
     private final ConfigurableApplicationContext applicationContext;
-    
+
     @Override
     public void authorize(final HttpServletRequest request, final Service service, final Assertion assertion) {
         val registeredService = this.servicesManager.findServiceBy(service);
         RegisteredServiceAccessStrategyUtils.ensureServiceAccessIsAllowed(service, registeredService);
 
         LOGGER.debug("Evaluating service [{}] to ensure required authentication handlers can satisfy assertion", service);
-        val primaryAuthentication = assertion.getPrimaryAuthentication();
+        val primaryAuthentication = assertion.primaryAuthentication();
         val attributes = primaryAuthentication.getAttributes();
         if (!attributes.containsKey(AuthenticationHandler.SUCCESSFUL_AUTHENTICATION_HANDLERS)) {
             throw new UnauthorizedServiceException(UnauthorizedServiceException.CODE_UNAUTHZ_SERVICE, StringUtils.EMPTY);
@@ -57,7 +57,8 @@ public class AuthenticationPolicyAwareServiceTicketValidationAuthorizer implemen
             try {
                 val simpleName = p.getClass().getSimpleName();
                 LOGGER.trace("Executing authentication policy [{}]", simpleName);
-                if (!p.isSatisfiedBy(primaryAuthentication, assertedHandlers, applicationContext, Optional.of(assertion))) {
+                val result = p.isSatisfiedBy(primaryAuthentication, assertedHandlers, applicationContext, Optional.of(assertion));
+                if (!result.isSuccess()) {
                     throw new UnauthorizedServiceException(UnauthorizedServiceException.CODE_UNAUTHZ_SERVICE, StringUtils.EMPTY);
                 }
             } catch (final Exception e) {

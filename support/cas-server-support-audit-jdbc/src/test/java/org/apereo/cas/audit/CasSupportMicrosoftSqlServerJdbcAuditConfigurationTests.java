@@ -1,6 +1,6 @@
 package org.apereo.cas.audit;
 
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import org.junit.jupiter.api.Tag;
 import org.springframework.test.context.TestPropertySource;
@@ -15,10 +15,10 @@ import org.springframework.test.context.TestPropertySource;
     "cas.audit.jdbc.user=sa",
     "cas.audit.jdbc.password=p@ssw0rd",
     "cas.audit.jdbc.driver-class=com.microsoft.sqlserver.jdbc.SQLServerDriver",
-    "cas.audit.jdbc.url=jdbc:sqlserver://localhost:1433;databaseName=audit",
-    "cas.audit.jdbc.dialect=org.hibernate.dialect.SQLServer2012Dialect"
+    "cas.audit.jdbc.url=jdbc:sqlserver://localhost:1433;databaseName=audit;encrypt=false;trustServerCertificate=true",
+    "cas.audit.jdbc.dialect=org.hibernate.dialect.SQLServer2016Dialect"
     })
-@EnabledIfPortOpen(port = 1433)
+@EnabledIfListeningOnPort(port = 1433)
 @Tag("MsSqlServer")
 public class CasSupportMicrosoftSqlServerJdbcAuditConfigurationTests extends CasSupportJdbcAuditConfigurationTests {
 }

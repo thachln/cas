@@ -4,13 +4,15 @@ import org.apereo.cas.authentication.Authentication;
 import org.apereo.cas.authentication.MultifactorAuthenticationProvider;
 import org.apereo.cas.configuration.model.support.mfa.MultifactorAuthenticationProviderBypassProperties;
 import org.apereo.cas.services.RegisteredService;
-import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 import org.apereo.cas.util.scripting.WatchableGroovyScriptResource;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.io.Serial;
 
 /**
  * This is {@link GroovyMultifactorAuthenticationProviderBypassEvaluator}.
@@ -20,6 +22,7 @@ import javax.servlet.http.HttpServletRequest;
  */
 @Slf4j
 public class GroovyMultifactorAuthenticationProviderBypassEvaluator extends BaseMultifactorAuthenticationProviderBypassEvaluator {
+    @Serial
     private static final long serialVersionUID = -4909072898415688377L;
 
     private final transient WatchableGroovyScriptResource watchableScript;
@@ -36,16 +39,14 @@ public class GroovyMultifactorAuthenticationProviderBypassEvaluator extends Base
                                                                           final RegisteredService registeredService,
                                                                           final MultifactorAuthenticationProvider provider,
                                                                           final HttpServletRequest request) {
-        try {
-            val principal = authentication.getPrincipal();
+        return FunctionUtils.doAndHandle(() -> {
+            val principal = resolvePrincipal(authentication.getPrincipal());
             LOGGER.debug("Evaluating multifactor authentication bypass properties for principal [{}], "
-                    + "service [{}] and provider [{}] via Groovy script [{}]",
+                         + "service [{}] and provider [{}] via Groovy script [{}]",
                 principal.getId(), registeredService, provider, watchableScript.getResource());
             val args = new Object[]{authentication, principal, registeredService, provider, LOGGER, request};
             return watchableScript.execute(args, Boolean.class);
-        } catch (final Exception e) {
-            LoggingUtils.error(LOGGER, e);
-            return true;
-        }
+        }, e -> true).get();
+
     }
 }

@@ -1,14 +1,15 @@
 package org.apereo.cas.support.oauth.web.audit;
 
 import org.apereo.cas.audit.AuditableExecutionResult;
-import org.apereo.cas.support.oauth.web.response.accesstoken.ext.AccessTokenRequestDataHolder;
+import org.apereo.cas.support.oauth.OAuth20Constants;
+import org.apereo.cas.support.oauth.web.response.accesstoken.ext.AccessTokenRequestContext;
 
 import lombok.val;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apereo.inspektr.audit.spi.support.ReturnValueAsStringResourceResolver;
 import org.aspectj.lang.JoinPoint;
+
+import java.util.HashMap;
 
 /**
  * The {@link OAuth20AccessTokenGrantRequestAuditResourceResolver} for audit advice
@@ -25,18 +26,16 @@ public class OAuth20AccessTokenGrantRequestAuditResourceResolver extends ReturnV
         val executionResult = auditResult.getExecutionResult();
 
         if (executionResult.isPresent()) {
-            val accessTokenRequest = (AccessTokenRequestDataHolder) executionResult.get();
+            val accessTokenRequest = (AccessTokenRequestContext) executionResult.get();
             val tokenId = accessTokenRequest.getToken() == null ? "N/A" : accessTokenRequest.getToken().getId();
-
-            val result = new ToStringBuilder(this, ToStringStyle.NO_CLASS_NAME_STYLE)
-                .append("token", tokenId)
-                .append("client_id", accessTokenRequest.getRegisteredService().getClientId())
-                .append("service", accessTokenRequest.getService().getId())
-                .append("grant_type", accessTokenRequest.getGrantType().getType())
-                .append("response_type", accessTokenRequest.getResponseType().getType())
-                .append("scopes", accessTokenRequest.getScopes())
-                .toString();
-            return new String[]{result};
+            val values = new HashMap<>();
+            values.put("token", tokenId);
+            values.put("client_id", accessTokenRequest.getRegisteredService().getClientId());
+            values.put("service", accessTokenRequest.getService().getId());
+            values.put("grant_type", accessTokenRequest.getGrantType().getType());
+            values.put("response_type", accessTokenRequest.getResponseType().getType());
+            values.put(OAuth20Constants.SCOPE, accessTokenRequest.getScopes());
+            return new String[]{auditFormat.serialize(values)};
         }
         return ArrayUtils.EMPTY_STRING_ARRAY;
     }

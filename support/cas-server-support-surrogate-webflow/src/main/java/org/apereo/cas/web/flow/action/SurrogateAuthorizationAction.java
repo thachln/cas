@@ -3,11 +3,11 @@ package org.apereo.cas.web.flow.action;
 import org.apereo.cas.audit.AuditableContext;
 import org.apereo.cas.audit.AuditableExecution;
 import org.apereo.cas.authentication.AuthenticationCredentialsThreadLocalBinder;
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.support.WebUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.val;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
 
@@ -18,7 +18,7 @@ import org.springframework.webflow.execution.RequestContext;
  * @since 5.2.0
  */
 @RequiredArgsConstructor
-public class SurrogateAuthorizationAction extends AbstractAction {
+public class SurrogateAuthorizationAction extends BaseCasWebflowAction {
     private final AuditableExecution registeredServiceAccessStrategyEnforcer;
 
     @Override
@@ -35,7 +35,6 @@ public class SurrogateAuthorizationAction extends AbstractAction {
                     .service(service)
                     .authentication(authentication)
                     .registeredService(svc)
-                    .retrievePrincipalAttributesFromReleasePolicy(Boolean.TRUE)
                     .build();
                 val accessResult = this.registeredServiceAccessStrategyEnforcer.execute(audit);
                 accessResult.throwExceptionIfNeeded();

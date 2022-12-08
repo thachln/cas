@@ -1,10 +1,10 @@
 package org.apereo.cas.support.saml.idp.metadata.writer;
 
 import org.apereo.cas.util.RandomUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.SneakyThrows;
 import lombok.val;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.DERSequence;
@@ -24,6 +24,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
@@ -40,41 +41,48 @@ public class DefaultSamlIdPCertificateAndKeyWriter implements SamlIdPCertificate
     private static final int X509_CERT_BITS_SIZE = 160;
 
     private int keySize = 2048;
+
     private String hostname;
+
     private String keyType = "RSA";
+
     private String certificateAlgorithm = "SHA256withRSA";
+
     private int certificateLifetimeInYears = 20;
+
     private List<String> uriSubjectAltNames;
 
-    @SneakyThrows
     @Override
     public void writeCertificateAndKey(final Writer privateKeyWriter, final Writer certificateWriter) {
-        val keypair = generateKeyPair();
-        val certificate = generateCertificate(keypair);
-        try (val keyOut = new JcaPEMWriter(privateKeyWriter)) {
-            keyOut.writeObject(keypair.getPrivate());
-            keyOut.flush();
-        }
+        FunctionUtils.doUnchecked(__ -> {
+            val keypair = generateKeyPair();
+            val certificate = generateCertificate(keypair);
+            try (val keyOut = new JcaPEMWriter(privateKeyWriter)) {
+                keyOut.writeObject(keypair.getPrivate());
+                keyOut.flush();
+            }
 
-        try (val certOut = new JcaPEMWriter(certificateWriter)) {
-            certOut.writeObject(certificate);
-            certOut.flush();
-        }
+            try (val certOut = new JcaPEMWriter(certificateWriter)) {
+                certOut.writeObject(certificate);
+                certOut.flush();
+            }
+        });
     }
 
-    @SneakyThrows
     private KeyPair generateKeyPair() {
-        val generator = KeyPairGenerator.getInstance(keyType);
-        generator.initialize(keySize);
-        return generator.generateKeyPair();
+        return FunctionUtils.doUnchecked(() -> {
+            val generator = KeyPairGenerator.getInstance(keyType);
+            generator.initialize(keySize);
+            return generator.generateKeyPair();
+        });
     }
 
-    @SuppressWarnings("JdkObsolete")
+    @SuppressWarnings("JavaUtilDate")
     private X509Certificate generateCertificate(final KeyPair keypair) throws Exception {
         val dn = new X500Name("CN=" + hostname);
         val notBefore = new GregorianCalendar();
         val notOnOrAfter = new GregorianCalendar();
-        notOnOrAfter.set(GregorianCalendar.YEAR, notOnOrAfter.get(GregorianCalendar.YEAR) + certificateLifetimeInYears);
+        notOnOrAfter.set(Calendar.YEAR, notOnOrAfter.get(Calendar.YEAR) + certificateLifetimeInYears);
 
         val builder = new JcaX509v3CertificateBuilder(
             dn,

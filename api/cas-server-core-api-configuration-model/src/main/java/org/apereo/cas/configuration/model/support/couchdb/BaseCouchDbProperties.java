@@ -1,11 +1,13 @@
 package org.apereo.cas.configuration.model.support.couchdb;
 
+import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -20,20 +22,25 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public abstract class BaseCouchDbProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1323894615409106853L;
 
     /**
      * Connection url.
      */
+    @RequiredProperty
     private String url = "http://localhost:5984";
 
     /**
      * Username for connection.
      */
+    @RequiredProperty
     private String username;
+
     /**
      * Password for connection.
      */
+    @RequiredProperty
     private String password;
 
     /**
@@ -97,9 +104,9 @@ public abstract class BaseCouchDbProperties implements Serializable {
     private int retries = 5;
 
     /**
-     * Database name. Defaults to +serviceRegistry+ and +ticketRegistry+ for the service and ticket registries,
-     * respectively.
+     * Database name.
      */
+    @RequiredProperty
     private String dbName;
 
     /**

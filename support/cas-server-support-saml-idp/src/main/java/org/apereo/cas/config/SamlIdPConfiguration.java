@@ -1,20 +1,25 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.CentralAuthenticationService;
+import org.apereo.cas.audit.AuditActionResolvers;
+import org.apereo.cas.audit.AuditPrincipalIdProvider;
+import org.apereo.cas.audit.AuditResourceResolvers;
 import org.apereo.cas.audit.AuditTrailConstants;
 import org.apereo.cas.audit.AuditTrailRecordResolutionPlanConfigurer;
-import org.apereo.cas.authentication.ProtocolAttributeEncoder;
 import org.apereo.cas.authentication.attribute.AttributeDefinitionStore;
+import org.apereo.cas.authentication.attribute.AttributeDefinitionStoreConfigurer;
+import org.apereo.cas.authentication.attribute.DefaultAttributeDefinitionStore;
 import org.apereo.cas.authentication.principal.PersistentIdGenerator;
 import org.apereo.cas.authentication.principal.ServiceFactory;
 import org.apereo.cas.configuration.CasConfigurationProperties;
-import org.apereo.cas.jpa.JpaPersistenceProviderConfigurer;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.logout.slo.SingleLogoutServiceLogoutUrlBuilder;
 import org.apereo.cas.logout.slo.SingleLogoutServiceLogoutUrlBuilderConfigurer;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.support.saml.OpenSamlConfigBean;
 import org.apereo.cas.support.saml.idp.metadata.locator.SamlIdPMetadataLocator;
-import org.apereo.cas.support.saml.services.SamlRegisteredService;
 import org.apereo.cas.support.saml.services.idp.metadata.cache.SamlRegisteredServiceCachingMetadataResolver;
+import org.apereo.cas.support.saml.web.idp.audit.SamlMetadataResolverAuditResourceResolver;
 import org.apereo.cas.support.saml.web.idp.audit.SamlRequestAuditResourceResolver;
 import org.apereo.cas.support.saml.web.idp.audit.SamlResponseAuditPrincipalIdProvider;
 import org.apereo.cas.support.saml.web.idp.audit.SamlResponseAuditResourceResolver;
@@ -22,13 +27,13 @@ import org.apereo.cas.support.saml.web.idp.profile.artifact.CasSamlArtifactMap;
 import org.apereo.cas.support.saml.web.idp.profile.builders.SamlProfileObjectBuilder;
 import org.apereo.cas.support.saml.web.idp.profile.builders.assertion.SamlProfileSamlAssertionBuilder;
 import org.apereo.cas.support.saml.web.idp.profile.builders.attr.SamlProfileSamlAttributeStatementBuilder;
-import org.apereo.cas.support.saml.web.idp.profile.builders.authn.AuthnContextClassRefBuilder;
-import org.apereo.cas.support.saml.web.idp.profile.builders.authn.DefaultAuthnContextClassRefBuilder;
+import org.apereo.cas.support.saml.web.idp.profile.builders.authn.DefaultSamlProfileAuthnContextClassRefBuilder;
+import org.apereo.cas.support.saml.web.idp.profile.builders.authn.SamlProfileAuthnContextClassRefBuilder;
 import org.apereo.cas.support.saml.web.idp.profile.builders.authn.SamlProfileSamlAuthNStatementBuilder;
 import org.apereo.cas.support.saml.web.idp.profile.builders.conditions.SamlProfileSamlConditionsBuilder;
+import org.apereo.cas.support.saml.web.idp.profile.builders.enc.DefaultSamlIdPObjectSigner;
 import org.apereo.cas.support.saml.web.idp.profile.builders.enc.SamlIdPObjectEncrypter;
 import org.apereo.cas.support.saml.web.idp.profile.builders.enc.SamlIdPObjectSigner;
-import org.apereo.cas.support.saml.web.idp.profile.builders.enc.attribute.SamlAttributeEncoder;
 import org.apereo.cas.support.saml.web.idp.profile.builders.nameid.SamlProfileSamlNameIdBuilder;
 import org.apereo.cas.support.saml.web.idp.profile.builders.response.SamlProfileSaml2ResponseBuilder;
 import org.apereo.cas.support.saml.web.idp.profile.builders.response.SamlProfileSamlResponseBuilderConfigurationContext;
@@ -41,6 +46,7 @@ import org.apereo.cas.support.saml.web.idp.profile.builders.response.soap.SamlPr
 import org.apereo.cas.support.saml.web.idp.profile.builders.subject.SamlProfileSamlSubjectBuilder;
 import org.apereo.cas.support.saml.web.idp.profile.slo.SamlIdPSingleLogoutServiceLogoutUrlBuilder;
 import org.apereo.cas.ticket.ExpirationPolicyBuilder;
+import org.apereo.cas.ticket.TicketFactory;
 import org.apereo.cas.ticket.TicketFactoryExecutionPlanConfigurer;
 import org.apereo.cas.ticket.artifact.DefaultSamlArtifactTicketFactory;
 import org.apereo.cas.ticket.artifact.SamlArtifactTicketExpirationPolicyBuilder;
@@ -49,34 +55,36 @@ import org.apereo.cas.ticket.query.DefaultSamlAttributeQueryTicketFactory;
 import org.apereo.cas.ticket.query.SamlAttributeQueryTicketExpirationPolicyBuilder;
 import org.apereo.cas.ticket.query.SamlAttributeQueryTicketFactory;
 import org.apereo.cas.ticket.registry.TicketRegistry;
+import org.apereo.cas.util.function.FunctionUtils;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
+import org.apereo.cas.web.UrlValidator;
 import org.apereo.cas.web.cookie.CasCookieBuilder;
 
 import lombok.val;
 import org.apache.velocity.app.VelocityEngine;
 import org.apereo.inspektr.audit.spi.support.DefaultAuditActionResolver;
+import org.opensaml.saml.common.SAMLObject;
 import org.opensaml.saml.common.binding.artifact.SAMLArtifactMap;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.AttributeStatement;
 import org.opensaml.saml.saml2.core.AuthnStatement;
 import org.opensaml.saml.saml2.core.Conditions;
-import org.opensaml.saml.saml2.core.NameID;
+import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.Subject;
-import org.opensaml.saml.saml2.ecp.Response;
-import org.pac4j.core.context.JEEContext;
+import org.opensaml.soap.soap11.Envelope;
 import org.pac4j.core.context.session.SessionStore;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.core.io.ClassPathResource;
 
 import java.time.Duration;
-import java.util.List;
 
 /**
  * The {@link SamlIdPConfiguration}.
@@ -84,335 +92,655 @@ import java.util.List;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration("samlIdPConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.SAMLIdentityProvider)
+@AutoConfiguration
 public class SamlIdPConfiguration {
-
-    @Autowired
-    @Qualifier("ticketGrantingTicketCookieGenerator")
-    private ObjectProvider<CasCookieBuilder> ticketGrantingTicketCookieGenerator;
-
-    @Autowired
-    @Qualifier("ticketRegistry")
-    private ObjectProvider<TicketRegistry> ticketRegistry;
-
-    @Autowired
-    @Qualifier("samlIdPDistributedSessionStore")
-    private ObjectProvider<SessionStore<JEEContext>> samlIdPDistributedSessionStore;
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("defaultSamlRegisteredServiceCachingMetadataResolver")
-    private ObjectProvider<SamlRegisteredServiceCachingMetadataResolver> defaultSamlRegisteredServiceCachingMetadataResolver;
-
-    @Autowired
-    @Qualifier("centralAuthenticationService")
-    private ObjectProvider<CentralAuthenticationService> centralAuthenticationService;
-
-    @Autowired
-    @Qualifier("casSamlIdPMetadataResolver")
-    private ObjectProvider<MetadataResolver> casSamlIdPMetadataResolver;
-
-    @Autowired
-    @Qualifier("shibbolethCompatiblePersistentIdGenerator")
-    private ObjectProvider<PersistentIdGenerator> shibbolethCompatiblePersistentIdGenerator;
-
-    @Autowired
-    @Qualifier("servicesManager")
-    private ObjectProvider<ServicesManager> servicesManager;
-
-    @Autowired
-    @Qualifier("shibboleth.OpenSAMLConfig")
-    private ObjectProvider<OpenSamlConfigBean> openSamlConfigBean;
-
-    @Autowired
-    @Qualifier("shibboleth.VelocityEngine")
-    private ObjectProvider<VelocityEngine> velocityEngineFactory;
-
-    @Autowired
-    @Qualifier("samlIdPServiceFactory")
-    private ObjectProvider<ServiceFactory> samlIdPServiceFactory;
-
-    @Autowired
-    @Qualifier("samlIdPMetadataLocator")
-    private ObjectProvider<SamlIdPMetadataLocator> samlIdPMetadataLocator;
-
-    @Autowired
-    @Qualifier("attributeDefinitionStore")
-    private ObjectProvider<AttributeDefinitionStore> attributeDefinitionStore;
-
-    @ConditionalOnMissingBean(name = "samlSingleLogoutServiceLogoutUrlBuilderConfigurer")
-    @Bean
-    @RefreshScope
-    public SingleLogoutServiceLogoutUrlBuilderConfigurer samlSingleLogoutServiceLogoutUrlBuilderConfigurer() {
-        return () -> new SamlIdPSingleLogoutServiceLogoutUrlBuilder(servicesManager.getObject(),
-            defaultSamlRegisteredServiceCachingMetadataResolver.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlResponseBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<org.opensaml.saml.saml2.core.Response> samlProfileSamlResponseBuilder() {
-        return new SamlProfileSaml2ResponseBuilder(getSamlResponseBuilderConfigurationContextBuilder().build());
-    }
-
-    @ConditionalOnMissingBean(name = "samlArtifactTicketFactory")
-    @Bean
-    @RefreshScope
-    public SamlArtifactTicketFactory samlArtifactTicketFactory() {
-        return new DefaultSamlArtifactTicketFactory(samlArtifactTicketExpirationPolicy(),
-            openSamlConfigBean.getObject(),
-            samlIdPServiceFactory.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "samlArtifactTicketFactoryConfigurer")
-    @Bean
-    @RefreshScope
-    public TicketFactoryExecutionPlanConfigurer samlArtifactTicketFactoryConfigurer() {
-        return this::samlArtifactTicketFactory;
-    }
-
-    @ConditionalOnMissingBean(name = "samlArtifactTicketExpirationPolicy")
-    @Bean
-    @RefreshScope
-    public ExpirationPolicyBuilder samlArtifactTicketExpirationPolicy() {
-        return new SamlArtifactTicketExpirationPolicyBuilder(casProperties);
-    }
-
-    @Bean(initMethod = "initialize", destroyMethod = "destroy")
-    @RefreshScope
-    public SAMLArtifactMap samlArtifactMap() {
-        val map = new CasSamlArtifactMap(ticketRegistry.getObject(),
-            samlArtifactTicketFactory(),
-            ticketGrantingTicketCookieGenerator.getObject(),
-            samlIdPDistributedSessionStore.getObject(),
-            centralAuthenticationService.getObject());
-        val expirationPolicy = samlArtifactTicketExpirationPolicy().buildTicketExpirationPolicy();
-        map.setArtifactLifetime(Duration.ofSeconds(expirationPolicy.getTimeToLive()));
-        return map;
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlSubjectBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<Subject> samlProfileSamlSubjectBuilder() {
-        return new SamlProfileSamlSubjectBuilder(openSamlConfigBean.getObject(),
-            samlProfileSamlNameIdBuilder(),
-            casProperties,
-            samlObjectEncrypter());
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlSoap11FaultResponseBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<Response> samlProfileSamlSoap11FaultResponseBuilder() {
-        val context = getSamlResponseBuilderConfigurationContextBuilder()
-            .samlSoapResponseBuilder(samlProfileSamlResponseBuilder())
-            .build();
-        return new SamlProfileSamlSoap11FaultResponseBuilder(context);
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlSoap11ResponseBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<Response> samlProfileSamlSoap11ResponseBuilder() {
-        val context = getSamlResponseBuilderConfigurationContextBuilder()
-            .samlSoapResponseBuilder(samlProfileSamlResponseBuilder())
-            .build();
-        return new SamlProfileSamlSoap11ResponseBuilder(context);
-    }
-
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlArtifactFaultResponseBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<org.opensaml.saml.saml2.core.Response> samlProfileSamlArtifactFaultResponseBuilder() {
-        val context = getSamlResponseBuilderConfigurationContextBuilder()
-            .samlSoapResponseBuilder(samlProfileSamlResponseBuilder())
-            .build();
-        return new SamlProfileArtifactFaultResponseBuilder(context);
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlArtifactResponseBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<org.opensaml.saml.saml2.core.Response> samlProfileSamlArtifactResponseBuilder() {
-        val context = getSamlResponseBuilderConfigurationContextBuilder()
-            .samlSoapResponseBuilder(samlProfileSamlResponseBuilder())
-            .build();
-        return new SamlProfileArtifactResponseBuilder(context);
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlNameIdBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<NameID> samlProfileSamlNameIdBuilder() {
-        return new SamlProfileSamlNameIdBuilder(openSamlConfigBean.getObject(),
-            shibbolethCompatiblePersistentIdGenerator.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlConditionsBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<Conditions> samlProfileSamlConditionsBuilder() {
-        return new SamlProfileSamlConditionsBuilder(openSamlConfigBean.getObject(), casProperties);
-    }
-
-    @ConditionalOnMissingBean(name = "defaultAuthnContextClassRefBuilder")
-    @Bean
-    @RefreshScope
-    public AuthnContextClassRefBuilder defaultAuthnContextClassRefBuilder() {
-        return new DefaultAuthnContextClassRefBuilder(casProperties);
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlAssertionBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder() {
-        return new SamlProfileSamlAssertionBuilder(
-            openSamlConfigBean.getObject(),
-            casProperties,
-            samlProfileSamlAuthNStatementBuilder(),
-            samlProfileSamlAttributeStatementBuilder(),
-            samlProfileSamlSubjectBuilder(),
-            samlProfileSamlConditionsBuilder(),
-            samlObjectSigner());
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlAuthNStatementBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<AuthnStatement> samlProfileSamlAuthNStatementBuilder() {
-        return new SamlProfileSamlAuthNStatementBuilder(openSamlConfigBean.getObject(), defaultAuthnContextClassRefBuilder(), casProperties);
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlAttributeStatementBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<AttributeStatement> samlProfileSamlAttributeStatementBuilder() {
-        return new SamlProfileSamlAttributeStatementBuilder(
-            openSamlConfigBean.getObject(),
-            samlAttributeEncoder(),
-            casProperties.getAuthn().getSamlIdp(),
-            samlObjectEncrypter(),
-            attributeDefinitionStore.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "samlAttributeEncoder")
-    @Bean
-    @RefreshScope
-    public ProtocolAttributeEncoder samlAttributeEncoder() {
-        return new SamlAttributeEncoder();
-    }
-
-    @ConditionalOnMissingBean(name = "samlObjectEncrypter")
-    @Bean
-    @RefreshScope
-    public SamlIdPObjectEncrypter samlObjectEncrypter() {
-        return new SamlIdPObjectEncrypter(casProperties.getAuthn().getSamlIdp());
-    }
-
-    @ConditionalOnMissingBean(name = "samlObjectSigner")
-    @Bean
-    @RefreshScope
-    public SamlIdPObjectSigner samlObjectSigner() {
-        return new SamlIdPObjectSigner(
-            this.casSamlIdPMetadataResolver.getObject(),
-            casProperties,
-            this.samlIdPMetadataLocator.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlAttributeQueryFaultResponseBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<org.opensaml.saml.saml2.core.Response> samlProfileSamlAttributeQueryFaultResponseBuilder() {
-        val context = getSamlResponseBuilderConfigurationContextBuilder()
-            .samlSoapResponseBuilder(samlProfileSamlResponseBuilder())
-            .build();
-        return new SamlProfileAttributeQueryFaultResponseBuilder(context);
-    }
-
-    @ConditionalOnMissingBean(name = "samlProfileSamlAttributeQueryResponseBuilder")
-    @Bean
-    @RefreshScope
-    public SamlProfileObjectBuilder<org.opensaml.saml.saml2.core.Response> samlProfileSamlAttributeQueryResponseBuilder() {
-        val context = getSamlResponseBuilderConfigurationContextBuilder()
-            .samlSoapResponseBuilder(samlProfileSamlResponseBuilder())
-            .build();
-        return new SamlProfileAttributeQueryResponseBuilder(context);
-    }
-
-    @ConditionalOnMissingBean(name = "samlAttributeQueryTicketFactory")
-    @Bean
-    @RefreshScope
-    public SamlAttributeQueryTicketFactory samlAttributeQueryTicketFactory() {
-        return new DefaultSamlAttributeQueryTicketFactory(
-            samlAttributeQueryTicketExpirationPolicy(),
-            samlIdPServiceFactory.getObject(),
-            openSamlConfigBean.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "samlAttributeQueryTicketFactoryConfigurer")
-    @Bean
-    @RefreshScope
-    public TicketFactoryExecutionPlanConfigurer samlAttributeQueryTicketFactoryConfigurer() {
-        return this::samlAttributeQueryTicketFactory;
-    }
-
-    @ConditionalOnMissingBean(name = "samlAttributeQueryTicketExpirationPolicy")
-    @Bean
-    @RefreshScope
-    public ExpirationPolicyBuilder samlAttributeQueryTicketExpirationPolicy() {
-        return new SamlAttributeQueryTicketExpirationPolicyBuilder(casProperties);
-    }
-
-    @Bean
-    public SamlResponseAuditPrincipalIdProvider samlResponseAuditPrincipalIdProvider() {
-        return new SamlResponseAuditPrincipalIdProvider();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(name = "casSamlIdPAuditTrailRecordResolutionPlanConfigurer")
-    public AuditTrailRecordResolutionPlanConfigurer casSamlIdPAuditTrailRecordResolutionPlanConfigurer() {
-        return plan -> {
-            plan.registerAuditResourceResolver("SAML2_RESPONSE_RESOURCE_RESOLVER", new SamlResponseAuditResourceResolver());
-            plan.registerAuditActionResolver("SAML2_RESPONSE_ACTION_RESOLVER",
-                new DefaultAuditActionResolver(AuditTrailConstants.AUDIT_ACTION_POSTFIX_CREATED, AuditTrailConstants.AUDIT_ACTION_POSTFIX_CREATED));
-
-            plan.registerAuditResourceResolver("SAML2_REQUEST_RESOURCE_RESOLVER", new SamlRequestAuditResourceResolver());
-            plan.registerAuditActionResolver("SAML2_REQUEST_ACTION_RESOLVER",
-                new DefaultAuditActionResolver(AuditTrailConstants.AUDIT_ACTION_POSTFIX_CREATED, AuditTrailConstants.AUDIT_ACTION_POSTFIX_CREATED));
-        };
-    }
-
-    @ConditionalOnClass(value = JpaPersistenceProviderConfigurer.class)
-    @Configuration("samlIdPJpaServiceRegistryConfiguration")
-    public static class SamlIdPJpaServiceRegistryConfiguration {
+    @Configuration(value = "SamlIdPProfileBuilderConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class SamlIdPProfileBuilderConfiguration {
+        @ConditionalOnMissingBean(name = "samlProfileSamlAttributeQueryFaultResponseBuilder")
         @Bean
-        @ConditionalOnMissingBean(name = "samlIdPJpaServicePersistenceProviderConfigurer")
-        public JpaPersistenceProviderConfigurer samlIdPJpaServicePersistenceProviderConfigurer() {
-            return context -> context.getIncludeEntityClasses().addAll(List.of(SamlRegisteredService.class.getName()));
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Envelope> samlProfileSamlAttributeQueryFaultResponseBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlObjectSigner")
+            final SamlIdPObjectSigner samlObjectSigner,
+            @Qualifier("velocityEngineFactory")
+            final VelocityEngine velocityEngineFactory,
+            @Qualifier("samlProfileSamlAssertionBuilder")
+            final SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
+            final CasCookieBuilder ticketGrantingTicketCookieGenerator,
+            @Qualifier(TicketRegistry.BEAN_NAME)
+            final TicketRegistry ticketRegistry,
+            @Qualifier("samlIdPDistributedSessionStore")
+            final SessionStore samlIdPDistributedSessionStore,
+            @Qualifier("samlArtifactMap")
+            final SAMLArtifactMap samlArtifactMap,
+            @Qualifier(TicketFactory.BEAN_NAME)
+            final TicketFactory ticketFactory,
+            @Qualifier(CentralAuthenticationService.BEAN_NAME)
+            final CentralAuthenticationService centralAuthenticationService,
+            @Qualifier("samlProfileSamlResponseBuilder")
+            final SamlProfileObjectBuilder<Response> samlProfileSamlResponseBuilder) {
+            val context = SamlProfileSamlResponseBuilderConfigurationContext.builder()
+                .samlIdPMetadataResolver(casSamlIdPMetadataResolver)
+                .openSamlConfigBean(openSamlConfigBean)
+                .samlObjectSigner(samlObjectSigner)
+                .velocityEngineFactory(velocityEngineFactory)
+                .samlProfileSamlAssertionBuilder(samlProfileSamlAssertionBuilder)
+                .samlObjectEncrypter(samlObjectEncrypter)
+                .ticketGrantingTicketCookieGenerator(ticketGrantingTicketCookieGenerator)
+                .ticketRegistry(ticketRegistry)
+                .sessionStore(samlIdPDistributedSessionStore)
+                .samlArtifactMap(samlArtifactMap)
+                .centralAuthenticationService(centralAuthenticationService)
+                .casProperties(casProperties)
+                .samlSoapResponseBuilder(samlProfileSamlResponseBuilder)
+                .ticketFactory(ticketFactory)
+                .build();
+            return new SamlProfileAttributeQueryFaultResponseBuilder(context);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlAttributeQueryResponseBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Envelope> samlProfileSamlAttributeQueryResponseBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlObjectSigner")
+            final SamlIdPObjectSigner samlObjectSigner,
+            @Qualifier("velocityEngineFactory")
+            final VelocityEngine velocityEngineFactory,
+            @Qualifier("samlProfileSamlAssertionBuilder")
+            final SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
+            final CasCookieBuilder ticketGrantingTicketCookieGenerator,
+            @Qualifier(TicketRegistry.BEAN_NAME)
+            final TicketRegistry ticketRegistry,
+            @Qualifier("samlIdPDistributedSessionStore")
+            final SessionStore samlIdPDistributedSessionStore,
+            @Qualifier("samlArtifactMap")
+            final SAMLArtifactMap samlArtifactMap,
+            @Qualifier(CentralAuthenticationService.BEAN_NAME)
+            final CentralAuthenticationService centralAuthenticationService,
+            @Qualifier(TicketFactory.BEAN_NAME)
+            final TicketFactory ticketFactory,
+            @Qualifier("samlProfileSamlResponseBuilder")
+            final SamlProfileObjectBuilder<Response> samlProfileSamlResponseBuilder) {
+            val context = SamlProfileSamlResponseBuilderConfigurationContext.builder()
+                .samlIdPMetadataResolver(casSamlIdPMetadataResolver)
+                .openSamlConfigBean(openSamlConfigBean)
+                .samlObjectSigner(samlObjectSigner)
+                .velocityEngineFactory(velocityEngineFactory)
+                .samlProfileSamlAssertionBuilder(samlProfileSamlAssertionBuilder)
+                .samlObjectEncrypter(samlObjectEncrypter)
+                .ticketGrantingTicketCookieGenerator(ticketGrantingTicketCookieGenerator)
+                .ticketRegistry(ticketRegistry)
+                .sessionStore(samlIdPDistributedSessionStore)
+                .samlArtifactMap(samlArtifactMap)
+                .centralAuthenticationService(centralAuthenticationService)
+                .casProperties(casProperties)
+                .samlSoapResponseBuilder(samlProfileSamlResponseBuilder)
+                .ticketFactory(ticketFactory)
+                .build();
+            return new SamlProfileAttributeQueryResponseBuilder(context);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlSubjectBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Subject> samlProfileSamlSubjectBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("samlProfileSamlNameIdBuilder")
+            final SamlProfileObjectBuilder<SAMLObject> samlProfileSamlNameIdBuilder,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean) {
+            return new SamlProfileSamlSubjectBuilder(openSamlConfigBean, samlProfileSamlNameIdBuilder, casProperties, samlObjectEncrypter);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlSoap11FaultResponseBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Envelope> samlProfileSamlSoap11FaultResponseBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlObjectSigner")
+            final SamlIdPObjectSigner samlObjectSigner,
+            @Qualifier("velocityEngineFactory")
+            final VelocityEngine velocityEngineFactory,
+            @Qualifier("samlProfileSamlAssertionBuilder")
+            final SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
+            final CasCookieBuilder ticketGrantingTicketCookieGenerator,
+            @Qualifier(TicketRegistry.BEAN_NAME)
+            final TicketRegistry ticketRegistry,
+            @Qualifier("samlIdPDistributedSessionStore")
+            final SessionStore samlIdPDistributedSessionStore,
+            @Qualifier("samlArtifactMap")
+            final SAMLArtifactMap samlArtifactMap,
+            @Qualifier(CentralAuthenticationService.BEAN_NAME)
+            final CentralAuthenticationService centralAuthenticationService,
+            @Qualifier(TicketFactory.BEAN_NAME)
+            final TicketFactory ticketFactory,
+            @Qualifier("samlProfileSamlResponseBuilder")
+            final SamlProfileObjectBuilder<Response> samlProfileSamlResponseBuilder) {
+            val context = SamlProfileSamlResponseBuilderConfigurationContext.builder()
+                .samlIdPMetadataResolver(casSamlIdPMetadataResolver)
+                .openSamlConfigBean(openSamlConfigBean)
+                .samlObjectSigner(samlObjectSigner)
+                .velocityEngineFactory(velocityEngineFactory)
+                .samlProfileSamlAssertionBuilder(samlProfileSamlAssertionBuilder)
+                .samlObjectEncrypter(samlObjectEncrypter)
+                .ticketGrantingTicketCookieGenerator(ticketGrantingTicketCookieGenerator)
+                .ticketRegistry(ticketRegistry)
+                .sessionStore(samlIdPDistributedSessionStore)
+                .samlArtifactMap(samlArtifactMap)
+                .centralAuthenticationService(centralAuthenticationService)
+                .casProperties(casProperties)
+                .samlSoapResponseBuilder(samlProfileSamlResponseBuilder)
+                .ticketFactory(ticketFactory)
+                .build();
+            return new SamlProfileSamlSoap11FaultResponseBuilder(context);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlSoap11ResponseBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Envelope> samlProfileSamlSoap11ResponseBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlObjectSigner")
+            final SamlIdPObjectSigner samlObjectSigner,
+            @Qualifier("velocityEngineFactory")
+            final VelocityEngine velocityEngineFactory,
+            @Qualifier("samlProfileSamlAssertionBuilder")
+            final SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
+            final CasCookieBuilder ticketGrantingTicketCookieGenerator,
+            @Qualifier(TicketRegistry.BEAN_NAME)
+            final TicketRegistry ticketRegistry,
+            @Qualifier("samlIdPDistributedSessionStore")
+            final SessionStore samlIdPDistributedSessionStore,
+            @Qualifier("samlArtifactMap")
+            final SAMLArtifactMap samlArtifactMap,
+            @Qualifier(CentralAuthenticationService.BEAN_NAME)
+            final CentralAuthenticationService centralAuthenticationService,
+            @Qualifier(TicketFactory.BEAN_NAME)
+            final TicketFactory ticketFactory,
+            @Qualifier("samlProfileSamlResponseBuilder")
+            final SamlProfileObjectBuilder<Response> samlProfileSamlResponseBuilder) {
+            val context = SamlProfileSamlResponseBuilderConfigurationContext.builder()
+                .samlIdPMetadataResolver(casSamlIdPMetadataResolver)
+                .openSamlConfigBean(openSamlConfigBean)
+                .samlObjectSigner(samlObjectSigner)
+                .velocityEngineFactory(velocityEngineFactory)
+                .samlProfileSamlAssertionBuilder(samlProfileSamlAssertionBuilder)
+                .samlObjectEncrypter(samlObjectEncrypter)
+                .ticketGrantingTicketCookieGenerator(ticketGrantingTicketCookieGenerator)
+                .ticketRegistry(ticketRegistry)
+                .sessionStore(samlIdPDistributedSessionStore)
+                .samlArtifactMap(samlArtifactMap)
+                .centralAuthenticationService(centralAuthenticationService)
+                .casProperties(casProperties)
+                .samlSoapResponseBuilder(samlProfileSamlResponseBuilder)
+                .ticketFactory(ticketFactory)
+                .build();
+            return new SamlProfileSamlSoap11ResponseBuilder(context);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlArtifactFaultResponseBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Envelope> samlProfileSamlArtifactFaultResponseBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlObjectSigner")
+            final SamlIdPObjectSigner samlObjectSigner,
+            @Qualifier("velocityEngineFactory")
+            final VelocityEngine velocityEngineFactory,
+            @Qualifier("samlProfileSamlAssertionBuilder")
+            final SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
+            final CasCookieBuilder ticketGrantingTicketCookieGenerator,
+            @Qualifier(TicketRegistry.BEAN_NAME)
+            final TicketRegistry ticketRegistry,
+            @Qualifier("samlIdPDistributedSessionStore")
+            final SessionStore samlIdPDistributedSessionStore,
+            @Qualifier("samlArtifactMap")
+            final SAMLArtifactMap samlArtifactMap,
+            @Qualifier(TicketFactory.BEAN_NAME)
+            final TicketFactory ticketFactory,
+            @Qualifier(CentralAuthenticationService.BEAN_NAME)
+            final CentralAuthenticationService centralAuthenticationService,
+            @Qualifier("samlProfileSamlResponseBuilder")
+            final SamlProfileObjectBuilder<Response> samlProfileSamlResponseBuilder) {
+            val context = SamlProfileSamlResponseBuilderConfigurationContext.builder()
+                .samlIdPMetadataResolver(casSamlIdPMetadataResolver)
+                .openSamlConfigBean(openSamlConfigBean)
+                .samlObjectSigner(samlObjectSigner)
+                .velocityEngineFactory(velocityEngineFactory)
+                .samlProfileSamlAssertionBuilder(samlProfileSamlAssertionBuilder)
+                .samlObjectEncrypter(samlObjectEncrypter)
+                .ticketGrantingTicketCookieGenerator(ticketGrantingTicketCookieGenerator)
+                .ticketRegistry(ticketRegistry)
+                .sessionStore(samlIdPDistributedSessionStore)
+                .samlArtifactMap(samlArtifactMap)
+                .centralAuthenticationService(centralAuthenticationService)
+                .casProperties(casProperties)
+                .samlSoapResponseBuilder(samlProfileSamlResponseBuilder)
+                .ticketFactory(ticketFactory)
+                .build();
+            return new SamlProfileArtifactFaultResponseBuilder(context);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlArtifactResponseBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Envelope> samlProfileSamlArtifactResponseBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlObjectSigner")
+            final SamlIdPObjectSigner samlObjectSigner,
+            @Qualifier("velocityEngineFactory")
+            final VelocityEngine velocityEngineFactory,
+            @Qualifier("samlProfileSamlAssertionBuilder")
+            final SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
+            final CasCookieBuilder ticketGrantingTicketCookieGenerator,
+            @Qualifier(TicketRegistry.BEAN_NAME)
+            final TicketRegistry ticketRegistry,
+            @Qualifier("samlIdPDistributedSessionStore")
+            final SessionStore samlIdPDistributedSessionStore,
+            @Qualifier("samlArtifactMap")
+            final SAMLArtifactMap samlArtifactMap,
+            @Qualifier(CentralAuthenticationService.BEAN_NAME)
+            final CentralAuthenticationService centralAuthenticationService,
+            @Qualifier(TicketFactory.BEAN_NAME)
+            final TicketFactory ticketFactory,
+            @Qualifier("samlProfileSamlResponseBuilder")
+            final SamlProfileObjectBuilder<Response> samlProfileSamlResponseBuilder) {
+            val context = SamlProfileSamlResponseBuilderConfigurationContext.builder()
+                .samlIdPMetadataResolver(casSamlIdPMetadataResolver)
+                .openSamlConfigBean(openSamlConfigBean)
+                .samlObjectSigner(samlObjectSigner)
+                .velocityEngineFactory(velocityEngineFactory)
+                .samlProfileSamlAssertionBuilder(samlProfileSamlAssertionBuilder)
+                .samlObjectEncrypter(samlObjectEncrypter)
+                .ticketGrantingTicketCookieGenerator(ticketGrantingTicketCookieGenerator)
+                .ticketRegistry(ticketRegistry)
+                .sessionStore(samlIdPDistributedSessionStore)
+                .samlArtifactMap(samlArtifactMap)
+                .centralAuthenticationService(centralAuthenticationService)
+                .casProperties(casProperties)
+                .samlSoapResponseBuilder(samlProfileSamlResponseBuilder)
+                .ticketFactory(ticketFactory)
+                .build();
+            return new SamlProfileArtifactResponseBuilder(context);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlNameIdBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<SAMLObject> samlProfileSamlNameIdBuilder(
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier("shibbolethCompatiblePersistentIdGenerator")
+            final PersistentIdGenerator shibbolethCompatiblePersistentIdGenerator,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter) {
+            return new SamlProfileSamlNameIdBuilder(openSamlConfigBean, shibbolethCompatiblePersistentIdGenerator,
+                casSamlIdPMetadataResolver, samlObjectEncrypter);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlConditionsBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Conditions> samlProfileSamlConditionsBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean) {
+            return new SamlProfileSamlConditionsBuilder(openSamlConfigBean, casProperties);
+        }
+
+        @ConditionalOnMissingBean(name = "defaultAuthnContextClassRefBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileAuthnContextClassRefBuilder defaultAuthnContextClassRefBuilder(
+            final CasConfigurationProperties casProperties) {
+            return new DefaultSamlProfileAuthnContextClassRefBuilder(casProperties);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlAssertionBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder(
+            @Qualifier("samlProfileSamlAuthNStatementBuilder")
+            final SamlProfileObjectBuilder<AuthnStatement> samlProfileSamlAuthNStatementBuilder,
+            @Qualifier("samlProfileSamlAttributeStatementBuilder")
+            final SamlProfileObjectBuilder<AttributeStatement> samlProfileSamlAttributeStatementBuilder,
+            @Qualifier("samlProfileSamlSubjectBuilder")
+            final SamlProfileObjectBuilder<Subject> samlProfileSamlSubjectBuilder,
+            @Qualifier("samlProfileSamlConditionsBuilder")
+            final SamlProfileObjectBuilder<Conditions> samlProfileSamlConditionsBuilder,
+            @Qualifier("samlObjectSigner")
+            final SamlIdPObjectSigner samlObjectSigner,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean) {
+            return new SamlProfileSamlAssertionBuilder(openSamlConfigBean, samlProfileSamlAuthNStatementBuilder,
+                samlProfileSamlAttributeStatementBuilder, samlProfileSamlSubjectBuilder,
+                samlProfileSamlConditionsBuilder, samlObjectSigner, casSamlIdPMetadataResolver);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlAuthNStatementBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<AuthnStatement> samlProfileSamlAuthNStatementBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("defaultAuthnContextClassRefBuilder")
+            final SamlProfileAuthnContextClassRefBuilder defaultAuthnContextClassRefBuilder,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean) {
+            return new SamlProfileSamlAuthNStatementBuilder(openSamlConfigBean, defaultAuthnContextClassRefBuilder, casProperties);
+        }
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlAttributeStatementBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<AttributeStatement> samlProfileSamlAttributeStatementBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier("samlProfileSamlNameIdBuilder")
+            final SamlProfileObjectBuilder<SAMLObject> samlProfileSamlNameIdBuilder,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlIdPServiceFactory")
+            final ServiceFactory samlIdPServiceFactory,
+            @Qualifier(AttributeDefinitionStore.BEAN_NAME)
+            final AttributeDefinitionStore attributeDefinitionStore,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver) {
+            return new SamlProfileSamlAttributeStatementBuilder(openSamlConfigBean,
+                casProperties.getAuthn().getSamlIdp(), samlObjectEncrypter,
+                attributeDefinitionStore, samlIdPServiceFactory,
+                samlProfileSamlNameIdBuilder, casSamlIdPMetadataResolver);
+        }
+
+
+        @ConditionalOnMissingBean(name = "samlProfileSamlResponseBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlProfileObjectBuilder<Response> samlProfileSamlResponseBuilder(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlObjectSigner")
+            final SamlIdPObjectSigner samlObjectSigner,
+            @Qualifier("velocityEngineFactory")
+            final VelocityEngine velocityEngineFactory,
+            @Qualifier("samlProfileSamlAssertionBuilder")
+            final SamlProfileObjectBuilder<Assertion> samlProfileSamlAssertionBuilder,
+            @Qualifier("samlObjectEncrypter")
+            final SamlIdPObjectEncrypter samlObjectEncrypter,
+            @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
+            final CasCookieBuilder ticketGrantingTicketCookieGenerator,
+            @Qualifier(TicketRegistry.BEAN_NAME)
+            final TicketRegistry ticketRegistry,
+            @Qualifier("samlIdPDistributedSessionStore")
+            final SessionStore samlIdPDistributedSessionStore,
+            @Qualifier(TicketFactory.BEAN_NAME)
+            final TicketFactory ticketFactory,
+            @Qualifier("samlArtifactMap")
+            final SAMLArtifactMap samlArtifactMap,
+            @Qualifier(CentralAuthenticationService.BEAN_NAME)
+            final CentralAuthenticationService centralAuthenticationService) {
+            val context = SamlProfileSamlResponseBuilderConfigurationContext.builder()
+                .samlIdPMetadataResolver(casSamlIdPMetadataResolver)
+                .openSamlConfigBean(openSamlConfigBean)
+                .samlObjectSigner(samlObjectSigner)
+                .velocityEngineFactory(velocityEngineFactory)
+                .samlProfileSamlAssertionBuilder(samlProfileSamlAssertionBuilder)
+                .samlObjectEncrypter(samlObjectEncrypter)
+                .ticketGrantingTicketCookieGenerator(ticketGrantingTicketCookieGenerator)
+                .ticketRegistry(ticketRegistry)
+                .sessionStore(samlIdPDistributedSessionStore)
+                .samlArtifactMap(samlArtifactMap)
+                .centralAuthenticationService(centralAuthenticationService)
+                .casProperties(casProperties)
+                .ticketFactory(ticketFactory)
+                .build();
+            return new SamlProfileSaml2ResponseBuilder(context);
+        }
+
+    }
+
+    @Configuration(value = "SamlIdPTicketFactoryPlanConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class SamlIdPTicketFactoryPlanConfiguration {
+        @ConditionalOnMissingBean(name = "samlAttributeQueryTicketFactoryConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public TicketFactoryExecutionPlanConfigurer samlAttributeQueryTicketFactoryConfigurer(
+            @Qualifier("samlAttributeQueryTicketFactory")
+            final SamlAttributeQueryTicketFactory samlAttributeQueryTicketFactory) {
+            return () -> samlAttributeQueryTicketFactory;
+        }
+
+        @ConditionalOnMissingBean(name = "samlArtifactTicketFactoryConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public TicketFactoryExecutionPlanConfigurer samlArtifactTicketFactoryConfigurer(
+            @Qualifier("samlArtifactTicketFactory")
+            final SamlArtifactTicketFactory samlArtifactTicketFactory) {
+            return () -> samlArtifactTicketFactory;
         }
     }
 
-    private SamlProfileSamlResponseBuilderConfigurationContext.
-        SamlProfileSamlResponseBuilderConfigurationContextBuilder getSamlResponseBuilderConfigurationContextBuilder() {
+    @Configuration(value = "SamlIdPTicketExpirationPolicyConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class SamlIdPTicketExpirationPolicyConfiguration {
+        @ConditionalOnMissingBean(name = "samlAttributeQueryTicketExpirationPolicy")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public ExpirationPolicyBuilder samlAttributeQueryTicketExpirationPolicy(final CasConfigurationProperties casProperties) {
+            return new SamlAttributeQueryTicketExpirationPolicyBuilder(casProperties);
+        }
 
-        return SamlProfileSamlResponseBuilderConfigurationContext.builder()
-            .openSamlConfigBean(openSamlConfigBean.getObject())
-            .samlObjectSigner(samlObjectSigner())
-            .velocityEngineFactory(velocityEngineFactory.getObject())
-            .samlProfileSamlAssertionBuilder(samlProfileSamlAssertionBuilder())
-            .samlObjectEncrypter(samlObjectEncrypter())
-            .ticketGrantingTicketCookieGenerator(ticketGrantingTicketCookieGenerator.getObject())
-            .ticketRegistry(ticketRegistry.getObject())
-            .sessionStore(samlIdPDistributedSessionStore.getObject())
-            .samlArtifactTicketFactory(samlArtifactTicketFactory())
-            .samlArtifactMap(samlArtifactMap())
-            .centralAuthenticationService(centralAuthenticationService.getObject())
-            .samlAttributeQueryTicketFactory(samlAttributeQueryTicketFactory())
-            .casProperties(casProperties);
+        @ConditionalOnMissingBean(name = "samlArtifactTicketExpirationPolicy")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public ExpirationPolicyBuilder samlArtifactTicketExpirationPolicy(final CasConfigurationProperties casProperties) {
+            return new SamlArtifactTicketExpirationPolicyBuilder(casProperties);
+        }
+    }
+
+    @Configuration(value = "SamlIdPTicketConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class SamlIdPTicketConfiguration {
+        @ConditionalOnMissingBean(name = "samlAttributeQueryTicketFactory")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlAttributeQueryTicketFactory samlAttributeQueryTicketFactory(
+            @Qualifier("samlAttributeQueryTicketExpirationPolicy")
+            final ExpirationPolicyBuilder samlAttributeQueryTicketExpirationPolicy,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlIdPServiceFactory")
+            final ServiceFactory samlIdPServiceFactory) {
+            return new DefaultSamlAttributeQueryTicketFactory(samlAttributeQueryTicketExpirationPolicy,
+                samlIdPServiceFactory, openSamlConfigBean);
+        }
+
+        @ConditionalOnMissingBean(name = "samlArtifactTicketFactory")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlArtifactTicketFactory samlArtifactTicketFactory(
+            @Qualifier("samlArtifactTicketExpirationPolicy")
+            final ExpirationPolicyBuilder samlArtifactTicketExpirationPolicy,
+            @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
+            final OpenSamlConfigBean openSamlConfigBean,
+            @Qualifier("samlIdPServiceFactory")
+            final ServiceFactory samlIdPServiceFactory) {
+            return new DefaultSamlArtifactTicketFactory(samlArtifactTicketExpirationPolicy,
+                openSamlConfigBean, samlIdPServiceFactory);
+        }
+
+        @Bean(initMethod = "initialize", destroyMethod = "destroy")
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SAMLArtifactMap samlArtifactMap(
+            @Qualifier(TicketFactory.BEAN_NAME)
+            final TicketFactory ticketFactory,
+            @Qualifier("samlArtifactTicketExpirationPolicy")
+            final ExpirationPolicyBuilder samlArtifactTicketExpirationPolicy,
+            @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
+            final CasCookieBuilder ticketGrantingTicketCookieGenerator,
+            @Qualifier(TicketRegistry.BEAN_NAME)
+            final TicketRegistry ticketRegistry,
+            @Qualifier("samlIdPDistributedSessionStore")
+            final SessionStore samlIdPDistributedSessionStore) {
+            val map = new CasSamlArtifactMap(ticketRegistry, ticketFactory,
+                ticketGrantingTicketCookieGenerator, samlIdPDistributedSessionStore);
+            val expirationPolicy = samlArtifactTicketExpirationPolicy.buildTicketExpirationPolicy();
+            map.setArtifactLifetime(Duration.ofSeconds(expirationPolicy.getTimeToLive()));
+            return map;
+        }
+    }
+
+    @Configuration(value = "SamlIdPLogoutConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class SamlIdPLogoutConfiguration {
+        @ConditionalOnMissingBean(name = "samlSingleLogoutServiceLogoutUrlBuilder")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SingleLogoutServiceLogoutUrlBuilder samlSingleLogoutServiceLogoutUrlBuilder(
+            @Qualifier("defaultSamlRegisteredServiceCachingMetadataResolver")
+            final SamlRegisteredServiceCachingMetadataResolver defaultSamlRegisteredServiceCachingMetadataResolver,
+            @Qualifier(ServicesManager.BEAN_NAME)
+            final ServicesManager servicesManager,
+            @Qualifier(UrlValidator.BEAN_NAME)
+            final UrlValidator urlValidator) {
+            return new SamlIdPSingleLogoutServiceLogoutUrlBuilder(servicesManager, defaultSamlRegisteredServiceCachingMetadataResolver, urlValidator);
+        }
+
+        @ConditionalOnMissingBean(name = "samlSingleLogoutServiceLogoutUrlBuilderConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SingleLogoutServiceLogoutUrlBuilderConfigurer samlSingleLogoutServiceLogoutUrlBuilderConfigurer(
+            @Qualifier("samlSingleLogoutServiceLogoutUrlBuilder")
+            final SingleLogoutServiceLogoutUrlBuilder samlSingleLogoutServiceLogoutUrlBuilder) {
+            return () -> samlSingleLogoutServiceLogoutUrlBuilder;
+        }
+    }
+
+    @Configuration(value = "SamlIdPCryptoConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class SamlIdPCryptoConfiguration {
+        @ConditionalOnMissingBean(name = "samlObjectEncrypter")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlIdPObjectEncrypter samlObjectEncrypter(
+            @Qualifier("samlIdPMetadataLocator")
+            final SamlIdPMetadataLocator samlIdPMetadataLocator,
+            final CasConfigurationProperties casProperties) {
+            return new SamlIdPObjectEncrypter(casProperties.getAuthn().getSamlIdp(), samlIdPMetadataLocator);
+        }
+
+        @ConditionalOnMissingBean(name = SamlIdPObjectSigner.DEFAULT_BEAN_NAME)
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public SamlIdPObjectSigner samlObjectSigner(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("casSamlIdPMetadataResolver")
+            final MetadataResolver casSamlIdPMetadataResolver,
+            @Qualifier("samlIdPMetadataLocator")
+            final SamlIdPMetadataLocator samlIdPMetadataLocator) {
+            return new DefaultSamlIdPObjectSigner(casSamlIdPMetadataResolver, casProperties, samlIdPMetadataLocator);
+        }
+    }
+
+    @Configuration(value = "SamlIdPAuditConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class SamlIdPAuditConfiguration {
+        @Bean
+        @ConditionalOnMissingBean(name = "samlResponseAuditPrincipalIdProvider")
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public AuditPrincipalIdProvider samlResponseAuditPrincipalIdProvider() {
+            return new SamlResponseAuditPrincipalIdProvider();
+        }
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = "casSamlIdPAuditTrailRecordResolutionPlanConfigurer")
+        public AuditTrailRecordResolutionPlanConfigurer casSamlIdPAuditTrailRecordResolutionPlanConfigurer() {
+            return plan -> {
+                plan.registerAuditResourceResolver(AuditResourceResolvers.SAML2_RESPONSE_RESOURCE_RESOLVER, new SamlResponseAuditResourceResolver());
+                plan.registerAuditActionResolver(AuditActionResolvers.SAML2_RESPONSE_ACTION_RESOLVER,
+                    new DefaultAuditActionResolver(AuditTrailConstants.AUDIT_ACTION_POSTFIX_CREATED, AuditTrailConstants.AUDIT_ACTION_POSTFIX_CREATED));
+
+                plan.registerAuditResourceResolver(AuditResourceResolvers.SAML2_REQUEST_RESOURCE_RESOLVER, new SamlRequestAuditResourceResolver());
+                plan.registerAuditActionResolver(AuditActionResolvers.SAML2_REQUEST_ACTION_RESOLVER,
+                    new DefaultAuditActionResolver(AuditTrailConstants.AUDIT_ACTION_POSTFIX_CREATED, AuditTrailConstants.AUDIT_ACTION_POSTFIX_CREATED));
+
+                plan.registerAuditResourceResolver(AuditResourceResolvers.SAML2_METADATA_RESOLUTION_RESOURCE_RESOLVER,
+                    new SamlMetadataResolverAuditResourceResolver());
+                plan.registerAuditActionResolver(AuditActionResolvers.SAML2_METADATA_RESOLUTION_ACTION_RESOLVER, new DefaultAuditActionResolver());
+            };
+        }
+    }
+
+    @Configuration(value = "SamlIdPAttributeDefinitionsConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class SamlIdPAttributeDefinitionsConfiguration {
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @Bean
+        @ConditionalOnMissingBean(name = "samlIdPAttributeDefinitionStoreConfigurer")
+        public AttributeDefinitionStoreConfigurer samlIdPAttributeDefinitionStoreConfigurer() {
+            return store -> FunctionUtils.doUnchecked(__ -> {
+                try (val samlStore = new DefaultAttributeDefinitionStore(new ClassPathResource("samlidp-attribute-definitions.json"))) {
+                    store.importStore(samlStore);
+                }
+            });
+        }
     }
 }

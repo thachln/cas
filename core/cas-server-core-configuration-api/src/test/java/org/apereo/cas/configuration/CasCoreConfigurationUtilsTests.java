@@ -21,12 +21,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.2.0
  */
-@SpringBootTest(classes = RefreshAutoConfiguration.class, properties = {
-    "cas.server.name=https://sso.example.org",
-    "cas.server.prefix=https://sso.example.org/cas",
-    "cas.person-directory.attribute-definition-store.json.location=file:/defn-test.json",
-    "cas.authn.attribute-repository.ldap[0].ldap-url=ldap://localhost:1389"
-})
+@SpringBootTest(classes = RefreshAutoConfiguration.class,
+    properties = {
+        "cas.server.name=https://sso.example.org",
+        "cas.server.prefix=https://sso.example.org/cas",
+        "cas.authn.attribute-repository.attribute-definition-store.json.location=file:/defn-test.json",
+        "cas.authn.attribute-repository.ldap[0].ldap-url=ldap://localhost:1389"
+    })
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 @Tag("CasConfiguration")
 public class CasCoreConfigurationUtilsTests {
@@ -40,12 +41,12 @@ public class CasCoreConfigurationUtilsTests {
 
         assertEquals("https://sso.example.org", map.get("cas.server.name"));
         assertEquals("https://sso.example.org/cas", map.get("cas.server.prefix"));
-        assertEquals("file:/defn-test.json", map.get("cas.person-directory.attribute-definition-store.json.location"));
+        assertEquals("file:/defn-test.json", map.get("cas.authn.attribute-repository.attribute-definition-store.json.location"));
         assertEquals("ldap://localhost:1389", map.get("cas.authn.attribute-repository.ldap[0].ldap-url"));
     }
 
     @Test
-    public void verifyMapping() {
+    public void verifyMappingByPropertyRef() {
         val props = new CasConfigurationProperties();
         props.getAuthn().getSyncope().setName("SyncopeAuth");
         props.getAuthn().getSyncope().setUrl("https://github.com/apereo/cas");
@@ -62,6 +63,21 @@ public class CasCoreConfigurationUtilsTests {
     }
 
     @Test
+    public void verifyMapping() {
+        val props = new CasConfigurationProperties();
+        props.getAuthn().getSyncope().setName("SyncopeAuth");
+        props.getAuthn().getSyncope().setUrl("https://github.com/apereo/cas");
+        props.getAuthn().getSyncope().setDomain("Master");
+
+        val filters = new SimpleFilterProvider()
+            .setFailOnUnknownId(false)
+            .addFilter(CasConfigurationProperties.class.getSimpleName(), SimpleBeanPropertyFilter.filterOutAllExcept("authn"))
+            .addFilter(AuthenticationProperties.class.getSimpleName(), SimpleBeanPropertyFilter.filterOutAllExcept("syncope"));
+        val map = CasCoreConfigurationUtils.asMap(props.withHolder(), filters);
+        assertTrue(map.keySet().stream().allMatch(key -> key.startsWith("cas.authn.syncope")));
+    }
+
+    @Test
     public void verifyMappingCollections() {
         val props = new CasConfigurationProperties();
         val ldap = new LdapAuthenticationProperties();
@@ -73,10 +89,8 @@ public class CasCoreConfigurationUtilsTests {
 
         val filters = new SimpleFilterProvider()
             .setFailOnUnknownId(false)
-            .addFilter(CasConfigurationProperties.class.getSimpleName(), SimpleBeanPropertyFilter.filterOutAllExcept(
-                CasCoreConfigurationUtils.getPropertyName(CasConfigurationProperties.class, CasConfigurationProperties::getAuthn)))
-            .addFilter(AuthenticationProperties.class.getSimpleName(), SimpleBeanPropertyFilter.filterOutAllExcept(
-                CasCoreConfigurationUtils.getPropertyName(AuthenticationProperties.class, AuthenticationProperties::getLdap)));
+            .addFilter(CasConfigurationProperties.class.getSimpleName(), SimpleBeanPropertyFilter.filterOutAllExcept("authn"))
+            .addFilter(AuthenticationProperties.class.getSimpleName(), SimpleBeanPropertyFilter.filterOutAllExcept("ldap"));
         val map = CasCoreConfigurationUtils.asMap(props.withHolder(), filters);
         assertTrue(map.keySet().stream().allMatch(key -> key.startsWith("cas.authn.ldap")));
     }

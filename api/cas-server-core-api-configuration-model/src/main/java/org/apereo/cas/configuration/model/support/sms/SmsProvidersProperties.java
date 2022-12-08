@@ -1,7 +1,5 @@
 package org.apereo.cas.configuration.model.support.sms;
 
-import org.apereo.cas.configuration.model.RestEndpointProperties;
-import org.apereo.cas.configuration.model.SpringResourceProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 
 import lombok.Getter;
@@ -9,6 +7,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -22,6 +21,7 @@ import java.io.Serializable;
 @RequiresModule(name = "cas-server-core-util", automated = true)
 @Accessors(chain = true)
 public class SmsProvidersProperties implements Serializable {
+    @Serial
     private static final long serialVersionUID = -3713886839517507306L;
 
     /**
@@ -43,6 +43,12 @@ public class SmsProvidersProperties implements Serializable {
     private ClickatellProperties clickatell = new ClickatellProperties();
 
     /**
+     * SmsMode settings.
+     */
+    @NestedConfigurationProperty
+    private SmsModeProperties smsMode = new SmsModeProperties();
+
+    /**
      * SNS settings.
      */
     @NestedConfigurationProperty
@@ -57,26 +63,12 @@ public class SmsProvidersProperties implements Serializable {
     /**
      * Groovy script for sending sms notifications.
      */
-    private Groovy groovy = new Groovy();
+    @NestedConfigurationProperty
+    private GroovySmsProperties groovy = new GroovySmsProperties();
 
     /**
      * Send SMS via via REST.
      */
-    private Rest rest = new Rest();
-
-    @RequiresModule(name = "cas-server-core-util", automated = true)
-    @Getter
-    @Setter
-    @Accessors(chain = true)
-    public static class Rest extends RestEndpointProperties {
-        private static final long serialVersionUID = -8102345678378393382L;
-    }
-
-    @RequiresModule(name = "cas-server-core-util", automated = true)
-    @Getter
-    @Setter
-    @Accessors(chain = true)
-    public static class Groovy extends SpringResourceProperties {
-        private static final long serialVersionUID = 8079027843747126083L;
-    }
+    @NestedConfigurationProperty
+    private RestfulSmsProperties rest = new RestfulSmsProperties();
 }

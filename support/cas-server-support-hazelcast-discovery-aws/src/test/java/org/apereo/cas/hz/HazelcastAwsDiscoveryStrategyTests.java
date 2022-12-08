@@ -2,6 +2,7 @@ package org.apereo.cas.hz;
 
 import org.apereo.cas.configuration.model.support.hazelcast.HazelcastClusterProperties;
 
+import com.hazelcast.aws.AwsDiscoveryStrategyFactory;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.JoinConfig;
 import com.hazelcast.config.NetworkConfig;
@@ -36,6 +37,21 @@ public class HazelcastAwsDiscoveryStrategyTests {
         aws.setTagKey("TagKey");
         aws.setTagValue("TagValue");
 
-        assertNotNull(strategy.get(properties, mock(JoinConfig.class), mock(Config.class), mock(NetworkConfig.class)));
+        val result = strategy.get(properties, mock(JoinConfig.class), mock(Config.class), mock(NetworkConfig.class));
+        assertNotNull(result);
+        assertTrue(result.isPresent());
+
+        val discoveryProperties = result.get().getProperties();
+        for (val propertyDefinition : new AwsDiscoveryStrategyFactory().getConfigurationProperties()) {
+            val value = discoveryProperties.get(propertyDefinition.key());
+            if (value == null) {
+                assertTrue(propertyDefinition.optional(),
+                    () -> "Property " + propertyDefinition.key() + " is not optional and should be given");
+            } else {
+                assertDoesNotThrow(() -> propertyDefinition.typeConverter().convert(value),
+                    () -> "Property " + propertyDefinition.key() + " has invalid value '" + value + '\'');
+            }
+        }
+
     }
 }

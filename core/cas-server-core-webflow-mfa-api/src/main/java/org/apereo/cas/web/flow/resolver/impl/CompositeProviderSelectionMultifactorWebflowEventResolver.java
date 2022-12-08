@@ -2,17 +2,21 @@ package org.apereo.cas.web.flow.resolver.impl;
 
 import org.apereo.cas.authentication.Authentication;
 import org.apereo.cas.authentication.ChainingMultifactorAuthenticationProvider;
+import org.apereo.cas.authentication.MultifactorAuthenticationContextValidationResult;
 import org.apereo.cas.authentication.MultifactorAuthenticationProvider;
 import org.apereo.cas.services.RegisteredService;
+import org.apereo.cas.util.CollectionUtils;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.webflow.execution.Event;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Collection;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * This is {@link CompositeProviderSelectionMultifactorWebflowEventResolver}.
@@ -24,12 +28,12 @@ import java.util.Collection;
 public class CompositeProviderSelectionMultifactorWebflowEventResolver extends SelectiveMultifactorAuthenticationProviderWebflowEventResolver {
 
     public CompositeProviderSelectionMultifactorWebflowEventResolver(
-        final CasWebflowEventResolutionConfigurationContext webflowEventResolutionConfigurationContext) {
-        super(webflowEventResolutionConfigurationContext);
+        final CasWebflowEventResolutionConfigurationContext configurationContext) {
+        super(configurationContext);
     }
 
     @Override
-    protected Pair<Collection<Event>, Collection<MultifactorAuthenticationProvider>> filterEventsByMultifactorAuthenticationProvider(
+    protected Optional<Pair<Collection<Event>, Collection<MultifactorAuthenticationProvider>>> filterEventsByMultifactorAuthenticationProvider(
         final Collection<Event> resolveEvents,
         final Authentication authentication,
         final RegisteredService registeredService,
@@ -45,7 +49,30 @@ public class CompositeProviderSelectionMultifactorWebflowEventResolver extends S
         val chainingProvider = (ChainingMultifactorAuthenticationProvider)
             event.getAttributes().get(MultifactorAuthenticationProvider.class.getName());
 
-        LOGGER.debug("Finalized set of resolved events are [{}]", resolveEvents);
-        return Pair.of(resolveEvents, chainingProvider.getMultifactorAuthenticationProviders());
+        return chainingProvider.getMultifactorAuthenticationProviders()
+            .stream()
+            .map(provider -> getConfigurationContext().getAuthenticationContextValidator()
+                .validate(authentication, provider.getId(), Optional.ofNullable(registeredService)))
+            .filter(MultifactorAuthenticationContextValidationResult::isSuccess)
+            .map(result -> {
+                val validatedProvider = result.getProvider().orElseThrow();
+                val validatedEvent = CollectionUtils.wrapCollection(new Event(this,
+                    validatedProvider.getId(), event.getAttributes()));
+                val validatedProviders = CollectionUtils.wrapCollection(validatedProvider);
+                return Optional.of(Pair.of(validatedEvent, validatedProviders));
+            })
+            .findAny()
+            .orElseGet(() -> {
+                val activeProviders = chainingProvider.getMultifactorAuthenticationProviders()
+                    .stream()
+                    .filter(provider -> {
+                        val bypass = provider.getBypassEvaluator();
+                        return bypass == null || bypass.shouldMultifactorAuthenticationProviderExecute(authentication,
+                            registeredService, provider, request);
+                    })
+                    .collect(Collectors.toList());
+                LOGGER.debug("Finalized set of resolved events are [{}] with providers [{}]", resolveEvents, activeProviders);
+                return activeProviders.isEmpty() ? Optional.empty() : Optional.of(Pair.of(resolveEvents, activeProviders));
+            });
     }
 }

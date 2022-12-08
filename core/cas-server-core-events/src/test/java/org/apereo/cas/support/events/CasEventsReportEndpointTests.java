@@ -1,6 +1,7 @@
 package org.apereo.cas.support.events;
 
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.config.CasCoreUtilConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.support.events.authentication.CasAuthenticationTransactionFailureEvent;
 import org.apereo.cas.support.events.config.CasCoreEventsConfiguration;
@@ -24,13 +25,13 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 import javax.security.auth.login.FailedLoginException;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -43,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(classes = {
     CasEventsReportEndpointTests.CasEventsReportEndpointTestConfiguration.class,
     CasCoreEventsConfiguration.class,
+    CasCoreUtilConfiguration.class,
     RefreshAutoConfiguration.class
 })
 @EnableConfigurationProperties(CasConfigurationProperties.class)
@@ -52,7 +54,7 @@ public class CasEventsReportEndpointTests {
     private ConfigurableApplicationContext applicationContext;
 
     @Autowired
-    @Qualifier("casEventRepository")
+    @Qualifier(CasEventRepository.BEAN_NAME)
     private CasEventRepository casEventRepository;
 
     @Autowired
@@ -73,16 +75,15 @@ public class CasEventsReportEndpointTests {
             CollectionUtils.wrap("error", new FailedLoginException()),
             CollectionUtils.wrap(CoreAuthenticationTestUtils.getCredentialsWithSameUsernameAndPassword()));
         applicationContext.publishEvent(event);
-        assertFalse(casEventRepository.load().isEmpty());
+        assertFalse(casEventRepository.load().findAny().isEmpty());
 
-        val endpoint = new CasEventsReportEndpoint(casProperties, casEventRepository);
+        val endpoint = new CasEventsReportEndpoint(casProperties, applicationContext);
         val result = endpoint.events();
         assertNotNull(result);
         assertFalse(result.isEmpty());
     }
 
-    @TestConfiguration("CasEventsReportEndpointTestConfiguration")
-    @Lazy(false)
+    @TestConfiguration(value = "CasEventsReportEndpointTestConfiguration", proxyBeanMethods = false)
     public static class CasEventsReportEndpointTestConfiguration {
         @Bean
         public CasEventRepository casEventRepository() {
@@ -90,13 +91,14 @@ public class CasEventsReportEndpointTests {
                 private final Collection<CasEvent> events = new LinkedHashSet<>();
 
                 @Override
-                public void saveInternal(final CasEvent event) {
+                public CasEvent saveInternal(final CasEvent event) {
                     events.add(event);
+                    return event;
                 }
 
                 @Override
-                public Collection<CasEvent> load() {
-                    return events;
+                public Stream<CasEvent> load() {
+                    return events.stream();
                 }
             };
         }

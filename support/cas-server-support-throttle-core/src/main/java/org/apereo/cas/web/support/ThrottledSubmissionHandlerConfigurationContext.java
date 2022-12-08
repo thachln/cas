@@ -1,13 +1,15 @@
 package org.apereo.cas.web.support;
 
 import org.apereo.cas.audit.AuditTrailExecutionPlan;
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.throttle.ThrottledRequestExecutor;
 import org.apereo.cas.throttle.ThrottledRequestResponseHandler;
 
-import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 
 /**
  * This is {@link ThrottledSubmissionHandlerConfigurationContext}.
@@ -18,20 +20,17 @@ import lombok.ToString;
 @ToString
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 public class ThrottledSubmissionHandlerConfigurationContext {
-    private final int failureThreshold;
-
-    private final int failureRangeInSeconds;
-
-    private final String usernameParameter;
-    private final String authenticationFailureCode;
-
     private final AuditTrailExecutionPlan auditTrailExecutionPlan;
-
-    private final String applicationCode;
 
     private final ThrottledRequestResponseHandler throttledRequestResponseHandler;
 
     private final ThrottledRequestExecutor throttledRequestExecutor;
+
+    private final ConfigurableApplicationContext applicationContext;
+
+    private final CasConfigurationProperties casProperties;
+
+    private final ThrottledSubmissionsStore<ThrottledSubmission> throttledSubmissionStore;
 }

@@ -1,10 +1,11 @@
 package org.apereo.cas.authentication;
 
+import org.apereo.cas.configuration.model.support.mfa.BaseMultifactorAuthenticationProviderProperties;
 import org.apereo.cas.services.RegisteredService;
-import org.apereo.cas.services.RegisteredServiceMultifactorPolicyFailureModes;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -25,7 +26,7 @@ public interface ChainingMultifactorAuthenticationProvider extends MultifactorAu
      *
      * @return the multifactor authentication providers
      */
-    Collection<MultifactorAuthenticationProvider> getMultifactorAuthenticationProviders();
+    List<MultifactorAuthenticationProvider> getMultifactorAuthenticationProviders();
 
     /**
      * Add multifactor authentication provider multifactor authentication provider.
@@ -76,8 +77,8 @@ public interface ChainingMultifactorAuthenticationProvider extends MultifactorAu
     }
 
     @Override
-    default RegisteredServiceMultifactorPolicyFailureModes getFailureMode() {
-        return RegisteredServiceMultifactorPolicyFailureModes.NONE;
+    default BaseMultifactorAuthenticationProviderProperties.MultifactorAuthenticationProviderFailureModes getFailureMode() {
+        return BaseMultifactorAuthenticationProviderProperties.MultifactorAuthenticationProviderFailureModes.NONE;
     }
 
     @Override

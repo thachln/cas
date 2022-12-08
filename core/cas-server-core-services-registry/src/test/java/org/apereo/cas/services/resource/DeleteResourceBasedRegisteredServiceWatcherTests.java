@@ -4,7 +4,6 @@ import org.apereo.cas.services.util.RegisteredServiceJsonSerializer;
 import org.apereo.cas.support.events.service.CasRegisteredServiceDeletedEvent;
 import org.apereo.cas.support.events.service.CasRegisteredServicesLoadedEvent;
 
-import lombok.SneakyThrows;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -29,8 +28,7 @@ import static org.mockito.Mockito.*;
 public class DeleteResourceBasedRegisteredServiceWatcherTests {
 
     @Test
-    @SneakyThrows
-    public void verifyOperationNotFound() {
+    public void verifyOperationNotFound() throws Exception {
         val result = new AtomicBoolean(false);
         val mockAppContext = mock(ConfigurableApplicationContext.class);
         doAnswer(args -> {
@@ -39,7 +37,7 @@ public class DeleteResourceBasedRegisteredServiceWatcherTests {
             return null;
         }).when(mockAppContext).publishEvent(any());
         val watcher = new DeleteResourceBasedRegisteredServiceWatcher(new AbstractResourceBasedServiceRegistry(new ClassPathResource("services"),
-            List.of(new RegisteredServiceJsonSerializer()), mockAppContext,
+            List.of(new RegisteredServiceJsonSerializer(mockAppContext)), mockAppContext,
             new ArrayList<>()) {
             @Override
             protected String[] getExtensions() {
@@ -51,8 +49,7 @@ public class DeleteResourceBasedRegisteredServiceWatcherTests {
     }
 
     @Test
-    @SneakyThrows
-    public void verifyOperationFoundDeleted() {
+    public void verifyOperationFoundDeleted() throws Exception {
         val result = new AtomicBoolean(false);
         val mockAppContext = mock(ConfigurableApplicationContext.class);
         doAnswer(args -> {
@@ -61,7 +58,7 @@ public class DeleteResourceBasedRegisteredServiceWatcherTests {
             return null;
         }).when(mockAppContext).publishEvent(any());
         val registry = new AbstractResourceBasedServiceRegistry(new ClassPathResource("services"),
-            List.of(new RegisteredServiceJsonSerializer()), mockAppContext,
+            List.of(new RegisteredServiceJsonSerializer(mockAppContext)), mockAppContext,
             new ArrayList<>()) {
             @Override
             protected String[] getExtensions() {
@@ -86,7 +83,7 @@ public class DeleteResourceBasedRegisteredServiceWatcherTests {
             return null;
         }).when(mockAppContext).publishEvent(any());
         val registry = new AbstractResourceBasedServiceRegistry(new ClassPathResource("services"),
-            List.of(new RegisteredServiceJsonSerializer()), mockAppContext,
+            List.of(new RegisteredServiceJsonSerializer(mockAppContext)), mockAppContext,
             new ArrayList<>()) {
             @Override
             protected String[] getExtensions() {

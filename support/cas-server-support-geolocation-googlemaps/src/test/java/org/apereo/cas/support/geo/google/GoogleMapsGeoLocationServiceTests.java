@@ -1,6 +1,7 @@
 package org.apereo.cas.support.geo.google;
 
 import org.apereo.cas.authentication.adaptive.geo.GeoLocationService;
+import org.apereo.cas.config.CasGeoLocationConfiguration;
 import org.apereo.cas.support.geo.config.GoogleMapsGeoCodingConfiguration;
 
 import com.google.maps.GeoApiContext;
@@ -27,27 +28,30 @@ import static org.mockito.Mockito.*;
  */
 @SpringBootTest(classes = {
     RefreshAutoConfiguration.class,
+    CasGeoLocationConfiguration.class,
     GoogleMapsGeoCodingConfiguration.class
-}, properties = "cas.google-maps.api-key=AIzaSyCea6zDOkwJVIOm0vZyAI5eHYrz9Vzlhi9")
-@Tag("Simple")
+}, properties = "cas.geo-location.google-maps.api-key=AIzaSyCea6zDOkwJVIOm0vZyAI5eHYrz9Vzlhi9")
+@Tag("GeoLocation")
 public class GoogleMapsGeoLocationServiceTests {
     @Autowired
-    @Qualifier("geoLocationService")
+    @Qualifier(GeoLocationService.BEAN_NAME)
     private GeoLocationService geoLocationService;
 
     @Test
-    public void verifyOperation() throws Exception {
-        assertNotNull(geoLocationService);
+    public void verifyOperation() {
+        assertNull(geoLocationService.locate("8.8.8.8"));
         assertNull(geoLocationService.locate(null, 12.123));
         val resp = geoLocationService.locate(40.689060, -74.044636);
         assertEquals(40.689060, resp.getLatitude());
         assertEquals(-74.044636, resp.getLongitude());
         assertTrue(resp.getAddresses().isEmpty());
-        assertNotNull(geoLocationService.locate(InetAddress.getByName("www.github.com")));
+        assertDoesNotThrow(() -> {
+            geoLocationService.locate(InetAddress.getByName("www.github.com"));
+        });
     }
 
     @Test
-    public void verifyGeocode() throws Exception {
+    public void verifyGeocode() {
         val service = new GoogleMapsGeoLocationService(mock(GeoApiContext.class)) {
             @Override
             protected GeocodingResult[] reverseGeocode(final LatLng latlng) {

@@ -4,6 +4,8 @@ title: CAS - Attribute Value Release Policies
 category: Attributes
 ---
 
+{% include variables.html %}
+
 # Attribute Value Filters
 
 While each policy defines what principal attributes may be allowed for a given service,
@@ -15,7 +17,7 @@ Attribute filters can be chained together so as to associate multiple filters wi
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 200,
@@ -51,11 +53,11 @@ matches a certain regex pattern are released.
 
 Suppose that the following attributes are resolved:
 
-| Name                                    | Value
-|-----------------------------------------|----------------------------------------------------------------
-| `uid`                                   | jsmith
-| `groupMembership`                       | std
-| `cn`                                    | JohnSmith
+| Name              | Value     |
+|-------------------|-----------|
+| `uid`             | jsmith    |
+| `groupMembership` | std       |
+| `cn`              | JohnSmith |
 
 The following configuration for instance considers the initial list of `uid`,
 `groupMembership` and then only allows and releases attributes whose value's length
@@ -63,7 +65,7 @@ is 3 characters. Therefore, out of the above list, only `groupMembership` is rel
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 200,
@@ -87,7 +89,7 @@ For example, the below example only allows release of `memberOf` if it contains 
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 200,
@@ -112,12 +114,12 @@ For example, the below example only allows release of `memberOf` if it contains 
 
 The following fields are supported by this filter:
 
-| Name                 | Description
-|----------------------|--------------------------------------------------------------------------
-| `patterns`           | A map of attributes and their associated pattern tried against value(s).
-| `completeMatch`      | Indicates whether pattern-matching should execute over the entire value region.
-| `excludeUnmappedAttributes` | Indicates whether unmapped attributes should be removed from the final bundle.
-| `caseInsensitive` | Indicates whether pattern matching should be done in a case-insensitive manner.
+| Name                        | Description                                                                     |
+|-----------------------------|---------------------------------------------------------------------------------|
+| `patterns`                  | A map of attributes and their associated pattern tried against value(s).        |
+| `completeMatch`             | Indicates whether pattern-matching should execute over the entire value region. |
+| `excludeUnmappedAttributes` | Indicates whether unmapped attributes should be removed from the final bundle.  |
+| `caseInsensitive`           | Indicates whether pattern matching should be done in a case-insensitive manner. |
 
 ## Reverse Mapped Regex
 
@@ -126,7 +128,7 @@ Identical to the *Mapped Regex* filter, except that the filter only allows a sel
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 200,
@@ -136,6 +138,7 @@ Identical to the *Mapped Regex* filter, except that the filter only allows a sel
     "attributeFilter" : {
       "@class": "org.apereo.cas.services.support.RegisteredServiceReverseMappedRegexAttributeFilter",
       "patterns": {
+          "@class" : "java.util.TreeMap",  
           "memberOf": "^\\w{3}$"
       },
       "excludeUnmappedAttributes": false,
@@ -156,7 +159,7 @@ For example, the following definition attempts to filter all values assigned to 
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 200,
@@ -191,7 +194,7 @@ An inline groovy filter allows you to embed the script directly in the service d
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 200,
@@ -213,7 +216,7 @@ An external groovy filter allows you to define the script in file located outsid
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 200,
@@ -239,14 +242,14 @@ def run(final Object... args) {
     def logger = args[1]
 
     logger.info "Attributes currently resolved: ${attributes}"
-    def map =...
+    def map = ...
     return map
 }
 ```
 
 The parameters passed are as follows:
 
-| Parameter             | Description
-|-----------------------|-----------------------------------------------------------------------
-| `attributes`      | A `Map` of current  attributes resolved from sources.
-| `logger`              | The object responsible for issuing log messages such as `logger.info(...)`.
+| Parameter    | Description                                                                 |
+|--------------|-----------------------------------------------------------------------------|
+| `attributes` | A `Map` of current  attributes resolved from sources.                       |
+| `logger`     | The object responsible for issuing log messages such as `logger.info(...)`. |

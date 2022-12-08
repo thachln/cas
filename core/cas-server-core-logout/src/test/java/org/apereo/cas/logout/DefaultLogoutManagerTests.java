@@ -7,12 +7,11 @@ import org.apereo.cas.authentication.principal.WebApplicationServiceFactory;
 import org.apereo.cas.logout.slo.DefaultSingleLogoutServiceLogoutUrlBuilder;
 import org.apereo.cas.logout.slo.DefaultSingleLogoutServiceMessageHandler;
 import org.apereo.cas.mock.MockTicketGrantingTicket;
-import org.apereo.cas.services.AbstractRegisteredService;
+import org.apereo.cas.services.BaseRegisteredService;
+import org.apereo.cas.services.CasRegisteredService;
 import org.apereo.cas.services.RegexMatchingRegisteredServiceProxyPolicy;
-import org.apereo.cas.services.RegexRegisteredService;
 import org.apereo.cas.services.RegisteredServiceLogoutType;
 import org.apereo.cas.services.ServicesManager;
-import org.apereo.cas.ticket.TicketGrantingTicket;
 import org.apereo.cas.util.RandomUtils;
 import org.apereo.cas.util.http.HttpClient;
 import org.apereo.cas.util.http.HttpMessage;
@@ -38,7 +37,7 @@ import static org.mockito.Mockito.*;
  * @author Jerome Leleu
  * @since 4.0.0
  */
-@Tag("Authentication")
+@Tag("Logout")
 public class DefaultLogoutManagerTests {
     private static final String ID = "id";
 
@@ -46,11 +45,11 @@ public class DefaultLogoutManagerTests {
 
     private LogoutManager logoutManager;
 
-    private TicketGrantingTicket tgt;
+    private MockTicketGrantingTicket tgt;
 
     private AbstractWebApplicationService simpleWebApplicationServiceImpl;
 
-    private AbstractRegisteredService registeredService;
+    private BaseRegisteredService registeredService;
 
     @Mock
     private ServicesManager servicesManager;
@@ -65,12 +64,12 @@ public class DefaultLogoutManagerTests {
     }
 
     @SneakyThrows
-    public static AbstractRegisteredService getRegisteredService(final String id) {
-        val s = new RegexRegisteredService();
+    public static BaseRegisteredService getRegisteredService(final String id) {
+        val s = new CasRegisteredService();
         s.setServiceId(id);
         s.setName("Test registered service " + id);
         s.setDescription("Registered service description");
-        s.setProxyPolicy(new RegexMatchingRegisteredServiceProxyPolicy("^https?://.+"));
+        s.setProxyPolicy(new RegexMatchingRegisteredServiceProxyPolicy().setPattern("^https?://.+"));
         s.setId(RandomUtils.getNativeInstance().nextInt());
         return s;
     }
@@ -105,10 +104,12 @@ public class DefaultLogoutManagerTests {
         this.logoutManager = new DefaultLogoutManager(false, plan);
         this.registeredService = getRegisteredService(URL);
         when(servicesManager.findServiceBy(this.simpleWebApplicationServiceImpl)).thenReturn(this.registeredService);
+        assertTrue(plan.getLogoutRedirectionStrategies().isEmpty());
     }
 
     @Test
     public void verifyServiceLogoutUrlIsUsed() {
+
         this.registeredService.setLogoutUrl("https://www.apereo.org");
         val logoutRequests = this.logoutManager.performLogout(
             SingleLogoutExecutionRequest

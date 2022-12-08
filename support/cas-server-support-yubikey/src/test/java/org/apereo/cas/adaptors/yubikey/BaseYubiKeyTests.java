@@ -1,5 +1,6 @@
 package org.apereo.cas.adaptors.yubikey;
 
+import org.apereo.cas.audit.spi.config.CasCoreAuditConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPrincipalConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationServiceSelectionStrategyConfiguration;
@@ -37,10 +38,13 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 /**
  * This is {@link BaseYubiKeyTests}.
@@ -52,6 +56,7 @@ public abstract class BaseYubiKeyTests {
     @ImportAutoConfiguration({
         RefreshAutoConfiguration.class,
         MailSenderAutoConfiguration.class,
+        WebMvcAutoConfiguration.class,
         AopAutoConfiguration.class
     })
     @SpringBootConfiguration
@@ -87,6 +92,7 @@ public abstract class BaseYubiKeyTests {
         CasCoreNotificationsConfiguration.class,
         CasCoreUtilConfiguration.class,
         CasCoreWebConfiguration.class,
+        CasCoreAuditConfiguration.class,
         CasCoreTicketCatalogConfiguration.class,
         CasDefaultServiceTicketIdGeneratorsConfiguration.class,
         CasWebApplicationServiceFactoryConfiguration.class
@@ -94,11 +100,12 @@ public abstract class BaseYubiKeyTests {
     public static class SharedTestConfiguration {
     }
 
-    @TestConfiguration("YubiKeyTestConfiguration")
+    @TestConfiguration(value = "YubiKeyTestConfiguration", proxyBeanMethods = false)
     public static class YubiKeyTestConfiguration {
         private static final String BAD_TOKEN = "123456";
 
         @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
         public YubiKeyAccountValidator yubiKeyAccountValidator() {
             return (uid, token) -> !token.equals(BAD_TOKEN);
         }

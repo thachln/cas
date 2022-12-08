@@ -15,9 +15,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.test.annotation.DirtiesContext;
 
 import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -29,13 +29,12 @@ import static org.mockito.Mockito.*;
  * @since 5.3.0
  */
 @SpringBootTest(classes = BaseConsentRepositoryTests.SharedTestConfiguration.class)
-@DirtiesContext
-@Tag("Simple")
+@Tag("Consent")
 public class DefaultConsentEngineTests {
     @Autowired
-    @Qualifier("consentEngine")
+    @Qualifier(ConsentEngine.BEAN_NAME)
     private ConsentEngine consentEngine;
-    
+
     @BeforeAll
     public static void beforeAll() {
         val request = new MockHttpServletRequest();
@@ -46,7 +45,7 @@ public class DefaultConsentEngineTests {
 
     @Test
     public void verifyConsentDisablesRelease() {
-        val authentication = CoreAuthenticationTestUtils.getAuthentication("casuser");
+        val authentication = CoreAuthenticationTestUtils.getAuthentication(UUID.randomUUID().toString());
         val service = CoreAuthenticationTestUtils.getService();
         val consentService = RegisteredServiceTestUtils.getRegisteredService("consentService");
         consentService.setAttributeReleasePolicy(null);
@@ -56,7 +55,7 @@ public class DefaultConsentEngineTests {
 
     @Test
     public void verifyConsentIgnored() {
-        val authentication = CoreAuthenticationTestUtils.getAuthentication("casuser");
+        val authentication = CoreAuthenticationTestUtils.getAuthentication(UUID.randomUUID().toString());
         val service = CoreAuthenticationTestUtils.getService();
         val consentService = RegisteredServiceTestUtils.getRegisteredService("consentService");
         val policy = new ReturnAllAttributeReleasePolicy();
@@ -66,8 +65,8 @@ public class DefaultConsentEngineTests {
     }
 
     @Test
-    public void verifyConsentExpired() {
-        val authentication = CoreAuthenticationTestUtils.getAuthentication("casuser");
+    public void verifyConsentExpired() throws Exception {
+        val authentication = CoreAuthenticationTestUtils.getAuthentication(UUID.randomUUID().toString());
         val service = CoreAuthenticationTestUtils.getService();
         val consentService = RegisteredServiceTestUtils.getRegisteredService("consentService");
         val policy = new ReturnAllAttributeReleasePolicy();
@@ -79,8 +78,8 @@ public class DefaultConsentEngineTests {
     }
 
     @Test
-    public void verifyConsentIsAlwaysRequired() {
-        val authentication = CoreAuthenticationTestUtils.getAuthentication("casuser");
+    public void verifyConsentIsAlwaysRequired() throws Exception {
+        val authentication = CoreAuthenticationTestUtils.getAuthentication(UUID.randomUUID().toString());
         val service = CoreAuthenticationTestUtils.getService();
         val consentService = CoreAuthenticationTestUtils.getRegisteredService("consentService");
         val policy = new ReturnAllAttributeReleasePolicy();
@@ -96,8 +95,8 @@ public class DefaultConsentEngineTests {
     }
 
     @Test
-    public void verifyConsentIsRequiredByAttributeName() {
-        val authentication = CoreAuthenticationTestUtils.getAuthentication("casuser");
+    public void verifyConsentIsRequiredByAttributeName() throws Exception {
+        val authentication = CoreAuthenticationTestUtils.getAuthentication(UUID.randomUUID().toString());
         val service = CoreAuthenticationTestUtils.getService();
         val consentService = CoreAuthenticationTestUtils.getRegisteredService("consentService");
         val policy = new ReturnAllAttributeReleasePolicy();
@@ -112,8 +111,8 @@ public class DefaultConsentEngineTests {
     }
 
     @Test
-    public void verifyConsentFound() {
-        val authentication = CoreAuthenticationTestUtils.getAuthentication("casuser");
+    public void verifyConsentFound() throws Exception {
+        val authentication = CoreAuthenticationTestUtils.getAuthentication(UUID.randomUUID().toString());
         val service = CoreAuthenticationTestUtils.getService();
         val consentService = CoreAuthenticationTestUtils.getRegisteredService("consentService");
         val policy = new ReturnAllAttributeReleasePolicy();

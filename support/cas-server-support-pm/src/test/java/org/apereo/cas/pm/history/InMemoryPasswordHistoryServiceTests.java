@@ -1,7 +1,13 @@
 package org.apereo.cas.pm.history;
 
+import org.apereo.cas.audit.spi.config.CasCoreAuditConfiguration;
 import org.apereo.cas.config.CasCoreNotificationsConfiguration;
+import org.apereo.cas.config.CasCoreServicesConfiguration;
+import org.apereo.cas.config.CasCoreTicketCatalogConfiguration;
+import org.apereo.cas.config.CasCoreTicketIdGeneratorsConfiguration;
+import org.apereo.cas.config.CasCoreTicketsConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
+import org.apereo.cas.config.CasCoreWebConfiguration;
 import org.apereo.cas.pm.PasswordChangeRequest;
 import org.apereo.cas.pm.PasswordHistoryService;
 import org.apereo.cas.pm.config.PasswordManagementConfiguration;
@@ -25,25 +31,37 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(classes = {
     RefreshAutoConfiguration.class,
     PasswordManagementConfiguration.class,
+    CasCoreTicketsConfiguration.class,
+    CasCoreTicketCatalogConfiguration.class,
+    CasCoreTicketIdGeneratorsConfiguration.class,
+    CasCoreServicesConfiguration.class,
+    CasCoreWebConfiguration.class,
     CasCoreNotificationsConfiguration.class,
+    CasCoreAuditConfiguration.class,
     CasCoreUtilConfiguration.class
 }, properties = {
-    "cas.authn.pm.enabled=true",
-    "cas.authn.pm.history.enabled=true"
+    "cas.authn.pm.core.enabled=true",
+    "cas.authn.pm.history.core.enabled=true"
 })
 @Tag("PasswordOps")
 public class InMemoryPasswordHistoryServiceTests {
     @Autowired
-    @Qualifier("passwordHistoryService")
+    @Qualifier(PasswordHistoryService.BEAN_NAME)
     private PasswordHistoryService passwordHistoryService;
 
     @Test
     public void verifyValidity() {
-        val request = new PasswordChangeRequest("casuser", "password", "password");
+        passwordHistoryService.removeAll();
+        assertTrue(passwordHistoryService.fetchAll().isEmpty());
+
+        val request = new PasswordChangeRequest("casuser", "current-psw".toCharArray(), "123456".toCharArray(), "123456".toCharArray());
         assertFalse(passwordHistoryService.exists(request));
         assertTrue(passwordHistoryService.store(request));
         assertTrue(passwordHistoryService.exists(request));
         assertFalse(passwordHistoryService.fetchAll().isEmpty());
         assertFalse(passwordHistoryService.fetch("casuser").isEmpty());
+
+        passwordHistoryService.remove("casuser");
+        assertTrue(passwordHistoryService.fetch("casuser").isEmpty());
     }
 }

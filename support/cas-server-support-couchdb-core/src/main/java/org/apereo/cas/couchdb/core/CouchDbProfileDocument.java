@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.ektorp.support.CouchDbDocument;
 
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class CouchDbProfileDocument extends CouchDbDocument implements Principal {
 
+    @Serial
     private static final long serialVersionUID = -986478230300427397L;
 
     /**
@@ -45,7 +47,8 @@ public class CouchDbProfileDocument extends CouchDbDocument implements Principal
     private String linkedid;
 
     /**
-     `* Map for storing extra properties when AUP support uses shared database (e.g., user database).
+     * Map for storing extra properties when AUP support
+     * uses shared database (e.g., user database).
      */
     @JsonAnySetter
     private Map<String, List<Object>> attributes = new LinkedHashMap<>(0);

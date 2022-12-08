@@ -4,33 +4,25 @@ title: CAS - Service Management
 category: Services
 ---
 
+{% include variables.html %}
+
 # Service Management
 
 The CAS service management facility allows CAS server administrators to declare and configure which services
 (CAS clients) may make use of CAS in which ways. The core component of the service management facility is the
-service registry that stores one or more registered services containing metadata that drives a number of CAS behaviors:
+service registry that stores one or more registered services containing metadata that drives a number of CAS behaviors.
 
-* [Authorized services](Configuring-Service-Access-Strategy.html) - Control which services may participate in a CAS SSO session.
-* Forced authentication - Provides administrative control for forced authentication.
-* [Attribute release](../integration/Attribute-Release.html) - Provide user details to services for authorization and personalization.
-* [Proxy control](Configuring-Service-Proxy-Policy.html) - Further restrict authorized services by granting/denying proxy authentication capability.
-* [Theme control](../ux/User-Interface-Customization.html) - Define alternate CAS themes to be used for particular services.
+{% include_cached casproperties.html properties="cas.service-registry.core" %}
 
-To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#service-registry).
-
-## Administrative Endpoints
+## Actuator Endpoints
 
 The following endpoints are provided by CAS:
- 
-| Endpoint                 | Description
-|--------------------------|------------------------------------------------
-| `registeredServices`     | Provides a JSON representation of the [CAS service registry](Service-Management.html). The endpoint can also accept a mime-type of `application/vnd.cas.services+yaml` to produce YAML output. A `GET` operation with a parameter selector of `/{id}` will fetch a specific service definition. A `DELETE` operation with a parameter selector of `/{id}` will delete the specific service definition by its id.
-| `exportRegisteredServices`    | Provides a ZIP-file representation of the [CAS service registry](Service-Management.html).
-| `importRegisteredServices`    | Import service definitions into the [CAS service registry](Service-Management.html).
+
+{% include_cached actuators.html endpoints="registeredServices" casModule="cas-server-support-reports" %}
 
 ## Service Management Web Application
 
-The service management webapp is a standalone web application that may be deployed along side CAS that provides a GUI
+The service management webapp is a standalone web application that may be deployed alongside CAS that provides a GUI
 to manage service registry data. The management web application *MUST* share the same registry configuration as the 
 CAS server itself so the entire system can load the same services data. To learn more about 
 the management webapp, [please see this guide](Installing-ServicesMgmt-Webapp.html).
@@ -39,61 +31,35 @@ the management webapp, [please see this guide](Installing-ServicesMgmt-Webapp.ht
 
 Registered services present the following metadata:
 
-| Field                             | Description
-|-----------------------------------|---------------------------------------------------------------------------------
-| `id`                              | Required unique identifier. This **MUST** be a valid numeric value.
-| `name`                            | Required name (`255` characters or less).
-| `description`                     | Optional free-text description of the service. (`255` characters or less)
-| `informationUrl`                  | Optional free-text link to the service information guide.
-| `privacyUrl`                      | Optional free-text link to the service privacy policy.
-| `redirectUrl`                     | Optional URL to use when returning an authentication response back to applications.
-| `logo`                            | Optional path to an image file that is the logo for this service. The image will be displayed on the login page along with the service description and name. The value may be a relative path to the `images` directory of the CAS web application or it may be a full URL.
-| `serviceId`                       | Required [regular expression](http://docs.oracle.com/javase/tutorial/essential/regex/) describing a logical service. A logical service defines one or more URLs where a service or services are located. The definition of the url pattern must be **done carefully** because it can open security breaches.
-| `theme`                           | Optional theme name that may be used to customize the CAS UI when the service requests a ticket. See [this guide](../ux/User-Interface-Customization.html) for more details.
-| `proxyPolicy`                     | Determines whether the service is able to proxy authentication. See [this guide](Configuring-Service-Proxy-Policy.html) for more info.
-| `evaluationOrder`                 | Determines relative order of evaluation of registered services. This flag is particularly important in cases where two service URL expressions cover the same services; evaluation order determines which registration is evaluated first and acts as an internal sorting factor.
-| `authenticationPolicy`            | The authentication policy to act as a complement or override for the global authentication engine. See [this guide](Configuring-Service-AuthN-Policy.html) for more details.
-| `attributeReleasePolicy`          | The policy that describes the set of attributes allows to be released to the application, as well as any other filtering logic needed to weed some out. See [this guide](../integration/Attribute-Release.html) for more details on attribute release and filters.
-| `logoutType`                      | Defines how this service should be treated once the logout protocol is initiated. Acceptable values are `LogoutType.BACK_CHANNEL`, `LogoutType.FRONT_CHANNEL` or `LogoutType.NONE`. See [this guide](../installation/Logout-Single-Signout.html) for more details on logout.
-| `responseType`                      | Defines how CAS should respond to requests for this service. See [this guide](Configuring-Service-Response-Type.html) for more details.
-| `usernameAttributeProvider`       | The provider configuration which dictates what value as the "username" should be sent back to the application. See [this guide](../integration/Attribute-Release.html) for more details on attribute release and filters.
-| `accessStrategy`                  | The strategy configuration that outlines and access rules for this service. It describes whether the service is allowed, authorized to participate in SSO, or can be granted access from the CAS perspective based on a particular attribute-defined role, aka RBAC. See [this guide](../integration/Attribute-Release.html) for more details on attribute release and filters.
-| `publicKey`                          | The public key associated with this service that is used to authorize the request by encrypting certain elements and attributes in the CAS validation protocol response, such as [the PGT](../installation/Configuring-Proxy-Authentication.html) or [the credential](../integration/ClearPass.html). See [this guide](../integration/Attribute-Release.html) for more details on attribute release and filters.
-| `logoutUrl`                          | URL endpoint for this service to receive logout requests. See [this guide](../installation/Logout-Single-Signout.html) for more details
-| `properties`                      | Extra metadata associated with this service in form of key/value pairs. This is used to inject custom fields into the service definition, to be used later by extension modules to define additional behavior on a per-service basis. [See this guide](Configuring-Service-Custom-Properties.html) for more info please.
-| `multifactorPolicy`               | The policy that describes the configuration required for this service authentication, typically for [multifactor authentication](../mfa/Configuring-Multifactor-Authentication.html).
-| `contacts`               | Specify the collection of contacts associated with service that own the application. See [this guide](Configuring-Service-Contacts.html) for more info.
-| `matchingStrategy`        | Specify the strategy used to match the service definition against an authentication request. See [this guide](Configuring-Service-Matching-Strategy.html) for more info.
+| Field                       | Description                                                                                                                                                                                                                                                                                                                                                                                                                 |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `id`                        | Required unique identifier. This **MUST** be a valid numeric value.                                                                                                                                                                                                                                                                                                                                                         |
+| `name`                      | Required name (`255` characters or less).                                                                                                                                                                                                                                                                                                                                                                                   |
+| `description`               | Optional free-text description of the service. (`255` characters or less)                                                                                                                                                                                                                                                                                                                                                   |
+| `informationUrl`            | Optional free-text link to the service information guide.                                                                                                                                                                                                                                                                                                                                                                   |
+| `privacyUrl`                | Optional free-text link to the service privacy policy.                                                                                                                                                                                                                                                                                                                                                                      |
+| `redirectUrl`               | Optional URL to use when returning an authentication response back to applications.                                                                                                                                                                                                                                                                                                                                         |
+| `logo`                      | Optional path to an image file that is the logo for this service. The image will be displayed on the login page along with the service description and name. The value may be a relative path to the `images` directory of the CAS web application or it may be a full URL.                                                                                                                                                 |
+| `serviceId`                 | Required [regular expression](http://docs.oracle.com/javase/tutorial/essential/regex/) describing a logical service. A logical service defines one or more URLs where a service or services are located. The definition of the url pattern must be **done carefully** because it can open security breaches.                                                                                                                |
+| `locale`                    | Optional locale name that may be used to customize the CAS UI when the service requests a ticket. Values can use the [Spring Expression Language](../configuration/Configuration-Spring-Expressions.html) syntax. See [this guide](../ux/User-Interface-Customization-Localization.html) for more details.                                                                                                                  |
+| `theme`                     | Optional theme name that may be used to customize the CAS UI when the service requests a ticket. Values can use the [Spring Expression Language](../configuration/Configuration-Spring-Expressions.html) syntax. See [this guide](../ux/User-Interface-Customization.html) for more details.                                                                                                                                |
+| `proxyPolicy`               | Determines whether the service is able to proxy authentication. See [this guide](Configuring-Service-Proxy-Policy.html) for more info.                                                                                                                                                                                                                                                                                      |
+| `evaluationOrder`           | Determines relative order of evaluation of registered services. This flag is particularly important in cases where two service URL expressions cover the same services; evaluation order determines which registration is evaluated first and acts as an internal sorting factor.                                                                                                                                           |
+| `authenticationPolicy`      | The authentication policy to act as a complement or override for the global authentication engine. See [this guide](Configuring-Service-AuthN-Policy.html) for more details.                                                                                                                                                                                                                                                |
+| `attributeReleasePolicy`    | The policy that describes the set of attributes allows to be released to the application, as well as any other filtering logic needed to weed some out. See [this guide](../integration/Attribute-Release.html) for more details on attribute release and filters.                                                                                                                                                          |
+| `logoutType`                | Defines how this service should be treated once the logout protocol is initiated. Acceptable values are `LogoutType.BACK_CHANNEL`, `LogoutType.FRONT_CHANNEL` or `LogoutType.NONE`. See [this guide](../installation/Logout-Single-Signout.html) for more details on logout.                                                                                                                                                |
+| `responseType`              | Defines how CAS should respond to requests for this service. See [this guide](Configuring-Service-Response-Type.html) for more details.                                                                                                                                                                                                                                                                                     |
+| `usernameAttributeProvider` | The provider configuration which dictates what value as the "username" should be sent back to the application. See [this guide](../integration/Attribute-Release.html) for more details on attribute release and filters.                                                                                                                                                                                                   |
+| `accessStrategy`            | The [strategy configuration](Configuring-Service-Access-Strategy.html) that outlines and access rules for this service. It describes whether the service is allowed, authorized to participate in SSO, or can be granted access from the CAS perspective based on a particular attribute-defined role, aka RBAC. See [this guide](../integration/Attribute-Release.html) for more details on attribute release and filters. |
+| `publicKey`                 | The public key associated with this service that is used to authorize the request by encrypting certain elements and attributes in the CAS validation protocol response, such as [the PGT](../authentication/Configuring-Proxy-Authentication.html) or [the credential](../integration/ClearPass.html). See [this guide](../integration/Attribute-Release.html) for more details on attribute release and filters.          |
+| `logoutUrl`                 | URL endpoint for this service to receive logout requests. See [this guide](../installation/Logout-Single-Signout.html) for more details                                                                                                                                                                                                                                                                                     |
+| `properties`                | Extra metadata associated with this service in form of key/value pairs. This is used to inject custom fields into the service definition, to be used later by extension modules to define additional behavior on a per-service basis. [See this guide](Configuring-Service-Custom-Properties.html) for more info please.                                                                                                    |
+| `multifactorPolicy`         | The policy that describes the configuration required for this service authentication, typically for [multifactor authentication](../mfa/Configuring-Multifactor-Authentication.html).                                                                                                                                                                                                                                       |
+| `contacts`                  | Specify the collection of contacts associated with service that own the application. See [this guide](Configuring-Service-Contacts.html) for more info.                                                                                                                                                                                                                                                                     |
+| `matchingStrategy`          | Specify the strategy used to match the service definition against an authentication request. See [this guide](Configuring-Service-Matching-Strategy.html) for more info.                                                                                                                                                                                                                                                    |
+| `supportedProtocols`        | Specify supported and allowed protocols for this service. See [this guide](Configuring-Service-Supported-Protocols.html) for more info.                                                                                                                                                                                                                                                                                     |
 
 <div class="alert alert-info"><strong>Service Types</strong><p>Note that while the above properties apply to all <strong>generic</strong> service definitions, there are additional service types in CAS that may be activated and required depending on the protocol used and the nature of the client application. Always check the dedicated guide for the capability you have in mind (i.e. OAuth, SAML, etc).</p></div>
-
-### Service Access Strategy
-
-[See this guide](Configuring-Service-Access-Strategy.html) for more info.
-
-### Proxy Authentication Policy
-
-[See this guide](Configuring-Service-Proxy-Policy.html) for more info.
-
-### Required Authentication
-
-[See this guide](Configuring-Service-AuthN-Policy.html) for more details.
-
-### Tags & Properties
-
-[See this guide](Configuring-Service-Custom-Properties.html) for more info.
-
-### Contacts & Owners
-
-[See this guide](Configuring-Service-Contacts.html) for more info.
-
-### Expiration Policy
-
-[See this guide](Configuring-Service-Expiration-Policy.html) for more info.
-
-### Matching Strategy
-
-See [this guide](Configuring-Service-Matching-Strategy.html) for more info.
 
 ## Storage
 
@@ -110,7 +76,7 @@ The following options may be used to store services in CAS.
 | LDAP             | [See this guide](LDAP-Service-Management.html).       | Store service definitions in a directory server. Candidate for HA deployments.
 | JPA              | [See this guide](JPA-Service-Management.html).        | Store service definitions in a relational database (Oracle, MySQL, etc). Candidate for HA deployments.
 | Couchbase        | [See this guide](Couchbase-Service-Management.html).  | Store service definitions in Couchbase. Candidate for HA deployments.
-| Couchbase        | [See this guide](CouchDb-Service-Management.html).    | Store service definitions in CouchDb. Candidate for HA deployments.
+| CouchDB          | [See this guide](CouchDb-Service-Management.html).    | Store service definitions in CouchDb. Candidate for HA deployments.
 | DynamoDb         | [See this guide](DynamoDb-Service-Management.html).   | Store service definitions in DynamoDb. Candidate for HA deployments.
 | Amazon S3        | [See this guide](AmazonS3-Service-Management.html).   | Store service definitions in Amazon S3 buckets. Candidate for HA deployments.
 | CosmosDb         | [See this guide](CosmosDb-Service-Management.html).   | Store service definitions in an Azure CosmosDb. Candidate for HA deployments.

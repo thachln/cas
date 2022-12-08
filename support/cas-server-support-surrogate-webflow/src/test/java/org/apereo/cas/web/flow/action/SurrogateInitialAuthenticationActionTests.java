@@ -1,7 +1,7 @@
 package org.apereo.cas.web.flow.action;
 
-import org.apereo.cas.authentication.SurrogateUsernamePasswordCredential;
 import org.apereo.cas.authentication.credential.UsernamePasswordCredential;
+import org.apereo.cas.authentication.surrogate.SurrogateCredentialTrait;
 import org.apereo.cas.web.flow.CasWebflowConstants;
 import org.apereo.cas.web.support.WebUtils;
 
@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
@@ -25,77 +26,88 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@Tag("WebflowActions")
-public class SurrogateInitialAuthenticationActionTests extends BaseSurrogateInitialAuthenticationActionTests {
+@Tag("WebflowAuthenticationActions")
+@SpringBootTest(classes = BaseSurrogateAuthenticationTests.SharedTestConfiguration.class,
+    properties = "cas.authn.surrogate.simple.surrogates.casuser=cassurrogate")
+public class SurrogateInitialAuthenticationActionTests {
 
     @Autowired
-    @Qualifier("authenticationViaFormAction")
-    private Action authenticationViaFormAction;
+    @Qualifier(CasWebflowConstants.ACTION_ID_SURROGATE_INITIAL_AUTHENTICATION)
+    private Action initialAuthenticationAction;
 
     @Test
-    public void verifyNoCredentialsFound() {
-        try {
-            val context = new MockRequestContext();
-            context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(),
-                new MockHttpServletResponse()));
-            assertEquals(CasWebflowConstants.TRANSITION_ID_AUTHENTICATION_FAILURE, authenticationViaFormAction.execute(context).getId());
-        } catch (final Exception e) {
-            throw new AssertionError(e);
-        }
+    public void verifyNoCredentialsFound() throws Exception {
+        val context = new MockRequestContext();
+        context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(),
+            new MockHttpServletResponse()));
+        assertNull(initialAuthenticationAction.execute(context));
+        assertFalse(WebUtils.hasSurrogateAuthenticationRequest(context));
     }
 
     @Test
-    public void verifySurrogateCredentialsFound() {
-        try {
-            val context = new MockRequestContext();
-            val c = new SurrogateUsernamePasswordCredential();
-            c.setUsername("casuser");
-            c.setPassword("Mellon");
-            c.setSurrogateUsername("cassurrogate");
-            WebUtils.putCredential(context, c);
-            context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(), new MockHttpServletResponse()));
-            assertEquals(CasWebflowConstants.TRANSITION_ID_SUCCESS, authenticationViaFormAction.execute(context).getId());
-        } catch (final Exception e) {
-            throw new AssertionError(e);
-        }
+    public void verifySurrogateCredentialsFound() throws Exception {
+        val context = new MockRequestContext();
+        val credential = new UsernamePasswordCredential();
+        credential.setUsername("casuser");
+        credential.assignPassword("Mellon");
+        credential.getCredentialMetadata().addTrait(new SurrogateCredentialTrait("cassurrogate"));
+        WebUtils.putCredential(context, credential);
+        context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(), new MockHttpServletResponse()));
+        assertNull(initialAuthenticationAction.execute(context));
     }
 
     @Test
-    public void verifyUsernamePasswordCredentialsFound() {
-        try {
-            val context = new MockRequestContext();
-            val c = new UsernamePasswordCredential();
-            c.setUsername("cassurrogate+casuser");
-            c.setPassword("Mellon");
-            WebUtils.putCredential(context, c);
-            context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(), new MockHttpServletResponse()));
-            assertEquals(CasWebflowConstants.TRANSITION_ID_SUCCESS, authenticationViaFormAction.execute(context).getId());
-            assertTrue(WebUtils.getCredential(context) instanceof UsernamePasswordCredential);
-        } catch (final Exception e) {
-            throw new AssertionError(e);
-        }
+    public void verifySelectingSurrogateList() throws Exception {
+        val context = new MockRequestContext();
+        val c = new UsernamePasswordCredential();
+        c.setUsername("+casuser");
+        c.assignPassword("Mellon");
+        WebUtils.putCredential(context, c);
+        context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(), new MockHttpServletResponse()));
+        assertNull(initialAuthenticationAction.execute(context));
+        assertTrue(WebUtils.hasSurrogateAuthenticationRequest(context));
+        val credential = WebUtils.getCredential(context);
+        assertEquals("casuser", credential.getId());
+        assertTrue(credential.getCredentialMetadata().getTrait(SurrogateCredentialTrait.class).isEmpty());
     }
 
     @Test
-    public void verifyUsernamePasswordCredentialsBadPasswordAndCancelled() {
-        try {
-            val context = new MockRequestContext();
-            var credential = new UsernamePasswordCredential();
-            credential.setUsername("cassurrogate+casuser");
-            credential.setPassword("badpassword");
-            WebUtils.putCredential(context, credential);
-            context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(), new MockHttpServletResponse()));
-            assertEquals(CasWebflowConstants.TRANSITION_ID_AUTHENTICATION_FAILURE, authenticationViaFormAction.execute(context).getId());
-            assertTrue(WebUtils.getCredential(context) instanceof SurrogateUsernamePasswordCredential);
+    public void verifyUsernamePasswordCredentialsFound() throws Exception {
+        val context = new MockRequestContext();
+        val c = new UsernamePasswordCredential();
+        c.setUsername("cassurrogate+casuser");
+        c.assignPassword("Mellon");
+        WebUtils.putCredential(context, c);
+        context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(), new MockHttpServletResponse()));
+        assertNull(initialAuthenticationAction.execute(context));
+        assertFalse(WebUtils.hasSurrogateAuthenticationRequest(context));
+        val credential = WebUtils.getCredential(context);
+        assertEquals("casuser", credential.getId());
+        assertEquals("cassurrogate", credential.getCredentialMetadata()
+            .getTrait(SurrogateCredentialTrait.class).get().getSurrogateUsername());
+    }
 
-            val sc = WebUtils.getCredential(context, SurrogateUsernamePasswordCredential.class);
-            sc.setUsername("casuser");
-            sc.setPassword("Mellon");
-            WebUtils.putCredential(context, sc);
-            assertEquals(CasWebflowConstants.TRANSITION_ID_SUCCESS, authenticationViaFormAction.execute(context).getId());
-            assertTrue(WebUtils.getCredential(context) instanceof UsernamePasswordCredential);
-        } catch (final Exception e) {
-            throw new AssertionError(e);
-        }
+    @Test
+    public void verifyUsernamePasswordCredentialsBadPasswordAndCancelled() throws Exception {
+        val context = new MockRequestContext();
+        var credential = new UsernamePasswordCredential();
+        credential.setUsername("cassurrogate+casuser");
+        credential.assignPassword("badpassword");
+        WebUtils.putCredential(context, credential);
+        context.setExternalContext(new ServletExternalContext(new MockServletContext(), new MockHttpServletRequest(), new MockHttpServletResponse()));
+        assertNull(initialAuthenticationAction.execute(context));
+        val credential1 = WebUtils.getCredential(context);
+        assertEquals("casuser", credential1.getId());
+        assertEquals("cassurrogate", credential.getCredentialMetadata()
+            .getTrait(SurrogateCredentialTrait.class).get().getSurrogateUsername());
+
+        val sc = WebUtils.getCredential(context, UsernamePasswordCredential.class);
+        sc.setUsername("casuser");
+        sc.assignPassword("Mellon");
+        WebUtils.putCredential(context, sc);
+        assertNull(initialAuthenticationAction.execute(context));
+        val credential2 = WebUtils.getCredential(context);
+        assertEquals("casuser", credential2.getId());
+        assertTrue(credential.getCredentialMetadata().getTrait(SurrogateCredentialTrait.class).isEmpty());
     }
 }

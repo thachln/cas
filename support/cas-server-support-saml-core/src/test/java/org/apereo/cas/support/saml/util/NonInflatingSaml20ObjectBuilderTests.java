@@ -18,7 +18,7 @@ import org.opensaml.core.xml.schema.XSDateTime;
 import org.opensaml.core.xml.schema.XSInteger;
 import org.opensaml.core.xml.schema.XSString;
 import org.opensaml.core.xml.schema.XSURI;
-import org.opensaml.saml.saml2.core.NameID;
+import org.opensaml.saml.saml2.core.NameIDType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,11 +40,11 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 6.2.0
  */
-@Tag("SAML")
+@Tag("SAML2")
 @SpringBootTest(classes = CoreSamlConfigurationTests.SharedTestConfiguration.class)
 public class NonInflatingSaml20ObjectBuilderTests {
     @Autowired
-    @Qualifier("shibboleth.OpenSAMLConfig")
+    @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
     private OpenSamlConfigBean openSamlConfigBean;
     
     @Test
@@ -139,8 +139,8 @@ public class NonInflatingSaml20ObjectBuilderTests {
     @Test
     public void verifySubject() {
         val builder = new NonInflatingSaml20ObjectBuilder(openSamlConfigBean);
-        val id = builder.getNameID(NameID.UNSPECIFIED, "casuser");
-        val subjectId = builder.getNameID(NameID.UNSPECIFIED, "casuser");
+        val id = builder.getNameID(NameIDType.UNSPECIFIED, "casuser");
+        val subjectId = builder.getNameID(NameIDType.UNSPECIFIED, "casuser");
         val sub = builder.newSubject(id, subjectId, "cas", ZonedDateTime.now(ZoneOffset.UTC),
             "https://github.com", ZonedDateTime.now(ZoneOffset.UTC));
         assertNotNull(sub);

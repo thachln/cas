@@ -26,5 +26,19 @@ public enum DuoSecurityUserAccountStatus {
     /**
      * Duo service was unavailable.
      */
-    UNAVAILABLE
+    UNAVAILABLE;
+
+    /**
+     * Translate status to a duo account status type.
+     *
+     * @param status the status
+     * @return the duo security user account status
+     */
+    public static DuoSecurityUserAccountStatus from(final String status) {
+        return switch (status.toLowerCase()) {
+            case "bypass" -> ALLOW;
+            case "disabled", "locked", "pending_deletion" -> DENY;
+            default -> AUTH;
+        };
+    }
 }

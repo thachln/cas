@@ -1,10 +1,11 @@
 package org.apereo.cas.config;
 
+import org.apereo.cas.audit.spi.config.CasCoreAuditConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
 import org.apereo.cas.support.saml.OpenSamlConfigBean;
 
-import net.shibboleth.utilities.java.support.xml.BasicParserPool;
+import net.shibboleth.shared.xml.impl.BasicParserPool;
 import org.apache.velocity.app.VelocityEngine;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -31,14 +32,14 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(classes = CoreSamlConfigurationTests.SharedTestConfiguration.class)
 @EnableScheduling
-@Tag("SAML")
+@Tag("SAML2")
 public class CoreSamlConfigurationTests {
     @Autowired
     @Qualifier("shibboleth.VelocityEngine")
     protected VelocityEngine velocityEngineFactoryBean;
 
     @Autowired
-    @Qualifier("shibboleth.OpenSAMLConfig")
+    @Qualifier(OpenSamlConfigBean.DEFAULT_BEAN_NAME)
     protected OpenSamlConfigBean openSamlConfigBean;
 
     @Autowired
@@ -83,6 +84,8 @@ public class CoreSamlConfigurationTests {
         CasCoreAuthenticationSupportConfiguration.class,
         CasCoreAuthenticationHandlersConfiguration.class,
         CasCoreTicketIdGeneratorsConfiguration.class,
+        CasCoreAuditConfiguration.class,
+        CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
         CasCoreHttpConfiguration.class,
         CasCoreUtilConfiguration.class,
         CoreSamlConfiguration.class,

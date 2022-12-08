@@ -1,7 +1,8 @@
 package org.apereo.cas.authentication;
 
 import org.apereo.cas.authentication.credential.UsernamePasswordCredential;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.authentication.principal.Service;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
 import org.jooq.lambda.Unchecked;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit test for {@link LdapAuthenticationHandler}.
@@ -27,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     "cas.authn.ldap[0].bind-dn=Administrator@cas.example.org",
     "cas.authn.ldap[0].bind-credential=" + BaseActiveDirectoryLdapAuthenticationHandlerTests.AD_ADMIN_PASSWORD,
     "cas.authn.ldap[0].ldap-url=" + BaseActiveDirectoryLdapAuthenticationHandlerTests.AD_LDAP_URL,
-    "cas.authn.ldap[0].useStartTls=true",
+    "cas.authn.ldap[0].use-start-tls=true",
     "cas.authn.ldap[0].subtree-search=true",
     "cas.authn.ldap[0].base-dn=dc=cas,dc=example,dc=org",
     "cas.authn.ldap[0].follow-referrals=false",
@@ -42,8 +44,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     "cas.authn.ldap[0].password-policy.type=AD",
     "cas.authn.ldap[0].password-policy.enabled=true"
 })
-@EnabledIfPortOpen(port = 10390)
-@Tag("Ldap")
+@EnabledIfListeningOnPort(port = 10390)
+@Tag("ActiveDirectory")
 public class ActiveDirectoryLdapAuthenticationHandlerPasswordPolicyTests extends BaseActiveDirectoryLdapAuthenticationHandlerTests {
 
     @Override
@@ -53,13 +55,14 @@ public class ActiveDirectoryLdapAuthenticationHandlerPasswordPolicyTests extends
 
     @Test
     public void verifyAuthenticateWarnings() {
-        assertNotEquals(handler.size(), 0);
+        assertNotEquals(0, ldapAuthenticationHandlers.size());
 
-        this.handler.forEach(Unchecked.consumer(h -> {
+        ldapAuthenticationHandlers.toList().forEach(Unchecked.consumer(h -> {
             val credential = new UsernamePasswordCredential(getUsername(), getSuccessPassword());
-            val result = h.authenticate(credential);
+            val result = h.authenticate(credential, mock(Service.class));
             assertTrue(result.getWarnings() != null && !result.getWarnings().isEmpty());
-            assertTrue(result.getWarnings().stream().anyMatch(messageDescriptor -> messageDescriptor.getCode().equals("password.expiration.warning")));
+            assertTrue(result.getWarnings().stream()
+                .anyMatch(messageDescriptor -> "password.expiration.warning".equals(messageDescriptor.getCode())));
             assertNotNull(result.getPrincipal());
             assertEquals(credential.getUsername(), result.getPrincipal().getId());
             val attributes = result.getPrincipal().getAttributes();

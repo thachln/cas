@@ -1,6 +1,7 @@
 package org.apereo.cas.trusted.authentication.storage;
 
 import org.apereo.cas.audit.spi.config.CasCoreAuditConfiguration;
+import org.apereo.cas.config.CasCoreUtilConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustRecord;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustStorage;
@@ -11,6 +12,7 @@ import org.apereo.cas.trusted.config.RestMultifactorAuthenticationTrustConfigura
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.MockWebServer;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,7 +22,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,12 +44,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@Tag("RestfulApi")
+@Tag("RestfulApiAuthentication")
 @SpringBootTest(classes = {
     RestMultifactorAuthenticationTrustConfiguration.class,
     MultifactorAuthnTrustedDeviceFingerprintConfiguration.class,
     MultifactorAuthnTrustConfiguration.class,
     CasCoreAuditConfiguration.class,
+    CasCoreUtilConfiguration.class,
     RefreshAutoConfiguration.class
 },
     properties = {
@@ -61,10 +63,11 @@ import static org.junit.jupiter.api.Assertions.*;
         "cas.authn.mfa.trusted.rest.url=http://localhost:9297"
     })
 public class RestMultifactorAuthenticationTrustStorageTests {
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(false).build().toObjectMapper();
 
     @Autowired
-    @Qualifier("mfaTrustEngine")
+    @Qualifier(MultifactorAuthenticationTrustStorage.BEAN_NAME)
     private MultifactorAuthenticationTrustStorage mfaTrustEngine;
 
     @Autowired
@@ -86,12 +89,7 @@ public class RestMultifactorAuthenticationTrustStorageTests {
             webServer.start();
 
             mfaTrustEngine.save(r);
-            assertDoesNotThrow(new Executable() {
-                @Override
-                public void execute() {
-                    mfaTrustEngine.remove(r.getRecordKey());
-                }
-            });
+            assertDoesNotThrow(() -> mfaTrustEngine.remove(r.getRecordKey()));
         }
     }
 
@@ -100,12 +98,7 @@ public class RestMultifactorAuthenticationTrustStorageTests {
         try (val webServer = new MockWebServer(9297,
             new ByteArrayResource(StringUtils.EMPTY.getBytes(StandardCharsets.UTF_8), "REST Output"), MediaType.APPLICATION_JSON_VALUE)) {
             webServer.start();
-            assertDoesNotThrow(new Executable() {
-                @Override
-                public void execute() {
-                    mfaTrustEngine.remove(ZonedDateTime.now(ZoneOffset.UTC));
-                }
-            });
+            assertDoesNotThrow(() -> mfaTrustEngine.remove(ZonedDateTime.now(ZoneOffset.UTC)));
         }
     }
 

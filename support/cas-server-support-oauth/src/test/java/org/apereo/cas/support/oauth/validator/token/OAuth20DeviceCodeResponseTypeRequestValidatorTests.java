@@ -7,7 +7,7 @@ import org.apereo.cas.support.oauth.OAuth20ResponseTypes;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 import org.springframework.core.Ordered;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -27,7 +27,7 @@ public class OAuth20DeviceCodeResponseTypeRequestValidatorTests extends Abstract
     public void verifySupports() {
         val request = new MockHttpServletRequest();
         val response = new MockHttpServletResponse();
-        val validator = new OAuth20DeviceCodeResponseTypeRequestValidator(servicesManager, serviceFactory);
+        val validator = new OAuth20DeviceCodeResponseTypeRequestValidator(servicesManager, serviceFactory, oauthRequestParameterResolver);
         val context = new JEEContext(request, response);
         request.addParameter(OAuth20Constants.RESPONSE_TYPE, OAuth20ResponseTypes.DEVICE_CODE.getType());
         request.addParameter(OAuth20Constants.CLIENT_ID, CLIENT_ID);
@@ -41,7 +41,7 @@ public class OAuth20DeviceCodeResponseTypeRequestValidatorTests extends Abstract
     public void verifyValidate() {
         val request = new MockHttpServletRequest();
         val response = new MockHttpServletResponse();
-        val validator = new OAuth20DeviceCodeResponseTypeRequestValidator(servicesManager, serviceFactory);
+        val validator = new OAuth20DeviceCodeResponseTypeRequestValidator(servicesManager, serviceFactory, oauthRequestParameterResolver);
         val context = new JEEContext(request, response);
         request.setParameter(OAuth20Constants.RESPONSE_TYPE, "unknown");
         request.addParameter(OAuth20Constants.CLIENT_ID, "unknown");
@@ -50,6 +50,7 @@ public class OAuth20DeviceCodeResponseTypeRequestValidatorTests extends Abstract
         request.setParameter(OAuth20Constants.RESPONSE_TYPE, OAuth20ResponseTypes.DEVICE_CODE.getType());
         assertFalse(validator.validate(context));
 
+        addRegisteredService();
         request.setParameter(OAuth20Constants.CLIENT_ID, CLIENT_ID);
         assertTrue(validator.validate(context));
     }

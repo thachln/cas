@@ -18,13 +18,17 @@ import org.apereo.cas.config.CasCoreTicketCatalogConfiguration;
 import org.apereo.cas.config.CasCoreTicketIdGeneratorsConfiguration;
 import org.apereo.cas.config.CasCoreTicketsConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
+import org.apereo.cas.config.CasCoreUtilSerializationConfiguration;
 import org.apereo.cas.config.CasCoreWebConfiguration;
 import org.apereo.cas.config.CasPersonDirectoryTestConfiguration;
 import org.apereo.cas.config.SurrogateAuthenticationAuditConfiguration;
 import org.apereo.cas.config.SurrogateAuthenticationConfiguration;
 import org.apereo.cas.config.SurrogateAuthenticationMetadataConfiguration;
+import org.apereo.cas.config.SurrogateAuthenticationRestConfiguration;
+import org.apereo.cas.config.SurrogateComponentSerializationConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
+import org.apereo.cas.rest.config.CasCoreRestConfiguration;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.services.web.config.CasThemesConfiguration;
 import org.apereo.cas.web.config.CasCookieConfiguration;
@@ -40,6 +44,7 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.annotation.Import;
 
@@ -54,9 +59,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 6.0.0
  */
 public abstract class BaseSurrogateAuthenticationServiceTests {
-    public static final String CASUSER = "casuser";
-
     public static final String BANDERSON = "banderson";
+
+    public static final String ADMIN = "casadmin";
 
     @Mock
     protected ServicesManager servicesManager;
@@ -65,35 +70,55 @@ public abstract class BaseSurrogateAuthenticationServiceTests {
 
     @Test
     public void verifyUserAllowedToProxy() throws Exception {
-        assertFalse(getService().getEligibleAccountsForSurrogateToProxy(CASUSER).isEmpty());
+        assertFalse(getService().getImpersonationAccounts(getTestUser()).isEmpty());
     }
 
     @Test
     public void verifyUserNotAllowedToProxy() throws Exception {
-        assertTrue(getService().getEligibleAccountsForSurrogateToProxy("unknown-user").isEmpty());
+        assertTrue(getService().getImpersonationAccounts("unknown-user").isEmpty());
     }
 
     @Test
     public void verifyProxying() throws Exception {
         val service = Optional.of(CoreAuthenticationTestUtils.getService());
         val surrogateService = getService();
-        assertTrue(surrogateService.canAuthenticateAs(BANDERSON, CoreAuthenticationTestUtils.getPrincipal(CASUSER), service));
-        assertTrue(surrogateService.canAuthenticateAs(BANDERSON, CoreAuthenticationTestUtils.getPrincipal(BANDERSON), service));
-        assertFalse(surrogateService.canAuthenticateAs("XXXX", CoreAuthenticationTestUtils.getPrincipal(CASUSER), service));
-        assertFalse(surrogateService.canAuthenticateAs(CASUSER, CoreAuthenticationTestUtils.getPrincipal(BANDERSON), service));
+        assertTrue(surrogateService.canImpersonate(BANDERSON, CoreAuthenticationTestUtils.getPrincipal(getTestUser()), service));
+        assertTrue(surrogateService.canImpersonate(BANDERSON, CoreAuthenticationTestUtils.getPrincipal(BANDERSON), service));
+        assertFalse(surrogateService.canImpersonate("XXXX", CoreAuthenticationTestUtils.getPrincipal(getTestUser()), service));
+        assertFalse(surrogateService.canImpersonate(getTestUser(), CoreAuthenticationTestUtils.getPrincipal(BANDERSON), service));
+    }
+
+    @Test
+    public void verifyWildcard() throws Exception {
+        val service = Optional.of(CoreAuthenticationTestUtils.getService());
+        val admin = CoreAuthenticationTestUtils.getPrincipal(getAdminUser());
+        assertTrue(getService().canImpersonate("anyone", admin, service));
+        assertTrue(getService().isWildcardedAccount("anyone", admin));
+    }
+
+    public String getAdminUser() {
+        return ADMIN;
+    }
+
+    public String getTestUser() {
+        return "casuser";
     }
 
     @ImportAutoConfiguration({
         RefreshAutoConfiguration.class,
         MailSenderAutoConfiguration.class,
         SecurityAutoConfiguration.class,
+        WebMvcAutoConfiguration.class,
         AopAutoConfiguration.class
     })
     @SpringBootConfiguration
     @Import({
         SurrogateAuthenticationConfiguration.class,
+        SurrogateComponentSerializationConfiguration.class,
         SurrogateAuthenticationAuditConfiguration.class,
         SurrogateAuthenticationMetadataConfiguration.class,
+        SurrogateAuthenticationRestConfiguration.class,
+        CasCoreRestConfiguration.class,
         CasCoreAuthenticationPrincipalConfiguration.class,
         CasCoreAuthenticationPolicyConfiguration.class,
         CasCoreAuthenticationMetadataConfiguration.class,
@@ -109,6 +134,7 @@ public abstract class BaseSurrogateAuthenticationServiceTests {
         CasCoreServicesConfiguration.class,
         CasCoreWebflowConfiguration.class,
         CasWebflowContextConfiguration.class,
+        CasCoreUtilSerializationConfiguration.class,
         CasCoreMultifactorAuthenticationConfiguration.class,
         CasMultifactorAuthenticationWebflowConfiguration.class,
         CasCoreConfiguration.class,

@@ -8,15 +8,15 @@ import org.apereo.cas.config.SamlConfiguration;
 import org.apereo.cas.config.authentication.support.SamlAuthenticationEventExecutionPlanConfiguration;
 import org.apereo.cas.config.authentication.support.SamlServiceFactoryConfiguration;
 import org.apereo.cas.services.DefaultServicesManager;
-import org.apereo.cas.services.ServiceRegistry;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.services.ServicesManagerConfigurationContext;
 import org.apereo.cas.support.saml.AbstractOpenSamlTests;
 import org.apereo.cas.support.saml.SamlProtocolConstants;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
+import org.apereo.cas.web.UrlValidator;
 import org.apereo.cas.web.support.DefaultArgumentExtractor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.val;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Tag;
@@ -29,7 +29,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -49,7 +48,17 @@ import static org.mockito.Mockito.*;
 public class SamlServiceTests extends AbstractOpenSamlTests {
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "samlService.json");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
+
+
+    @Autowired
+    @Qualifier("servicesManagerConfigurationContext")
+    private ServicesManagerConfigurationContext servicesManagerConfigurationContext;
+
+    @Autowired
+    @Qualifier(UrlValidator.BEAN_NAME)
+    private UrlValidator urlValidator;
 
     @Autowired
     @Qualifier("samlServiceFactory")
@@ -61,18 +70,11 @@ public class SamlServiceTests extends AbstractOpenSamlTests {
         request.setParameter(SamlProtocolConstants.CONST_PARAM_TARGET, "service");
         val impl = samlServiceFactory.createService(request);
 
-        val context = ServicesManagerConfigurationContext.builder()
-            .serviceRegistry(mock(ServiceRegistry.class))
-            .applicationContext(applicationContext)
-            .environments(new HashSet<>(0))
-            .servicesCache(Caffeine.newBuilder().build())
-            .build();
-
-        val response = new SamlServiceResponseBuilder(new DefaultServicesManager(context))
+        val response = new SamlServiceResponseBuilder(new DefaultServicesManager(servicesManagerConfigurationContext), this.urlValidator)
             .build(impl, "ticketId", CoreAuthenticationTestUtils.getAuthentication());
         assertNotNull(response);
-        assertEquals(Response.ResponseType.REDIRECT, response.getResponseType());
-        assertTrue(response.getUrl().contains(SamlProtocolConstants.CONST_PARAM_ARTIFACT.concat("=")));
+        assertEquals(Response.ResponseType.REDIRECT, response.responseType());
+        assertTrue(response.url().contains(SamlProtocolConstants.CONST_PARAM_ARTIFACT.concat("=")));
     }
 
     @Test
@@ -89,18 +91,11 @@ public class SamlServiceTests extends AbstractOpenSamlTests {
         val request = new MockHttpServletRequest();
         request.setParameter(SamlProtocolConstants.CONST_PARAM_TARGET, "service");
         val impl = samlServiceFactory.createService(request);
-        val context = ServicesManagerConfigurationContext.builder()
-            .serviceRegistry(mock(ServiceRegistry.class))
-            .applicationContext(applicationContext)
-            .environments(new HashSet<>(0))
-            .servicesCache(Caffeine.newBuilder().build())
-            .build();
-
-        val response = new SamlServiceResponseBuilder(new DefaultServicesManager(context))
+        val response = new SamlServiceResponseBuilder(new DefaultServicesManager(servicesManagerConfigurationContext), this.urlValidator)
             .build(impl, null, CoreAuthenticationTestUtils.getAuthentication());
         assertNotNull(response);
-        assertEquals(Response.ResponseType.REDIRECT, response.getResponseType());
-        assertFalse(response.getUrl().contains(SamlProtocolConstants.CONST_PARAM_ARTIFACT.concat("=")));
+        assertEquals(Response.ResponseType.REDIRECT, response.responseType());
+        assertFalse(response.url().contains(SamlProtocolConstants.CONST_PARAM_ARTIFACT.concat("=")));
     }
 
     @Test

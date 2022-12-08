@@ -1,0 +1,51 @@
+description = "Apereo CAS Documentation Generator"
+
+project.ext["mainClassName"] = "org.apereo.cas.documentation.CasDocumentationApplication"
+project.ext["forceBootifulArtifact"] = true
+project.ext["archiveFileName"] = "casdocsgen.jar"
+
+apply from: rootProject.file("gradle/springboot.gradle")
+
+javadoc {
+    enabled(false)
+}
+
+test {
+    enabled(false)
+}
+
+if (tasks.findByName("install") != null) {
+    tasks.getByName("install").enabled(false)
+}
+
+dependencies {
+    libraries.each {
+        implementation it.value
+    }
+
+    rootProject.subprojects.each {
+        if (it.publishable) {
+            implementation it
+        } else {
+            logger.debug("Skipping project for documentation processing: ${it.name}")
+        }
+    }
+}
+
+tasks.register('jsonDependencies') {
+    doFirst {
+        def results = configurations.runtimeClasspath.resolvedConfiguration.firstLevelModuleDependencies
+            .findAll {dep -> !dep.module.id.group.startsWith("org.apereo.cas")}
+            .sort(dep -> dep.module.id.group + "/" + dep.module.id.name)
+            .stream()
+            .map(dep -> [group: dep.module.id.group, name: dep.module.id.name, version: dep.module.id.version])
+            .toList()
+
+        def output = new groovy.json.JsonBuilder(results).toPrettyString();
+        def file = new File("${buildDir}/dependencies.json")
+        file.delete()
+        file << output
+    }
+}
+
+tasks["build"].finalizedBy("jsonDependencies")

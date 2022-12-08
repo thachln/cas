@@ -1,5 +1,7 @@
 package org.apereo.cas.adaptors.u2f.storage;
 
+import org.apereo.cas.util.function.FunctionUtils;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -9,15 +11,15 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.SneakyThrows;
 import lombok.experimental.SuperBuilder;
 import lombok.val;
 import org.springframework.data.annotation.Id;
 
-import javax.persistence.Column;
-import javax.persistence.Lob;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.Transient;
+import jakarta.persistence.Column;
+import jakarta.persistence.Lob;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Transient;
+import java.io.Serial;
 import java.io.Serializable;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -35,6 +37,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @SuperBuilder
 public class U2FDeviceRegistration implements Serializable, Cloneable {
+    @Serial
     private static final long serialVersionUID = 7258490070277856614L;
 
     @Id
@@ -63,10 +66,9 @@ public class U2FDeviceRegistration implements Serializable, Cloneable {
     }
 
     @Override
-    @SneakyThrows
     @JsonIgnore
     public U2FDeviceRegistration clone() {
-        return (U2FDeviceRegistration) super.clone();
+        return FunctionUtils.doUnchecked(() -> (U2FDeviceRegistration) super.clone());
     }
 
     /**
@@ -75,13 +77,14 @@ public class U2FDeviceRegistration implements Serializable, Cloneable {
      * @param device the device
      * @return true/false
      */
-    @SneakyThrows
     public boolean matches(final U2FDeviceRegistration device) {
-        if (device.getUsername().equals(getUsername())) {
-            val requested = DeviceRegistration.fromJson(device.getRecord());
-            val current = DeviceRegistration.fromJson(getRecord());
-            return requested.equals(current);
-        }
-        return false;
+        return FunctionUtils.doUnchecked(() -> {
+            if (device.getUsername().equals(getUsername())) {
+                val requested = DeviceRegistration.fromJson(device.getRecord());
+                val current = DeviceRegistration.fromJson(getRecord());
+                return requested.equals(current);
+            }
+            return false;
+        });
     }
 }

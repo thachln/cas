@@ -11,10 +11,11 @@ import org.apereo.cas.authentication.policy.GroovyScriptAuthenticationPolicy;
 import org.apereo.cas.authentication.policy.NotPreventedAuthenticationPolicy;
 import org.apereo.cas.authentication.policy.RequiredAuthenticationHandlerAuthenticationPolicy;
 import org.apereo.cas.authentication.policy.RestfulAuthenticationPolicy;
-import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.authentication.principal.PrincipalFactory;
+import org.apereo.cas.authentication.principal.PrincipalNameTransformerUtils;
 import org.apereo.cas.authentication.principal.PrincipalResolver;
 import org.apereo.cas.authentication.principal.resolvers.PersonDirectoryPrincipalResolver;
+import org.apereo.cas.authentication.principal.resolvers.PrincipalResolutionContext;
 import org.apereo.cas.authentication.support.password.DefaultPasswordPolicyHandlingStrategy;
 import org.apereo.cas.authentication.support.password.GroovyPasswordPolicyHandlingStrategy;
 import org.apereo.cas.authentication.support.password.RejectResultCodePasswordPolicyHandlingStrategy;
@@ -22,8 +23,11 @@ import org.apereo.cas.configuration.model.core.authentication.AdaptiveAuthentica
 import org.apereo.cas.configuration.model.core.authentication.AuthenticationPolicyProperties;
 import org.apereo.cas.configuration.model.core.authentication.PasswordPolicyProperties;
 import org.apereo.cas.configuration.model.core.authentication.PersonDirectoryPrincipalResolverProperties;
+import org.apereo.cas.configuration.model.core.authentication.PrincipalAttributesCoreProperties;
 import org.apereo.cas.configuration.support.Beans;
 import org.apereo.cas.util.CollectionUtils;
+import org.apereo.cas.util.model.TriStateBoolean;
+import org.apereo.cas.util.transforms.ChainingPrincipalNameTransformer;
 import org.apereo.cas.validation.Assertion;
 
 import com.google.common.base.Splitter;
@@ -34,33 +38,28 @@ import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apereo.services.persondir.IPersonAttributeDao;
-import org.apereo.services.persondir.IPersonAttributeDaoFilter;
-import org.apereo.services.persondir.support.merger.BaseAdditiveAttributeMerger;
 import org.apereo.services.persondir.support.merger.IAttributeMerger;
 import org.apereo.services.persondir.support.merger.MultivaluedAttributeMerger;
 import org.apereo.services.persondir.support.merger.NoncollidingAttributeAdder;
 import org.apereo.services.persondir.support.merger.ReplacingAttributeAdder;
+import org.apereo.services.persondir.support.merger.ReturnChangesAdditiveAttributeMerger;
+import org.apereo.services.persondir.support.merger.ReturnOriginalAdditiveAttributeMerger;
 import org.codehaus.groovy.control.CompilerConfiguration;
+import org.jooq.lambda.Unchecked;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.DefaultResourceLoader;
 
 import java.nio.charset.StandardCharsets;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -75,6 +74,22 @@ import java.util.stream.Collectors;
 @Slf4j
 @UtilityClass
 public class CoreAuthenticationUtils {
+
+    /**
+     * Convert attribute values to objects.
+     *
+     * @param attributes the attributes
+     * @return the map
+     */
+    public static Map<String, Object> convertAttributeValuesToObjects(final Map<String, List<Object>> attributes) {
+        val entries = attributes.entrySet();
+        return entries
+            .stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+                val value = entry.getValue();
+                return value.size() == 1 ? value.get(0) : value;
+            }));
+    }
 
     /**
      * Convert attribute values to multi valued objects.
@@ -93,64 +108,26 @@ public class CoreAuthenticationUtils {
     }
 
     /**
-     * Retrieve attributes from attribute repository and return map.
-     *
-     * @param attributeRepository                  the attribute repository
-     * @param principalId                          the principal id
-     * @param activeAttributeRepositoryIdentifiers the active attribute repository identifiers
-     * @param currentPrincipal                     the current principal
-     * @return the map or null
-     */
-    public static Map<String, List<Object>> retrieveAttributesFromAttributeRepository(final IPersonAttributeDao attributeRepository,
-                                                                                      final String principalId,
-                                                                                      final Set<String> activeAttributeRepositoryIdentifiers,
-                                                                                      final Optional<Principal> currentPrincipal) {
-        var filter = IPersonAttributeDaoFilter.alwaysChoose();
-        if (activeAttributeRepositoryIdentifiers != null && !activeAttributeRepositoryIdentifiers.isEmpty()) {
-            val repoIdsArray = activeAttributeRepositoryIdentifiers.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-            filter = dao -> Arrays.stream(dao.getId())
-                .anyMatch(daoId -> daoId.equalsIgnoreCase(IPersonAttributeDao.WILDCARD)
-                    || StringUtils.equalsAnyIgnoreCase(daoId, repoIdsArray)
-                    || StringUtils.equalsAnyIgnoreCase(IPersonAttributeDao.WILDCARD, repoIdsArray));
-        }
-
-        val attrs = attributeRepository.getPerson(principalId, filter);
-        if (attrs == null) {
-            return new HashMap<>(0);
-        }
-        return attrs.getAttributes();
-
-    }
-
-    /**
      * Gets attribute merger.
      *
      * @param mergingPolicy the merging policy
      * @return the attribute merger
      */
-    public static IAttributeMerger getAttributeMerger(final String mergingPolicy) {
-        switch (mergingPolicy.toLowerCase()) {
-            case "multivalued":
-            case "multi_valued":
-            case "combine":
-            case "merge":
-                return new MultivaluedAttributeMerger();
-            case "add":
+    public static IAttributeMerger getAttributeMerger(final PrincipalAttributesCoreProperties.MergingStrategyTypes mergingPolicy) {
+        switch (mergingPolicy) {
+            case MULTIVALUED:
+                val merger = new MultivaluedAttributeMerger();
+                merger.setDistinctValues(true);
+                return merger;
+            case ADD:
                 return new NoncollidingAttributeAdder();
-            case "replace":
-            case "overwrite":
-            case "override":
-                return new ReplacingAttributeAdder();
-            case "none":
-                return new BaseAdditiveAttributeMerger() {
-                    @Override
-                    protected Map<String, List<Object>> mergePersonAttributes(final Map<String, List<Object>> toModify,
-                                                                              final Map<String, List<Object>> toConsider) {
-                        return new LinkedHashMap<>(toModify);
-                    }
-                };
+            case SOURCE:
+                return new ReturnOriginalAdditiveAttributeMerger();
+            case DESTINATION:
+                return new ReturnChangesAdditiveAttributeMerger();
+            case REPLACE:
             default:
-                throw new IllegalArgumentException("Unsupported merging policy [" + mergingPolicy + ']');
+                return new ReplacingAttributeAdder();
         }
     }
 
@@ -166,7 +143,28 @@ public class CoreAuthenticationUtils {
     public static boolean isRememberMeAuthentication(final Authentication model, final Assertion assertion) {
         val authnAttributes = model.getAttributes();
         val authnMethod = authnAttributes.get(RememberMeCredential.AUTHENTICATION_ATTRIBUTE_REMEMBER_ME);
-        return authnMethod != null && authnMethod.contains(Boolean.TRUE) && assertion.isFromNewLogin();
+        return authnMethod != null && authnMethod.contains(Boolean.TRUE) && assertion.fromNewLogin();
+    }
+
+    /**
+     * Is remember me recorded in authentication.
+     *
+     * @param authentication the authentication
+     * @return true/false
+     */
+    public static Boolean isRememberMeAuthentication(final Authentication authentication) {
+        if (authentication == null) {
+            return Boolean.FALSE;
+        }
+        val attributes = authentication.getAttributes();
+        LOGGER.trace("Located authentication attributes [{}]", attributes);
+
+        if (attributes.containsKey(RememberMeCredential.AUTHENTICATION_ATTRIBUTE_REMEMBER_ME)) {
+            val rememberMeValue = attributes.get(RememberMeCredential.AUTHENTICATION_ATTRIBUTE_REMEMBER_ME);
+            LOGGER.debug("Located remember-me authentication attribute [{}]", rememberMeValue);
+            return rememberMeValue.contains(Boolean.TRUE);
+        }
+        return Boolean.FALSE;
     }
 
     /**
@@ -174,12 +172,12 @@ public class CoreAuthenticationUtils {
      *
      * @param currentAttributes the current attributes
      * @param attributesToMerge the attributes to merge
+     * @param merger            the merger
      * @return the map
      */
-    public static Map<String, List<Object>> mergeAttributes(final Map<String, List<Object>> currentAttributes, final Map<String, List<Object>> attributesToMerge) {
-        val merger = new MultivaluedAttributeMerger();
-        merger.setDistinctValues(true);
-
+    public static Map<String, List<Object>> mergeAttributes(final Map<String, List<Object>> currentAttributes,
+                                                            final Map<String, List<Object>> attributesToMerge,
+                                                            final IAttributeMerger merger) {
         val toModify = currentAttributes.entrySet()
             .stream()
             .map(entry -> Pair.of(entry.getKey(), CollectionUtils.toCollection(entry.getValue(), ArrayList.class)))
@@ -194,6 +192,20 @@ public class CoreAuthenticationUtils {
         val results = merger.mergeAttributes((Map) toModify, (Map) toMerge);
         LOGGER.debug("Merged attributes with the final result as [{}]", results);
         return results;
+    }
+
+    /**
+     * Merge attributes map.
+     *
+     * @param currentAttributes the current attributes
+     * @param attributesToMerge the attributes to merge
+     * @return the map
+     */
+    public static Map<String, List<Object>> mergeAttributes(final Map<String, List<Object>> currentAttributes,
+                                                            final Map<String, List<Object>> attributesToMerge) {
+        val merger = new MultivaluedAttributeMerger();
+        merger.setDistinctValues(true);
+        return mergeAttributes(currentAttributes, attributesToMerge, merger);
     }
 
     /**
@@ -248,23 +260,17 @@ public class CoreAuthenticationUtils {
             if (StringUtils.isBlank(selectionCriteria)) {
                 return credential -> true;
             }
-
             if (selectionCriteria.endsWith(".groovy")) {
                 val loader = new DefaultResourceLoader();
                 val resource = loader.getResource(selectionCriteria);
                 val script = IOUtils.toString(resource.getInputStream(), StandardCharsets.UTF_8);
-
-                val clz = AccessController.doPrivileged((PrivilegedAction<Class<Predicate>>) () -> {
-                    val classLoader = new GroovyClassLoader(Beans.class.getClassLoader(),
-                        new CompilerConfiguration(), true);
-                    return classLoader.parseClass(script);
-                });
-                return clz.getDeclaredConstructor().newInstance();
-
+                val classLoader = new GroovyClassLoader(Beans.class.getClassLoader(),
+                    new CompilerConfiguration(), true);
+                val clz = classLoader.parseClass(script);
+                return (Predicate<Credential>) clz.getDeclaredConstructor().newInstance();
             }
-
             val predicateClazz = ClassUtils.getClass(selectionCriteria);
-            return (Predicate<org.apereo.cas.authentication.Credential>) predicateClazz.getDeclaredConstructor().newInstance();
+            return (Predicate<Credential>) predicateClazz.getDeclaredConstructor().newInstance();
         } catch (final Exception e) {
             val predicate = Pattern.compile(selectionCriteria).asPredicate();
             return credential -> predicate.test(credential.getId());
@@ -300,30 +306,87 @@ public class CoreAuthenticationUtils {
      *
      * @param principalFactory    the principal factory
      * @param attributeRepository the attribute repository
+     * @param attributeMerger     the attribute merger
      * @param personDirectory     the person directory
      * @return the principal resolver
      */
     public static PrincipalResolver newPersonDirectoryPrincipalResolver(
-        final PrincipalFactory principalFactory, final IPersonAttributeDao attributeRepository,
+        final PrincipalFactory principalFactory,
+        final IPersonAttributeDao attributeRepository,
+        final IAttributeMerger attributeMerger,
+        final PersonDirectoryPrincipalResolverProperties... personDirectory) {
+        return newPersonDirectoryPrincipalResolver(principalFactory, attributeRepository,
+            attributeMerger, PersonDirectoryPrincipalResolver.class, personDirectory);
+    }
+
+    /**
+     * New person directory principal resolver.
+     *
+     * @param <T>                 the type parameter
+     * @param principalFactory    the principal factory
+     * @param attributeRepository the attribute repository
+     * @param attributeMerger     the attribute merger
+     * @param resolverClass       the resolver class
+     * @param personDirectory     the person directory
+     * @return the resolver
+     */
+    public static <T extends PrincipalResolver> T newPersonDirectoryPrincipalResolver(
+        final PrincipalFactory principalFactory,
+        final IPersonAttributeDao attributeRepository,
+        final IAttributeMerger attributeMerger,
+        final Class<T> resolverClass,
         final PersonDirectoryPrincipalResolverProperties... personDirectory) {
 
-        return new PersonDirectoryPrincipalResolver(
-            attributeRepository,
-            principalFactory,
-            Arrays.stream(personDirectory).anyMatch(PersonDirectoryPrincipalResolverProperties::isReturnNull),
-            Arrays.stream(personDirectory)
-                .filter(p -> StringUtils.isNotBlank(p.getPrincipalAttribute()))
+        val context = buildPrincipalResolutionContext(principalFactory, attributeRepository, attributeMerger, personDirectory);
+        return Unchecked.supplier(() -> {
+            val ctor = resolverClass.getDeclaredConstructor(PrincipalResolutionContext.class);
+            return ctor.newInstance(context);
+        }).get();
+    }
+
+    /**
+     * New PrincipalResolutionContext.
+     *
+     * @param principalFactory    the principal factory
+     * @param attributeRepository the attribute repository
+     * @param attributeMerger     the attribute merger
+     * @param personDirectory     the person directory properties
+     * @return the resolver
+     */
+    public static PrincipalResolutionContext buildPrincipalResolutionContext(
+        final PrincipalFactory principalFactory,
+        final IPersonAttributeDao attributeRepository,
+        final IAttributeMerger attributeMerger,
+        final PersonDirectoryPrincipalResolverProperties... personDirectory) {
+
+        val transformers = Arrays.stream(personDirectory)
+            .map(p -> PrincipalNameTransformerUtils.newPrincipalNameTransformer(p.getPrincipalTransformation()))
+            .collect(Collectors.toList());
+        val transformer = new ChainingPrincipalNameTransformer(transformers);
+
+        return PrincipalResolutionContext.builder()
+            .attributeRepository(attributeRepository)
+            .attributeMerger(attributeMerger)
+            .principalFactory(principalFactory)
+            .returnNullIfNoAttributes(Arrays.stream(personDirectory).filter(p -> p.getReturnNull() != TriStateBoolean.UNDEFINED)
+                .map(p -> p.getReturnNull().toBoolean()).findFirst().orElse(Boolean.FALSE))
+            .principalAttributeNames(Arrays.stream(personDirectory)
                 .map(PersonDirectoryPrincipalResolverProperties::getPrincipalAttribute)
+                .filter(StringUtils::isNotBlank)
                 .findFirst()
-                .orElse(StringUtils.EMPTY),
-            Arrays.stream(personDirectory).anyMatch(PersonDirectoryPrincipalResolverProperties::isUseExistingPrincipalId),
-            Arrays.stream(personDirectory).anyMatch(PersonDirectoryPrincipalResolverProperties::isAttributeResolutionEnabled),
-            Arrays.stream(personDirectory)
+                .orElse(StringUtils.EMPTY))
+            .principalNameTransformer(transformer)
+            .useCurrentPrincipalId(Arrays.stream(personDirectory).filter(p -> p.getUseExistingPrincipalId() != TriStateBoolean.UNDEFINED)
+                .map(p -> p.getUseExistingPrincipalId().toBoolean()).findFirst().orElse(Boolean.FALSE))
+            .resolveAttributes(Arrays.stream(personDirectory).filter(p -> p.getAttributeResolutionEnabled() != TriStateBoolean.UNDEFINED)
+                .map(p -> p.getAttributeResolutionEnabled().toBoolean()).findFirst().orElse(Boolean.TRUE))
+            .activeAttributeRepositoryIdentifiers(Arrays.stream(personDirectory)
                 .filter(p -> StringUtils.isNotBlank(p.getActiveAttributeRepositoryIds()))
                 .map(p -> org.springframework.util.StringUtils.commaDelimitedListToSet(p.getActiveAttributeRepositoryIds()))
-                .flatMap(Set::stream)
-                .collect(Collectors.toSet())
-        );
+                .filter(p -> !p.isEmpty())
+                .findFirst()
+                .orElse(Collections.<String>emptySet()))
+            .build();
     }
 
     /**
@@ -367,7 +430,7 @@ public class CoreAuthenticationUtils {
             LOGGER.trace("Activating authentication policy [{}]", RestfulAuthenticationPolicy.class.getSimpleName());
             return policyProps.getRest()
                 .stream()
-                .map(r -> new RestfulAuthenticationPolicy(r.getUrl(), r.getBasicAuthUsername(), r.getBasicAuthPassword()))
+                .map(RestfulAuthenticationPolicy::new)
                 .collect(Collectors.toList());
         }
 
@@ -398,4 +461,20 @@ public class CoreAuthenticationUtils {
         }
         return new DefaultIPAddressIntelligenceService(adaptive);
     }
+
+    /**
+     * New principal election strategy conflict resolver.
+     *
+     * @param properties the properties
+     * @return the principal election strategy conflict resolver
+     */
+    public static PrincipalElectionStrategyConflictResolver newPrincipalElectionStrategyConflictResolver(
+        final PersonDirectoryPrincipalResolverProperties properties) {
+        if (StringUtils.equalsIgnoreCase(properties.getPrincipalResolutionConflictStrategy(), "first")) {
+            return PrincipalElectionStrategyConflictResolver.first();
+        }
+        return PrincipalElectionStrategyConflictResolver.last();
+    }
+
+
 }

@@ -1,6 +1,7 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.ticket.accesstoken.OAuth20AccessToken;
 import org.apereo.cas.ticket.accesstoken.OAuth20DefaultAccessToken;
 import org.apereo.cas.ticket.code.OAuth20Code;
@@ -13,10 +14,15 @@ import org.apereo.cas.ticket.refreshtoken.OAuth20DefaultRefreshToken;
 import org.apereo.cas.ticket.refreshtoken.OAuth20RefreshToken;
 import org.apereo.cas.ticket.serialization.TicketSerializationExecutionPlanConfigurer;
 import org.apereo.cas.util.serialization.AbstractJacksonBackedStringSerializer;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
+
+import java.io.Serial;
 
 /**
  * This is {@link CasOAuth20TicketSerializationConfiguration}.
@@ -24,11 +30,13 @@ import org.springframework.context.annotation.Configuration;
  * @author Misagh Moayyed
  * @since 5.2.0
  */
-@Configuration(value = "casOAuth20TicketSerializationConfiguration", proxyBeanMethods = false)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.OAuth)
+@AutoConfiguration
 public class CasOAuth20TicketSerializationConfiguration {
 
     @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     public TicketSerializationExecutionPlanConfigurer oauthTicketSerializationExecutionPlanConfigurer() {
         return plan -> {
             plan.registerTicketSerializer(new OAuthCodeTicketStringSerializer());
@@ -46,6 +54,7 @@ public class CasOAuth20TicketSerializationConfiguration {
     }
 
     private static class OAuthCodeTicketStringSerializer extends AbstractJacksonBackedStringSerializer<OAuth20DefaultCode> {
+        @Serial
         private static final long serialVersionUID = -2198623586274810263L;
 
         @Override
@@ -55,6 +64,7 @@ public class CasOAuth20TicketSerializationConfiguration {
     }
 
     private static class AccessTokenTicketStringSerializer extends AbstractJacksonBackedStringSerializer<OAuth20DefaultAccessToken> {
+        @Serial
         private static final long serialVersionUID = -2198623586274810263L;
 
         @Override
@@ -64,6 +74,7 @@ public class CasOAuth20TicketSerializationConfiguration {
     }
 
     private static class RefreshTokenTicketStringSerializer extends AbstractJacksonBackedStringSerializer<OAuth20DefaultRefreshToken> {
+        @Serial
         private static final long serialVersionUID = -2198623586274810263L;
 
         @Override
@@ -73,6 +84,7 @@ public class CasOAuth20TicketSerializationConfiguration {
     }
 
     private static class DeviceTokenTicketStringSerializer extends AbstractJacksonBackedStringSerializer<OAuth20DefaultDeviceToken> {
+        @Serial
         private static final long serialVersionUID = -2198623586274810263L;
 
         @Override
@@ -82,6 +94,7 @@ public class CasOAuth20TicketSerializationConfiguration {
     }
 
     private static class DeviceUserCodeTicketStringSerializer extends AbstractJacksonBackedStringSerializer<OAuth20DefaultDeviceUserCode> {
+        @Serial
         private static final long serialVersionUID = -2198623586274810263L;
 
         @Override

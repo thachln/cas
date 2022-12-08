@@ -2,23 +2,22 @@ package org.apereo.cas.uma.web.controllers.resource;
 
 import org.apereo.cas.support.oauth.OAuth20Constants;
 import org.apereo.cas.uma.UmaConfigurationContext;
-import org.apereo.cas.uma.ticket.resource.InvalidResourceSetException;
 import org.apereo.cas.uma.web.controllers.BaseUmaEndpointController;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.LoggingUtils;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.apache.commons.lang3.StringUtils;
 import org.hjson.JsonValue;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * This is {@link UmaCreateResourceSetRegistrationEndpointController}.
@@ -42,15 +41,16 @@ public class UmaCreateResourceSetRegistrationEndpointController extends BaseUmaE
      * @param response the response
      * @return the permission ticket
      */
-    @PostMapping(value = '/' + OAuth20Constants.BASE_OAUTH20_URL + '/' + OAuth20Constants.UMA_RESOURCE_SET_REGISTRATION_URL,
-        consumes = MediaType.APPLICATION_JSON_VALUE,
-        produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity registerResourceSet(@RequestBody final String body, final HttpServletRequest request, final HttpServletResponse response) {
+    @PostMapping(OAuth20Constants.BASE_OAUTH20_URL + '/' + OAuth20Constants.UMA_RESOURCE_SET_REGISTRATION_URL)
+    public ResponseEntity registerResourceSet(
+        @RequestBody
+        final String body,
+        final HttpServletRequest request, final HttpServletResponse response) {
         try {
             val profileResult = getAuthenticatedProfile(request, response, OAuth20Constants.UMA_PROTECTION_SCOPE);
 
             val umaRequest = MAPPER.readValue(JsonValue.readHjson(body).toString(), UmaResourceRegistrationRequest.class);
-            if (umaRequest == null) {
+            if (umaRequest == null || StringUtils.isBlank(umaRequest.getName())) {
                 val model = buildResponseEntityErrorModel(HttpStatus.NOT_FOUND, "UMA request cannot be found or parsed");
                 return new ResponseEntity(model, model, HttpStatus.BAD_REQUEST);
             }
@@ -65,12 +65,10 @@ public class UmaCreateResourceSetRegistrationEndpointController extends BaseUmaE
                 "code", HttpStatus.CREATED,
                 "resourceId", saved.getId(),
                 "location", location);
-            return new ResponseEntity(model, HttpStatus.OK);
-        } catch (final InvalidResourceSetException e) {
-            return new ResponseEntity(buildResponseEntityErrorModel(e), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(model, HttpStatus.OK);
         } catch (final Exception e) {
             LoggingUtils.error(LOGGER, e);
         }
-        return new ResponseEntity("Unable to complete the resource-set registration request.", HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>("Unable to complete the resource-set registration request.", HttpStatus.BAD_REQUEST);
     }
 }

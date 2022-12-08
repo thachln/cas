@@ -396,7 +396,7 @@ u2f.WrappedChromeRuntimePort_.prototype.addEventListener =
 u2f.WrappedAuthenticatorPort_ = function() {
     this.requestId_ = -1;
     this.requestObject_ = null;
-}
+};
 
 /**
  * Launch the Authenticator intent.
@@ -477,7 +477,7 @@ u2f.WrappedIosPort_ = function() {};
  * @param {Object} message
  */
 u2f.WrappedIosPort_.prototype.postMessage = function(message) {
-    var str = JSON.stringify(message);
+    var str = JSON.stringify(message, undefined, 2);
     var url = "u2f://auth?" + encodeURI(str);
     location.replace(url);
 };
@@ -712,7 +712,7 @@ u2f.sendRegisterRequest = function(appId, registerRequests, registeredKeys, call
  * Dispatches a message to the extension to find out the supported
  * JS API version.
  * If the user is on a mobile phone and is thus using Google Authenticator instead
- * of the Chrome extension, don't send the request and simply return 0.
+ * of the Chrome extension, don't send the request and return 0.
  * @param {function((u2f.Error|u2f.GetJsApiVersionResponse))} callback
  * @param {number=} opt_timeoutSeconds
  */

@@ -2,7 +2,7 @@ package org.apereo.cas.config;
 
 import org.apereo.cas.aws.AmazonEnvironmentAwareClientBuilder;
 import org.apereo.cas.configuration.CasConfigurationProperties;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import lombok.val;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Tag("DynamoDb")
 @Getter
-@EnabledIfPortOpen(port = 8000)
+@EnabledIfListeningOnPort(port = 8000)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 @SpringBootTest(classes = {
     RefreshAutoConfiguration.class,
@@ -51,7 +51,7 @@ public class DynamoDbCloudConfigBootstrapConfigurationTests {
     private CasConfigurationProperties casProperties;
 
     @BeforeAll
-    public static void initialize() {
+    public static void initialize() throws Exception {
         val environment = new MockEnvironment();
         environment.setProperty(DynamoDbCloudConfigBootstrapConfiguration.CAS_CONFIGURATION_PREFIX + '.' + "endpoint", "http://localhost:8000");
         environment.setProperty(DynamoDbCloudConfigBootstrapConfiguration.CAS_CONFIGURATION_PREFIX + '.' + "local-instance", "true");
@@ -63,7 +63,6 @@ public class DynamoDbCloudConfigBootstrapConfigurationTests {
         val amazonDynamoDBClient = builder.build(DynamoDbClient.builder(), DynamoDbClient.class);
 
         DynamoDbCloudConfigBootstrapConfiguration.createSettingsTable(amazonDynamoDBClient, true);
-
         val values = new HashMap<String, AttributeValue>();
         values.put(DynamoDbCloudConfigBootstrapConfiguration.ColumnNames.ID.getColumnName(),
             AttributeValue.builder().s(UUID.randomUUID().toString()).build());

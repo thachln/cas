@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
     RefreshAutoConfiguration.class,
     CasCoreUtilConfiguration.class
 })
-public class JsonServiceRegistryTests extends AbstractResourceBasedServiceRegistryTests {
+public class JsonServiceRegistryTests extends BaseResourceBasedServiceRegistryTests {
     @SneakyThrows
     @Override
     public ResourceBasedServiceRegistry getNewServiceRegistry() {
@@ -45,8 +45,7 @@ public class JsonServiceRegistryTests extends AbstractResourceBasedServiceRegist
     }
 
     @Test
-    @SneakyThrows
-    public void verifyRegistry() {
+    public void verifyRegistry() throws Exception {
         val appCtx = new StaticApplicationContext();
         appCtx.refresh();
         val registry = new JsonServiceRegistry(RESOURCE, WatcherService.noOp(),
@@ -59,37 +58,21 @@ public class JsonServiceRegistryTests extends AbstractResourceBasedServiceRegist
     }
 
     @Test
-    @SneakyThrows
-    public void verifyLegacyServiceDefinition() {
-        val resource = new ClassPathResource("Legacy-10000003.json");
-        val serializer = new RegisteredServiceJsonSerializer();
-        val service = serializer.from(resource.getInputStream());
-        assertNotNull(service);
-    }
-
-    @Test
-    @SneakyThrows
-    public void verifyRequiredHandlersServiceDefinition() {
+    public void verifyRequiredHandlersServiceDefinition() throws Exception {
+        val appCtx = new StaticApplicationContext();
+        appCtx.refresh();
         val resource = new ClassPathResource("RequiredHandlers-10000004.json");
-        val serializer = new RegisteredServiceJsonSerializer();
+        val serializer = new RegisteredServiceJsonSerializer(appCtx);
         val service = serializer.from(resource.getInputStream());
         assertNotNull(service);
     }
 
     @Test
-    @SneakyThrows
-    public void verifyMultifactorNotSetFailureMode() {
-        val resource = new ClassPathResource("MFA-FailureMode-1.json");
-        val serializer = new RegisteredServiceJsonSerializer();
-        val service = serializer.from(resource.getInputStream());
-        assertNotNull(service);
-    }
-
-    @Test
-    @SneakyThrows
-    public void verifyExistingDefinitionForCompatibility2() {
+    public void verifyExistingDefinitionForCompatibility2() throws Exception {
         val resource = new ClassPathResource("returnMappedAttributeReleasePolicyTest2.json");
-        val serializer = new RegisteredServiceJsonSerializer();
+        val appCtx = new StaticApplicationContext();
+        appCtx.refresh();
+        val serializer = new RegisteredServiceJsonSerializer(appCtx);
         val service = serializer.from(resource.getInputStream());
         assertNotNull(service);
         assertNotNull(service.getAttributeReleasePolicy());
@@ -99,10 +82,11 @@ public class JsonServiceRegistryTests extends AbstractResourceBasedServiceRegist
     }
 
     @Test
-    @SneakyThrows
-    public void verifyExistingDefinitionForCompatibility1() {
+    public void verifyExistingDefinitionForCompatibility1() throws Exception {
+        val appCtx = new StaticApplicationContext();
+        appCtx.refresh();
         val resource = new ClassPathResource("returnMappedAttributeReleasePolicyTest1.json");
-        val serializer = new RegisteredServiceJsonSerializer();
+        val serializer = new RegisteredServiceJsonSerializer(appCtx);
         val service = serializer.from(resource.getInputStream());
         assertNotNull(service);
         assertNotNull(service.getAttributeReleasePolicy());

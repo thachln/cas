@@ -1,11 +1,12 @@
 package org.apereo.cas.util.serialization;
 
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.function.FunctionUtils;
 
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.val;
 import org.apache.commons.lang3.ArrayUtils;
+import org.jooq.lambda.Unchecked;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -24,6 +25,7 @@ import java.io.Serializable;
  * @since 5.0.0
  */
 @UtilityClass
+@SuppressWarnings("BanSerializableRead")
 public class SerializationUtils {
 
     /**
@@ -46,11 +48,12 @@ public class SerializationUtils {
      * @param outputStream The stream to receive the object
      * @since 5.0.0
      */
-    @SneakyThrows
     public static void serialize(final Serializable object, final OutputStream outputStream) {
-        try (val out = new ObjectOutputStream(outputStream)) {
-            out.writeObject(object);
-        }
+        FunctionUtils.doUnchecked(__ -> {
+            try (val out = new ObjectOutputStream(outputStream)) {
+                out.writeObject(object);
+            }
+        });
     }
 
     /**
@@ -76,18 +79,19 @@ public class SerializationUtils {
      * @return the object
      * @since 5.0.0
      */
-    @SneakyThrows
     public static <T> T deserialize(final InputStream inputStream, final Class<T> clazz) {
-        try (val in = new ObjectInputStream(inputStream)) {
-            val obj = in.readObject();
+        return Unchecked.supplier(() -> {
+            try (val in = new ObjectInputStream(inputStream)) {
+                val obj = in.readObject();
 
-            if (!clazz.isAssignableFrom(obj.getClass())) {
-                throw new ClassCastException("Result [" + obj
-                    + " is of type " + obj.getClass()
-                    + " when we were expecting " + clazz);
+                if (!clazz.isAssignableFrom(obj.getClass())) {
+                    throw new ClassCastException("Result [" + obj
+                                                 + " is of type " + obj.getClass()
+                                                 + " when we were expecting " + clazz);
+                }
+                return (T) obj;
             }
-            return (T) obj;
-        }
+        }).get();
     }
 
     /**
@@ -129,7 +133,6 @@ public class SerializationUtils {
      * @return the t
      * @since 4.2
      */
-    @SneakyThrows
     public static <T extends Serializable> T decodeAndDeserializeObject(final byte[] object,
                                                                         final CipherExecutor cipher,
                                                                         final Class<T> type,
@@ -147,7 +150,6 @@ public class SerializationUtils {
      * @param type   the type
      * @return the t
      */
-    @SneakyThrows
     public static <T extends Serializable> T decodeAndDeserializeObject(final byte[] object,
                                                                         final CipherExecutor cipher,
                                                                         final Class<T> type) {
@@ -165,9 +167,6 @@ public class SerializationUtils {
      */
     public static <T extends Serializable> T deserializeAndCheckObject(final byte[] object, final Class<T> type) {
         val result = deserialize(object, type);
-        if (!type.isAssignableFrom(result.getClass())) {
-            throw new ClassCastException("Decoded object is of type " + result.getClass() + " when we were expecting " + type);
-        }
-        return (T) result;
+        return result;
     }
 }

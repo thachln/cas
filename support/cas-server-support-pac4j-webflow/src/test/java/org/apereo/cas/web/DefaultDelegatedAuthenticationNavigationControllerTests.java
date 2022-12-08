@@ -1,11 +1,15 @@
 package org.apereo.cas.web;
 
-import org.apereo.cas.services.UnauthorizedServiceException;
-import org.apereo.cas.web.view.DynamicHtmlView;
+import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.web.flow.controller.DefaultDelegatedAuthenticationNavigationController;
 
 import lombok.val;
+import org.apache.http.client.utils.URIBuilder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.pac4j.core.util.Pac4jConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -23,52 +27,37 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 6.2.0
  */
 @SpringBootTest(classes = BaseDelegatedAuthenticationTests.SharedTestConfiguration.class)
-@Tag("Simple")
+@Tag("Delegation")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class DefaultDelegatedAuthenticationNavigationControllerTests {
 
     @Autowired
-    @Qualifier("delegatedClientNavigationController")
+    @Qualifier("defaultDelegatedAuthenticationNavigationController")
     private DefaultDelegatedAuthenticationNavigationController controller;
 
+    @Autowired
+    @Qualifier(ServicesManager.BEAN_NAME)
+    private ServicesManager servicesManager;
+
+    @BeforeEach
+    public void beforeEach() {
+        servicesManager.deleteAll();
+    }
+
     @Test
-    public void verifyRedirectByParam() {
+    public void verifyRedirectByParam() throws Exception {
         val request = new MockHttpServletRequest();
         request.addParameter(Pac4jConstants.DEFAULT_CLIENT_NAME_PARAMETER, "CasClient");
+        request.addParameter("customParam", "customValue");
         val response = new MockHttpServletResponse();
-        assertTrue(controller.redirectToProvider(request, response) instanceof RedirectView);
-    }
-
-    @Test
-    public void verifyRedirectByAttr() {
-        val request = new MockHttpServletRequest();
-        request.setAttribute(Pac4jConstants.DEFAULT_CLIENT_NAME_PARAMETER, "SAML2Client");
-        val response = new MockHttpServletResponse();
-        assertTrue(controller.redirectToProvider(request, response) instanceof DynamicHtmlView);
-    }
-
-    @Test
-    public void verifyRedirectUnknownClient() {
-        val request = new MockHttpServletRequest();
-        request.setAttribute(Pac4jConstants.DEFAULT_CLIENT_NAME_PARAMETER, "BadClient");
-        val response = new MockHttpServletResponse();
-        assertThrows(UnauthorizedServiceException.class, () -> controller.redirectToProvider(request, response));
-    }
-
-    @Test
-    public void verifyRedirectMissingClient() {
-        val request = new MockHttpServletRequest();
-        val response = new MockHttpServletResponse();
-        assertThrows(UnauthorizedServiceException.class, () -> controller.redirectToProvider(request, response));
-    }
-
-    @Test
-    public void redirectResponseToFlow() {
-        val request = new MockHttpServletRequest();
-        request.setRequestURI("https://sso.example.org");
-        request.addParameter("param1", "value1");
-        val response = new MockHttpServletResponse();
-        assertNotNull(controller.redirectResponseToFlow("CasClient", request, response));
-        assertNotNull(controller.postResponseToFlow("CasClient", request, response));
+        var view = controller.redirectResponseToFlow("CASClient", request, response);
+        assertTrue(view instanceof RedirectView);
+        assertTrue(new URIBuilder(((RedirectView) view).getUrl()).getQueryParams()
+            .stream().anyMatch(c -> c.getName().equals(Pac4jConstants.DEFAULT_CLIENT_NAME_PARAMETER)));
+        view = controller.postResponseToFlow("CASClient", request, response);
+        assertTrue(view instanceof RedirectView);
+        assertTrue(new URIBuilder(((RedirectView) view).getUrl()).getQueryParams()
+            .stream().anyMatch(c -> c.getName().equals(Pac4jConstants.DEFAULT_CLIENT_NAME_PARAMETER)));
     }
 
 }

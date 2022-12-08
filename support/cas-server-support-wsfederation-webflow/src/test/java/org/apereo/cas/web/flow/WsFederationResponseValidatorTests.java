@@ -8,6 +8,7 @@ import org.apereo.cas.support.wsfederation.WsFederationHelper;
 import org.apereo.cas.support.wsfederation.web.WsFederationCookieManager;
 import org.apereo.cas.support.wsfederation.web.WsFederationNavigationController;
 import org.apereo.cas.util.HttpRequestUtils;
+import org.apereo.cas.util.spring.beans.BeanContainer;
 
 import lombok.val;
 import org.apache.commons.io.IOUtils;
@@ -18,7 +19,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.function.Executable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,7 +36,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.Collection;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -67,10 +66,10 @@ public class WsFederationResponseValidatorTests {
 
     @Autowired
     @Qualifier("wsFederationConfigurations")
-    private Collection<WsFederationConfiguration> wsFederationConfigurations;
+    private BeanContainer<WsFederationConfiguration> wsFederationConfigurations;
 
     @Autowired
-    @Qualifier("servicesManager")
+    @Qualifier(ServicesManager.BEAN_NAME)
     private ServicesManager servicesManager;
 
     @Autowired
@@ -85,12 +84,7 @@ public class WsFederationResponseValidatorTests {
         wsFederationHelper.setClock(clock);
 
         val context = prepareContext();
-        assertDoesNotThrow(new Executable() {
-            @Override
-            public void execute() {
-                wsFederationResponseValidator.validateWsFederationAuthenticationRequest(context);
-            }
-        });
+        assertDoesNotThrow(() -> wsFederationResponseValidator.validateWsFederationAuthenticationRequest(context));
     }
 
     @Test
@@ -118,7 +112,7 @@ public class WsFederationResponseValidatorTests {
 
         val service = RegisteredServiceTestUtils.getService(registeredService.getServiceId());
         request.addParameter(CasProtocolConstants.PARAMETER_SERVICE, service.getId());
-        val wsConfig = wsFederationConfigurations.iterator().next();
+        val wsConfig = wsFederationConfigurations.toList().get(0);
         val id = wsConfig.getId();
         request.addParameter(WsFederationNavigationController.PARAMETER_NAME, id);
         wsFederationNavigationController.redirectToProvider(request, response);

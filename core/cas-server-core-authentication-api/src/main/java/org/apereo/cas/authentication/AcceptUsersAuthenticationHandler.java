@@ -13,6 +13,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import javax.security.auth.login.AccountNotFoundException;
 import javax.security.auth.login.FailedLoginException;
+
 import java.security.GeneralSecurityException;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,34 +45,20 @@ public class AcceptUsersAuthenticationHandler extends AbstractUsernamePasswordAu
         this(null, null, PrincipalFactoryUtils.newPrincipalFactory(), Integer.MAX_VALUE, users);
     }
 
-    /**
-     * Instantiates a new Accept users authentication handler.
-     *
-     * @param name the name
-     */
     public AcceptUsersAuthenticationHandler(final String name) {
         this(name, null, PrincipalFactoryUtils.newPrincipalFactory(), Integer.MAX_VALUE, new HashMap<>(0));
     }
 
-    /**
-     * Instantiates a new Accept users authentication handler.
-     *
-     * @param name             the name
-     * @param servicesManager  the services manager
-     * @param principalFactory the principal factory
-     * @param order            the order
-     * @param users            the users
-     */
     public AcceptUsersAuthenticationHandler(final String name, final ServicesManager servicesManager,
-        final PrincipalFactory principalFactory, final Integer order,
-        final Map<String, String> users) {
+                                            final PrincipalFactory principalFactory, final Integer order,
+                                            final Map<String, String> users) {
         super(name, servicesManager, principalFactory, order);
         this.users = users;
     }
 
     @Override
     protected AuthenticationHandlerExecutionResult authenticateUsernamePasswordInternal(final UsernamePasswordCredential credential,
-        final String originalPassword) throws GeneralSecurityException {
+                                                                                        final String originalPassword) throws GeneralSecurityException {
 
         if (this.users == null || this.users.isEmpty()) {
             throw new FailedLoginException("No user can be accepted because none is defined");
@@ -82,7 +69,7 @@ public class AcceptUsersAuthenticationHandler extends AbstractUsernamePasswordAu
             LOGGER.debug("[{}] was not found in the map.", username);
             throw new AccountNotFoundException(username + " not found in backing map.");
         }
-        if (!StringUtils.equals(credential.getPassword(), cachedPassword)) {
+        if (!StringUtils.equals(credential.toPassword(), cachedPassword)) {
             throw new FailedLoginException();
         }
         val strategy = getPasswordPolicyHandlingStrategy();

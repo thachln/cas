@@ -36,7 +36,7 @@ public class ScriptingUtilsTests {
 
     @Test
     public void verifyExternalGroovyScript() {
-        assertTrue(ScriptingUtils.isExternalGroovyScript("file:/tmp/sample.groovy"));
+        assertTrue(ScriptingUtils.isExternalGroovyScript("file:/somefolder/sample.groovy"));
     }
 
     @Test
@@ -52,6 +52,9 @@ public class ScriptingUtilsTests {
         assertNull(result);
 
         result = ScriptingUtils.executeGroovyScript(mock(Resource.class), "someMethod", String.class);
+        assertNull(result);
+
+        result = ScriptingUtils.executeGroovyScript(mock(Resource.class), null, String.class);
         assertNull(result);
 
         assertNull(ScriptingUtils.parseGroovyShellScript(null));
@@ -101,43 +104,6 @@ public class ScriptingUtilsTests {
     public void verifyGroovyResourceClasspathNotFound() {
         val resource = new ClassPathResource("missing.groovy");
         val result = ScriptingUtils.executeGroovyScript(resource, "process", String.class, "casuser");
-        assertNull(result);
-    }
-
-    @Test
-    public void verifyGroovyResourceEngineExecution() {
-        val result = ScriptingUtils.executeGroovyScriptEngine("return name", CollectionUtils.wrap("name", "casuser"), String.class);
-        assertEquals("casuser", result);
-    }
-
-    @Test
-    public void verifyResourceScriptEngineExecution() throws IOException {
-        val file = File.createTempFile("test", ".groovy");
-        FileUtils.write(file, "def run(String name) { return name }", StandardCharsets.UTF_8);
-
-        val result = ScriptingUtils.executeScriptEngine(file.getCanonicalPath(), new Object[]{"casuser"}, String.class);
-        assertEquals("casuser", result);
-    }
-
-    @Test
-    public void verifyBadScriptEngine() throws IOException {
-        val file = File.createTempFile("test1", ".groovy");
-        FileUtils.write(file, "---", StandardCharsets.UTF_8);
-        val result = ScriptingUtils.executeScriptEngine(file.getCanonicalPath(), new Object[]{"casuser"}, String.class);
-        assertNull(result);
-    }
-
-    @Test
-    public void verifyEmptyScript() throws IOException {
-        val result = ScriptingUtils.executeScriptEngine(new File("bad.groovy").getCanonicalPath(), new Object[]{"casuser"}, String.class);
-        assertNull(result);
-    }
-
-    @Test
-    public void verifyNoEngine() throws IOException {
-        val file = File.createTempFile("test", ".txt");
-        FileUtils.write(file, "-", StandardCharsets.UTF_8);
-        val result = ScriptingUtils.executeScriptEngine(file.getCanonicalPath(), new Object[]{"casuser"}, String.class);
         assertNull(result);
     }
 

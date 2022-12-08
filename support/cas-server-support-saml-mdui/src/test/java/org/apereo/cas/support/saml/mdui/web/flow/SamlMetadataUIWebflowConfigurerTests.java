@@ -23,10 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @Import({
     CoreSamlConfiguration.class,
     SamlMetadataUIConfiguration.class,
-    SamlMetadataUIWebflowConfiguration.class,
-    BaseWebflowConfigurerTests.SharedTestConfiguration.class
+    SamlMetadataUIWebflowConfiguration.class
 })
-@Tag("SAML")
+@Tag("SAMLMetadata")
 public class SamlMetadataUIWebflowConfigurerTests extends BaseWebflowConfigurerTests {
     @Test
     public void verifyOperation() {

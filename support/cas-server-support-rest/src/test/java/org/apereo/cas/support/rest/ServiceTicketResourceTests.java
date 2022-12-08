@@ -6,7 +6,9 @@ import org.apereo.cas.authentication.AuthenticationManager;
 import org.apereo.cas.authentication.AuthenticationResult;
 import org.apereo.cas.authentication.AuthenticationTransaction;
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.authentication.DefaultAuthenticationResultBuilderFactory;
 import org.apereo.cas.authentication.DefaultAuthenticationSystemSupport;
+import org.apereo.cas.authentication.DefaultAuthenticationTransactionFactory;
 import org.apereo.cas.authentication.DefaultAuthenticationTransactionManager;
 import org.apereo.cas.authentication.principal.DefaultPrincipalElectionStrategy;
 import org.apereo.cas.authentication.principal.Service;
@@ -81,7 +83,8 @@ public class ServiceTicketResourceTests {
 
         this.serviceTicketResource = new ServiceTicketResource(
             new DefaultAuthenticationSystemSupport(new DefaultAuthenticationTransactionManager(publisher, mgmr),
-                new DefaultPrincipalElectionStrategy()),
+                new DefaultPrincipalElectionStrategy(), new DefaultAuthenticationResultBuilderFactory(),
+                new DefaultAuthenticationTransactionFactory()),
             ticketSupport, new DefaultArgumentExtractor(new WebApplicationServiceFactory()),
             new CasProtocolServiceTicketResourceEntityResponseFactory(casMock),
             new UsernamePasswordRestHttpRequestCredentialFactory(),
@@ -90,6 +93,7 @@ public class ServiceTicketResourceTests {
         this.mockMvc = MockMvcBuilders.standaloneSetup(this.serviceTicketResource)
             .defaultRequest(get("/")
                 .contextPath("/cas")
+                .accept(MediaType.APPLICATION_FORM_URLENCODED, MediaType.TEXT_PLAIN)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
             .build();
     }
@@ -101,7 +105,7 @@ public class ServiceTicketResourceTests {
         this.mockMvc.perform(post(TICKETS_RESOURCE_URL + "/TGT-1")
             .param(SERVICE, CoreAuthenticationTestUtils.getService().getId()))
             .andExpect(status().isOk())
-            .andExpect(content().contentType("text/plain;charset=ISO-8859-1"))
+            .andExpect(content().contentType("application/x-www-form-urlencoded;charset=ISO-8859-1"))
             .andExpect(content().string("ST-1"));
     }
 
@@ -115,7 +119,7 @@ public class ServiceTicketResourceTests {
             .param(USERNAME, TEST_VALUE)
             .param(PASSWORD, TEST_VALUE))
             .andExpect(status().isOk())
-            .andExpect(content().contentType("text/plain;charset=ISO-8859-1"))
+            .andExpect(content().contentType("application/x-www-form-urlencoded;charset=ISO-8859-1"))
             .andExpect(content().string("ST-1"))
             .andReturn().getResponse().getContentAsString();
         assertTrue(content.contains("ST-1"));

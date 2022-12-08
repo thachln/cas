@@ -18,7 +18,8 @@ import lombok.val;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Comparator;
 import java.util.Optional;
@@ -47,8 +48,10 @@ public class PredicatedPrincipalAttributeMultifactorAuthenticationTrigger implem
     public Optional<MultifactorAuthenticationProvider> isActivated(final Authentication authentication,
                                                                    final RegisteredService registeredService,
                                                                    final HttpServletRequest httpServletRequest,
+                                                                   final HttpServletResponse response,
                                                                    final Service service) {
-        val predicateResource = casProperties.getAuthn().getMfa().getGlobalPrincipalAttributePredicate();
+        val predicateResource = casProperties.getAuthn().getMfa().getTriggers()
+            .getPrincipal().getGlobalPrincipalAttributePredicate().getLocation();
 
         if (!ResourceUtils.doesResourceExist(predicateResource)) {
             LOGGER.trace("No predicate is defined to decide which multifactor authentication provider should be chosen");

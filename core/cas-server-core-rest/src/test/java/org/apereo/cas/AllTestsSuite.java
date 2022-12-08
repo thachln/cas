@@ -1,11 +1,12 @@
 package org.apereo.cas;
 
 import org.apereo.cas.rest.audit.RestResponseEntityAuditResourceResolverTests;
+import org.apereo.cas.rest.authentication.DefaultRestAuthenticationServiceTests;
 import org.apereo.cas.rest.factory.ChainingRestHttpRequestCredentialFactoryTests;
+import org.apereo.cas.rest.factory.UsernamePasswordRestHttpRequestCredentialFactoryTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * This is {@link AllTestsSuite}.
@@ -14,9 +15,11 @@ import org.junit.runner.RunWith;
  * @since 6.0.0-RC3
  */
 @SelectClasses({
+    DefaultRestAuthenticationServiceTests.class,
+    UsernamePasswordRestHttpRequestCredentialFactoryTests.class,
     RestResponseEntityAuditResourceResolverTests.class,
     ChainingRestHttpRequestCredentialFactoryTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class AllTestsSuite {
 }

@@ -1,9 +1,8 @@
 package org.apereo.cas.aws;
 
 import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.spring.SpringExpressionLanguageValueResolver;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
@@ -16,6 +15,7 @@ import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvide
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.SystemPropertyCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.WebIdentityTokenFileCredentialsProvider;
 import software.amazon.awssdk.profiles.ProfileFile;
 
 import java.nio.file.Path;
@@ -30,11 +30,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Slf4j
-@RequiredArgsConstructor
-@Getter
-public class ChainingAWSCredentialsProvider {
-    private final List<AwsCredentialsProvider> chain;
-
+public record ChainingAWSCredentialsProvider(List<AwsCredentialsProvider> chain) {
     /**
      * Gets instance.
      *
@@ -69,8 +65,12 @@ public class ChainingAWSCredentialsProvider {
                                                      final String profilePath, final String profileName) {
 
         LOGGER.debug("Attempting to locate AWS credentials...");
-
         val chain = new ArrayList<AwsCredentialsProvider>();
+        addProviderToChain(nothing -> {
+            chain.add(WebIdentityTokenFileCredentialsProvider.create());
+            return null;
+        });
+
         chain.add(InstanceProfileCredentialsProvider.create());
 
         if (StringUtils.isNotBlank(profilePath) && StringUtils.isNotBlank(profileName)) {
@@ -94,7 +94,8 @@ public class ChainingAWSCredentialsProvider {
 
         if (StringUtils.isNotBlank(credentialAccessKey) && StringUtils.isNotBlank(credentialSecretKey)) {
             addProviderToChain(nothing -> {
-                val credentials = AwsBasicCredentials.create(credentialAccessKey, credentialSecretKey);
+                val resolver = SpringExpressionLanguageValueResolver.getInstance();
+                val credentials = AwsBasicCredentials.create(resolver.resolve(credentialAccessKey), resolver.resolve(credentialSecretKey));
                 chain.add(StaticCredentialsProvider.create(credentials));
                 return null;
             });

@@ -3,10 +3,12 @@
 # while sleep 9m; do echo -e '\n=====[ Gradle build is still running ]====='; done &
 
 echo "Building Kafka image..."
-docker-compose -f ./ci/tests/kafka/docker-compose.yml up -d
+COMPOSE_FILE=./ci/tests/kafka/docker-compose.yml
+test -f $COMPOSE_FILE || COMPOSE_FILE=docker-compose.yml
+docker-compose -f $COMPOSE_FILE up -d
 sleep 5
 docker ps
-COUNT_KAFKA=$(docker ps | grep "kafka_"| wc -l)
+COUNT_KAFKA=$(docker ps --format "{{.ID}}: {{.Names}}" | grep -c "kafka")
 if [[ ${COUNT_KAFKA} -eq 2 ]]; then
     echo "Kafka docker images are running."
 else

@@ -15,7 +15,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.webflow.execution.Event;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * This is {@link MultifactorAuthenticationContingencyPlan}.
@@ -26,7 +26,8 @@ import javax.servlet.http.HttpServletRequest;
 @Slf4j
 public class MultifactorAuthenticationContingencyPlan extends BaseAuthenticationRiskContingencyPlan {
 
-    public MultifactorAuthenticationContingencyPlan(final CasConfigurationProperties casProperties, final ApplicationContext applicationContext) {
+    public MultifactorAuthenticationContingencyPlan(final CasConfigurationProperties casProperties,
+        final ApplicationContext applicationContext) {
         super(casProperties, applicationContext);
     }
 

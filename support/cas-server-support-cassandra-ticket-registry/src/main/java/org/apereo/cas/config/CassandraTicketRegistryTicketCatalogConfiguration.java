@@ -1,12 +1,18 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 import java.util.function.Function;
 
@@ -16,21 +22,26 @@ import java.util.function.Function;
  * @author Misagh Moayyed
  * @since 6.1.0
  */
-@Configuration(value = "cassandraTicketRegistryTicketCatalogConfiguration", proxyBeanMethods = false)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.TicketRegistry, module = "cassandra")
+@AutoConfiguration
 public class CassandraTicketRegistryTicketCatalogConfiguration extends BaseTicketDefinitionBuilderSupportConfiguration {
 
-    public CassandraTicketRegistryTicketCatalogConfiguration(final CasConfigurationProperties casProperties,
-                                                             @Qualifier("cassandraTicketCatalogConfigurationValuesProvider")
-                                                             final CasTicketCatalogConfigurationValuesProvider configProvider) {
-        super(casProperties, configProvider);
+    public CassandraTicketRegistryTicketCatalogConfiguration(
+        final ConfigurableApplicationContext applicationContext,
+        final CasConfigurationProperties casProperties,
+        @Qualifier("cassandraTicketCatalogConfigurationValuesProvider")
+        final CasTicketCatalogConfigurationValuesProvider configProvider) {
+        super(casProperties, configProvider, applicationContext);
     }
 
-    @Configuration("cassandraTicketCatalogConfigValuesProviderConfiguration")
-    static class Config {
 
-        @ConditionalOnMissingBean
+    @Configuration(value = "CassandraTicketRegistryTicketCatalogProviderConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CassandraTicketRegistryTicketCatalogProviderConfiguration {
+        @ConditionalOnMissingBean(name = "cassandraTicketCatalogConfigurationValuesProvider")
         @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
         public CasTicketCatalogConfigurationValuesProvider cassandraTicketCatalogConfigurationValuesProvider() {
             return new CasTicketCatalogConfigurationValuesProvider() {
                 @Override

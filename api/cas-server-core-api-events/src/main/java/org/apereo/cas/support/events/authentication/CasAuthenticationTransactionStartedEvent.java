@@ -6,6 +6,8 @@ import org.apereo.cas.support.events.AbstractCasEvent;
 import lombok.Getter;
 import lombok.ToString;
 
+import java.io.Serial;
+
 
 /**
  * This is {@link CasAuthenticationTransactionStartedEvent}.
@@ -16,16 +18,11 @@ import lombok.ToString;
 @ToString(callSuper = true)
 @Getter
 public class CasAuthenticationTransactionStartedEvent extends AbstractCasEvent {
+    @Serial
     private static final long serialVersionUID = -1862937393590213811L;
 
     private final Credential credential;
 
-    /**
-     * Instantiates a new Abstract cas sso event.
-     *
-     * @param source the source
-     * @param c      the c
-     */
     public CasAuthenticationTransactionStartedEvent(final Object source, final Credential c) {
         super(source);
         this.credential = c;

@@ -1,6 +1,8 @@
 package org.apereo.cas.adaptors.u2f.web.flow;
 
 import org.apereo.cas.adaptors.u2f.storage.U2FDeviceRepository;
+import org.apereo.cas.audit.spi.config.CasCoreAuditConfiguration;
+import org.apereo.cas.authentication.MultifactorAuthenticationProvider;
 import org.apereo.cas.config.CasCoreAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationMetadataConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPolicyConfiguration;
@@ -33,6 +35,7 @@ import org.apereo.cas.trusted.config.MultifactorAuthnTrustWebflowConfiguration;
 import org.apereo.cas.trusted.config.MultifactorAuthnTrustedDeviceFingerprintConfiguration;
 import org.apereo.cas.util.crypto.CertUtils;
 import org.apereo.cas.web.config.CasCookieConfiguration;
+import org.apereo.cas.web.flow.CasWebflowConstants;
 import org.apereo.cas.web.flow.config.CasCoreWebflowConfiguration;
 import org.apereo.cas.web.flow.config.CasMultifactorAuthenticationWebflowConfiguration;
 import org.apereo.cas.web.flow.config.CasWebflowContextConfiguration;
@@ -40,19 +43,17 @@ import org.apereo.cas.web.flow.config.CasWebflowContextConfiguration;
 import com.yubico.u2f.U2F;
 import com.yubico.u2f.data.DeviceRegistration;
 import lombok.val;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.webflow.execution.Action;
 
@@ -66,28 +67,33 @@ import static org.mockito.Mockito.*;
  */
 public abstract class BaseU2FWebflowActionTests {
     @Autowired
-    @Qualifier("u2fSaveAccountRegistrationAction")
+    @Qualifier(CasWebflowConstants.ACTION_ID_U2F_SAVE_REGISTRATION)
     protected Action u2fSaveAccountRegistrationAction;
 
     @Autowired
-    @Qualifier("u2fCheckAccountRegistrationAction")
+    @Qualifier(CasWebflowConstants.ACTION_ID_U2F_CHECK_REGISTRATION)
     protected Action u2fCheckAccountRegistrationAction;
 
     @Autowired
-    @Qualifier("u2fStartRegistrationAction")
+    @Qualifier(CasWebflowConstants.ACTION_ID_U2F_START_REGISTRATION)
     protected Action u2fStartRegistrationAction;
 
     @Autowired
-    @Qualifier("u2fStartAuthenticationAction")
+    @Qualifier(CasWebflowConstants.ACTION_ID_U2F_START_AUTHENTICATION)
     protected Action u2fStartAuthenticationAction;
 
     @Autowired
     @Qualifier("u2fDeviceRepository")
     protected U2FDeviceRepository deviceRepository;
 
+    @Autowired
+    @Qualifier("u2fMultifactorAuthenticationProvider")
+    protected MultifactorAuthenticationProvider u2fMultifactorAuthenticationProvider;
+
     @ImportAutoConfiguration({
         RefreshAutoConfiguration.class,
         MailSenderAutoConfiguration.class,
+        WebMvcAutoConfiguration.class,
         AopAutoConfiguration.class
     })
     @SpringBootConfiguration
@@ -118,7 +124,7 @@ public abstract class BaseU2FWebflowActionTests {
         CasCoreMultifactorAuthenticationConfiguration.class,
         CasMultifactorAuthenticationWebflowConfiguration.class,
         CasCoreConfiguration.class,
-
+        CasCoreAuditConfiguration.class,
 
         MultifactorAuthnTrustConfiguration.class,
         MultifactorAuthnTrustedDeviceFingerprintConfiguration.class,
@@ -134,20 +140,14 @@ public abstract class BaseU2FWebflowActionTests {
     public static class SharedTestConfiguration {
     }
 
-    @TestConfiguration("U2FTestConfiguration")
-    @Lazy(false)
+    @TestConfiguration(value = "U2FTestConfiguration", proxyBeanMethods = false)
     public static class U2FTestConfiguration {
         @Bean
         public U2F u2fService() throws Exception {
             val cert = CertUtils.readCertificate(new ClassPathResource("cert.crt"));
             val r1 = new DeviceRegistration("keyhandle11", "publickey1", cert, 20);
             val u2f = mock(U2F.class);
-            when(u2f.startRegistration(any(), any())).thenAnswer(new Answer<Object>() {
-                @Override
-                public Object answer(final InvocationOnMock invocationOnMock) throws Throwable {
-                    return new U2F().startRegistration(invocationOnMock.getArgument(0), invocationOnMock.getArgument(1));
-                }
-            });
+            when(u2f.startRegistration(any(), any())).thenAnswer(invocationOnMock -> new U2F().startRegistration(invocationOnMock.getArgument(0), invocationOnMock.getArgument(1)));
             when(u2f.finishRegistration(any(), any())).thenReturn(r1);
             when(u2f.finishSignature(any(), any(), any())).thenReturn(r1);
             return u2f;

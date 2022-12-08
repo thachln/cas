@@ -1,15 +1,21 @@
 package org.apereo.cas.configuration.support;
 
+import org.apereo.cas.configuration.model.core.authentication.AttributeRepositoryStates;
 import org.apereo.cas.configuration.model.core.authentication.PrincipalAttributesProperties;
+import org.apereo.cas.configuration.model.core.cache.SimpleCacheProperties;
 import org.apereo.cas.configuration.model.support.ConnectionPoolingProperties;
 
-import lombok.SneakyThrows;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import lombok.experimental.UtilityClass;
 import lombok.val;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apereo.services.persondir.IPersonAttributeDao;
 import org.apereo.services.persondir.support.NamedStubPersonAttributeDao;
+import org.jooq.lambda.Unchecked;
+import org.springframework.beans.factory.FactoryBean;
 import org.springframework.scheduling.concurrent.ThreadPoolExecutorFactoryBean;
 import org.springframework.util.StringUtils;
 
@@ -18,6 +24,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 
@@ -37,10 +44,11 @@ public class Beans {
      * @param config the config
      * @return the thread pool executor factory bean
      */
-    public static ThreadPoolExecutorFactoryBean newThreadPoolExecutorFactoryBean(final ConnectionPoolingProperties config) {
+    public static FactoryBean<ExecutorService> newThreadPoolExecutorFactoryBean(final ConnectionPoolingProperties config) {
         val bean = new ThreadPoolExecutorFactoryBean();
         bean.setMaxPoolSize(config.getMaxSize());
         bean.setCorePoolSize(config.getMinSize());
+        bean.afterPropertiesSet();
         return bean;
     }
 
@@ -50,24 +58,26 @@ public class Beans {
      * @param p the properties
      * @return the person attribute dao
      */
-    @SneakyThrows
     public static IPersonAttributeDao newStubAttributeRepository(final PrincipalAttributesProperties p) {
         val dao = new NamedStubPersonAttributeDao();
-        val pdirMap = new LinkedHashMap<String, List<Object>>();
+        val backingMap = new LinkedHashMap<String, List<Object>>();
         val stub = p.getStub();
         stub.getAttributes().forEach((key, value) -> {
             val vals = StringUtils.commaDelimitedListToStringArray(value);
-            pdirMap.put(key, Arrays.stream(vals)
+            backingMap.put(key, Arrays.stream(vals)
                 .map(v -> {
-                    val bool = BooleanUtils.toBooleanObject(v);
-                    if (bool != null) {
-                        return bool;
+                    val result = BooleanUtils.toBooleanObject(v);
+                    if (result != null) {
+                        return result;
                     }
                     return v;
                 })
                 .collect(Collectors.toList()));
         });
-        dao.setBackingMap(pdirMap);
+        dao.setBackingMap(backingMap);
+        dao.setOrder(stub.getOrder());
+        dao.setEnabled(stub.getState() != AttributeRepositoryStates.DISABLED);
+        dao.putTag("state", stub.getState() == AttributeRepositoryStates.ACTIVE);
         if (StringUtils.hasText(stub.getId())) {
             dao.setId(stub.getId());
         }
@@ -82,16 +92,86 @@ public class Beans {
      * @param value the length in seconds.
      * @return the duration
      */
-    @SneakyThrows
     public static Duration newDuration(final String value) {
+        if (isNeverDurable(value)) {
+            return Duration.ZERO;
+        }
+        if (isInfinitelyDurable(value)) {
+            return Duration.ofDays(Integer.MAX_VALUE);
+        }
         if (NumberUtils.isCreatable(value)) {
             return Duration.ofSeconds(Long.parseLong(value));
         }
         return Duration.parse(value);
     }
 
-    @SneakyThrows
+    /**
+     * Is infinitely durable?
+     *
+     * @param value the value
+     * @return true/false
+     */
+    public static boolean isInfinitelyDurable(final String value) {
+        return "-1".equalsIgnoreCase(value) || !StringUtils.hasText(value) || "INFINITE".equalsIgnoreCase(value);
+    }
+
+    /**
+     * Is never durable?
+     *
+     * @param value the value
+     * @return true/false
+     */
+    public static boolean isNeverDurable(final String value) {
+        return "0".equalsIgnoreCase(value) || "NEVER".equalsIgnoreCase(value) || !StringUtils.hasText(value);
+    }
+
+    /**
+     * Gets temp file path.
+     *
+     * @param prefix the prefix
+     * @param suffix the suffix
+     * @return the temp file path
+     */
     public static String getTempFilePath(final String prefix, final String suffix) {
-        return File.createTempFile(prefix, suffix).getCanonicalPath();
+        return Unchecked.supplier(() -> File.createTempFile(prefix, suffix).getCanonicalPath()).get();
+    }
+
+    /**
+     * New cache.
+     *
+     * @param <T>              the type parameter
+     * @param <V>              the type parameter
+     * @param cache            the cache
+     * @param expiryAfterWrite the expiry after write
+     * @return the caffeine
+     */
+    public static <T, V> Cache<T, V> newCache(final SimpleCacheProperties cache,
+                                              final Duration expiryAfterWrite) {
+        return newCache(cache)
+            .expireAfterWrite(expiryAfterWrite)
+            .build();
+    }
+
+    /**
+     * New cache.
+     *
+     * @param <T>         the type parameter
+     * @param <V>         the type parameter
+     * @param cache       the cache
+     * @param expiryAfter the expiry after
+     * @return the cache
+     */
+    public static <T, V> Cache<T, V> newCache(final SimpleCacheProperties cache,
+                                              final Expiry<T, V> expiryAfter) {
+        return newCache(cache)
+            .expireAfter(expiryAfter)
+            .build();
+    }
+
+    private static Caffeine newCache(final SimpleCacheProperties cache) {
+        val builder = Caffeine.newBuilder();
+        return builder
+            .initialCapacity(cache.getInitialCapacity())
+            .maximumSize(cache.getCacheSize());
     }
 }

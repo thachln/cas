@@ -10,9 +10,9 @@ import org.apereo.cas.util.CollectionUtils;
 import com.mongodb.client.model.Filters;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.MongoOperations;
 
+import javax.security.auth.login.AccountNotFoundException;
 import javax.security.auth.login.FailedLoginException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
@@ -26,27 +26,18 @@ import java.util.List;
  * @since 4.2.0
  */
 @Slf4j
-public class MongoDbAuthenticationHandler extends AbstractUsernamePasswordAuthenticationHandler implements AutoCloseable, DisposableBean {
-    private final MongoTemplate mongoTemplate;
+public class MongoDbAuthenticationHandler extends AbstractUsernamePasswordAuthenticationHandler {
+    private final MongoOperations mongoTemplate;
 
     private final MongoDbAuthenticationProperties properties;
 
     public MongoDbAuthenticationHandler(final String name, final ServicesManager servicesManager,
                                         final PrincipalFactory principalFactory,
                                         final MongoDbAuthenticationProperties properties,
-                                        final MongoTemplate mongoTemplate) {
+                                        final MongoOperations mongoTemplate) {
         super(name, servicesManager, principalFactory, properties.getOrder());
         this.mongoTemplate = mongoTemplate;
         this.properties = properties;
-    }
-
-    @Override
-    public void destroy() {
-        close();
-    }
-
-    @Override
-    public void close() {
     }
 
     @Override
@@ -58,9 +49,6 @@ public class MongoDbAuthenticationHandler extends AbstractUsernamePasswordAuthen
         val it = collection.find(Filters.eq(properties.getUsernameAttribute(), transformedCredential.getUsername())).iterator();
         if (it.hasNext()) {
             val result = it.next();
-            if (!result.containsKey(properties.getUsernameAttribute())) {
-                throw new FailedLoginException("No user attribute found for " + transformedCredential.getId());
-            }
             if (!result.containsKey(properties.getPasswordAttribute())) {
                 throw new FailedLoginException("No password attribute found for " + transformedCredential.getId());
             }
@@ -81,6 +69,6 @@ public class MongoDbAuthenticationHandler extends AbstractUsernamePasswordAuthen
             val principal = this.principalFactory.createPrincipal(transformedCredential.getId(), attributes);
             return createHandlerResult(transformedCredential, principal, new ArrayList<>(0));
         }
-        throw new FailedLoginException("Unable to locate user account");
+        throw new AccountNotFoundException("Unable to locate user account");
     }
 }

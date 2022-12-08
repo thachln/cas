@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.pac4j.cas.client.CasClient;
 import org.pac4j.cas.config.CasConfiguration;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(classes = RefreshAutoConfiguration.class)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@Tag("Simple")
+@Tag("Delegation")
 public class DelegatedClientIdentityProviderConfigurationFactoryTests {
 
     @Autowired
@@ -82,7 +82,9 @@ public class DelegatedClientIdentityProviderConfigurationFactoryTests {
         val service = RegisteredServiceTestUtils.getService("example");
         service.setOriginalUrl("http://service.original.url.com?response_type=idtoken+token");
         val client = new CasClient(new CasConfiguration());
-        client.setCustomProperties(Map.of(ClientCustomPropertyConstants.CLIENT_CUSTOM_PROPERTY_CSS_CLASS, "custom-class"));
+        client.setCustomProperties(Map.of(
+            ClientCustomPropertyConstants.CLIENT_CUSTOM_PROPERTY_CSS_CLASS, "custom-class",
+            ClientCustomPropertyConstants.CLIENT_CUSTOM_PROPERTY_AUTO_DISPLAY_NAME, "My Great Client"));
         val factory = DelegatedClientIdentityProviderConfigurationFactory.builder()
             .casProperties(casProperties)
             .client(client)

@@ -9,11 +9,15 @@ import org.apereo.cas.authentication.principal.ShibbolethCompatiblePersistentIdG
 import org.apereo.cas.authentication.principal.WebApplicationService;
 import org.apereo.cas.authentication.principal.WebApplicationServiceResponseBuilder;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.configuration.model.core.services.ServiceRegistryCoreProperties;
 import org.apereo.cas.configuration.support.Beans;
 import org.apereo.cas.notifications.CommunicationsManager;
 import org.apereo.cas.services.ChainingServiceRegistry;
 import org.apereo.cas.services.ChainingServicesManager;
 import org.apereo.cas.services.DefaultChainingServiceRegistry;
+import org.apereo.cas.services.DefaultChainingServicesManager;
+import org.apereo.cas.services.DefaultRegisteredServicesEventListener;
 import org.apereo.cas.services.DefaultServiceRegistryExecutionPlan;
 import org.apereo.cas.services.DefaultServicesManager;
 import org.apereo.cas.services.DefaultServicesManagerRegisteredServiceLocator;
@@ -39,36 +43,39 @@ import org.apereo.cas.services.replication.NoOpRegisteredServiceReplicationStrat
 import org.apereo.cas.services.replication.RegisteredServiceReplicationStrategy;
 import org.apereo.cas.services.resource.DefaultRegisteredServiceResourceNamingStrategy;
 import org.apereo.cas.services.resource.RegisteredServiceResourceNamingStrategy;
-import org.apereo.cas.services.util.RegisteredServiceYamlHttpMessageConverter;
+import org.apereo.cas.util.spring.beans.BeanCondition;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
+import org.apereo.cas.web.UrlValidator;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.jooq.lambda.Unchecked;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.AutoConfigureOrder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.env.Environment;
-import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.EnableAsync;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -79,230 +86,274 @@ import java.util.stream.Collectors;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration("casCoreServicesConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 @Slf4j
-@EnableAsync
+@EnableAsync(proxyTargetClass = false)
+@AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.ServiceRegistry)
+@AutoConfiguration
 public class CasCoreServicesConfiguration {
-    @Autowired
-    @Qualifier("communicationsManager")
-    private ObjectProvider<CommunicationsManager> communicationsManager;
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    private ConfigurableApplicationContext applicationContext;
-
-    @Autowired
-    private Environment environment;
-
-    @RefreshScope
-    @Bean
-    @ConditionalOnMissingBean(name = "shibbolethCompatiblePersistentIdGenerator")
-    public PersistentIdGenerator shibbolethCompatiblePersistentIdGenerator() {
-        return new ShibbolethCompatiblePersistentIdGenerator();
-    }
-
-    @ConditionalOnMissingBean(name = "webApplicationResponseBuilderLocator")
-    @Bean
-    public ResponseBuilderLocator webApplicationResponseBuilderLocator() {
-        val beans = applicationContext.getBeansOfType(ResponseBuilder.class, false, true);
-        val builders = new ArrayList<ResponseBuilder>(beans.values());
-        AnnotationAwareOrderComparator.sortIfNecessary(builders);
-        return new DefaultWebApplicationResponseBuilderLocator(builders);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(name = "webApplicationServiceResponseBuilder")
-    public ResponseBuilder<WebApplicationService> webApplicationServiceResponseBuilder() {
-        return new WebApplicationServiceResponseBuilder(servicesManager());
-    }
-
-    @ConditionalOnMissingBean(name = "registeredServiceCipherExecutor")
-    @Bean
-    @RefreshScope
-    public RegisteredServiceCipherExecutor registeredServiceCipherExecutor() {
-        return new RegisteredServicePublicKeyCipherExecutor();
-    }
-
-    @ConditionalOnMissingBean(name = "registeredServiceAccessStrategyEnforcer")
-    @Bean
-    @RefreshScope
-    public AuditableExecution registeredServiceAccessStrategyEnforcer() {
-        return new RegisteredServiceAccessStrategyAuditableEnforcer();
-    }
-
-    @ConditionalOnMissingBean(name = "servicesManager")
-    @Bean
-    @RefreshScope
-    public ServicesManager servicesManager() {
-        val configurers = applicationContext.getBeansOfType(ServicesManagerExecutionPlanConfigurer.class, false, true);
-        val chain = new ChainingServicesManager();
-        configurers.values().forEach(c -> chain.registerServiceManager(c.configureServicesManager()));
-        return chain;
-    }
-
-    @Bean
-    public HttpMessageConverter yamlHttpMessageConverter() {
-        return new RegisteredServiceYamlHttpMessageConverter();
-    }
-
-    @Bean
-    public RegisteredServicesEventListener registeredServicesEventListener() {
-        return new RegisteredServicesEventListener(servicesManager(), casProperties, communicationsManager.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "registeredServiceReplicationStrategy")
-    @Bean
-    @RefreshScope
-    public RegisteredServiceReplicationStrategy registeredServiceReplicationStrategy() {
-        return new NoOpRegisteredServiceReplicationStrategy();
-    }
-
-    @ConditionalOnMissingBean(name = "registeredServiceResourceNamingStrategy")
-    @Bean
-    @RefreshScope
-    public RegisteredServiceResourceNamingStrategy registeredServiceResourceNamingStrategy() {
-        return new DefaultRegisteredServiceResourceNamingStrategy();
-    }
-
-    @Bean
-    @Lazy(false)
-    public ServiceRegistryExecutionPlan serviceRegistryExecutionPlan() {
-        val configurers = applicationContext.getBeansOfType(ServiceRegistryExecutionPlanConfigurer.class, false, true);
-        val plan = new DefaultServiceRegistryExecutionPlan();
-        configurers.values().forEach(c -> {
-            LOGGER.trace("Configuring service registry [{}]", c.getName());
-            c.configureServiceRegistry(plan);
-        });
-        return plan;
-    }
-
-    @ConditionalOnProperty(prefix = "cas.service-registry.schedule", name = "enabled", havingValue = "true", matchIfMissing = true)
-    @Bean
-    public Runnable servicesManagerScheduledLoader() {
-        val plan = serviceRegistryExecutionPlan();
-        val filter = (Predicate) Predicates.not(Predicates.instanceOf(ImmutableServiceRegistry.class));
-        if (!plan.find(filter).isEmpty()) {
-            LOGGER.trace("Background task to load services is enabled to run every [{}]",
-                casProperties.getServiceRegistry().getSchedule().getRepeatInterval());
-            return new ServicesManagerScheduledLoader(servicesManager());
-        }
-        LOGGER.trace("Background task to load services is disabled");
-        return ServicesManagerScheduledLoader.noOp();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(name = "serviceRegistryListeners")
-    public Collection<ServiceRegistryListener> serviceRegistryListeners() {
-        return applicationContext.getBeansOfType(ServiceRegistryListener.class, false, true).values();
-    }
-
-    @ConditionalOnMissingBean(name = "serviceRegistry")
-    @Bean
-    @RefreshScope
-    @Lazy(false)
-    public ChainingServiceRegistry serviceRegistry() {
-        val plan = serviceRegistryExecutionPlan();
-        val filter = (Predicate) Predicates.not(Predicates.instanceOf(ImmutableServiceRegistry.class));
-
-        val chainingRegistry = new DefaultChainingServiceRegistry(applicationContext);
-        if (plan.find(filter).isEmpty()) {
-            LOGGER.warn("Runtime memory is used as the persistence storage for retrieving and persisting service definitions. "
-                + "Changes that are made to service definitions during runtime WILL be LOST when the CAS server is restarted. "
-                + "Ideally for production, you should choose a storage option (JSON, JDBC, MongoDb, etc) to track service definitions.");
-            chainingRegistry.addServiceRegistry(inMemoryServiceRegistry());
+    @Configuration(value = "CasCoreServicesResponseLocatorConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreServicesResponseLocatorConfiguration {
+        @ConditionalOnMissingBean(name = "webApplicationResponseBuilderLocator")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public ResponseBuilderLocator webApplicationResponseBuilderLocator(final List<ResponseBuilder> responseBuilders) {
+            AnnotationAwareOrderComparator.sortIfNecessary(responseBuilders);
+            return new DefaultWebApplicationResponseBuilderLocator(responseBuilders);
         }
 
-        chainingRegistry.addServiceRegistries(plan.getServiceRegistries());
-        return chainingRegistry;
     }
 
-    @Bean
-    @ConditionalOnMissingBean(name = "inMemoryServiceRegistry")
-    public ServiceRegistry inMemoryServiceRegistry() {
-        val services = getInMemoryRegisteredServices().orElseGet(ArrayList::new);
-        return new InMemoryServiceRegistry(applicationContext, services, serviceRegistryListeners());
+    @Configuration(value = "CasCoreServicesEventsConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    @AutoConfigureOrder(Ordered.LOWEST_PRECEDENCE)
+    public static class CasCoreServicesEventsConfiguration {
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public RegisteredServicesEventListener registeredServicesEventListener(
+            final CasConfigurationProperties casProperties,
+            @Qualifier(ServicesManager.BEAN_NAME) final ServicesManager servicesManager,
+            @Qualifier(CommunicationsManager.BEAN_NAME) final CommunicationsManager communicationsManager) {
+            return new DefaultRegisteredServicesEventListener(servicesManager, casProperties, communicationsManager);
+        }
     }
 
-    /**
-     * Refresh CAS services after application has loaded.
-     *
-     * @param event the event
-     */
-    @EventListener
-    @Async
-    public void refreshServicesManagerWhenReady(final ApplicationReadyEvent event) {
-        servicesManager().load();
+    @Configuration(value = "CasCoreServicesResponseBuilderConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreServicesResponseBuilderConfiguration {
+        @Bean
+        @ConditionalOnMissingBean(name = "webApplicationServiceResponseBuilder")
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public ResponseBuilder<WebApplicationService> webApplicationServiceResponseBuilder(
+            @Qualifier(ServicesManager.BEAN_NAME) final ServicesManager servicesManager,
+            @Qualifier(UrlValidator.BEAN_NAME) final UrlValidator urlValidator) {
+            return new WebApplicationServiceResponseBuilder(servicesManager, urlValidator);
+        }
     }
 
-    @RefreshScope
-    @Bean
-    @ConditionalOnMissingBean(name = "servicesManagerCache")
-    public Cache<Long, RegisteredService> servicesManagerCache() {
-        val serviceRegistry = casProperties.getServiceRegistry();
-        val duration = Beans.newDuration(serviceRegistry.getCache());
-        return Caffeine.newBuilder()
-            .initialCapacity(serviceRegistry.getCacheCapacity())
-            .maximumSize(serviceRegistry.getCacheSize())
-            .expireAfterWrite(duration)
-            .recordStats()
-            .build();
+    @Configuration(value = "CasCoreServicesBaseConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreServicesBaseConfiguration {
+
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @Bean
+        @ConditionalOnMissingBean(name = "shibbolethCompatiblePersistentIdGenerator")
+        public PersistentIdGenerator shibbolethCompatiblePersistentIdGenerator() {
+            return new ShibbolethCompatiblePersistentIdGenerator();
+        }
+
+        @ConditionalOnMissingBean(name = RegisteredServiceCipherExecutor.DEFAULT_BEAN_NAME)
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public RegisteredServiceCipherExecutor registeredServiceCipherExecutor() {
+            return new RegisteredServicePublicKeyCipherExecutor();
+        }
+
+        @ConditionalOnMissingBean(name = AuditableExecution.AUDITABLE_EXECUTION_REGISTERED_SERVICE_ACCESS)
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public AuditableExecution registeredServiceAccessStrategyEnforcer(final CasConfigurationProperties casProperties) {
+            return new RegisteredServiceAccessStrategyAuditableEnforcer(casProperties);
+        }
+
     }
 
-    @Bean
-    @ConditionalOnMissingBean(name = "defaultServicesManagerExecutionPlanConfigurer")
-    @ConditionalOnProperty(prefix = "cas.service-registry", name = "management-type", havingValue = "DEFAULT", matchIfMissing = true)
-    public ServicesManagerExecutionPlanConfigurer defaultServicesManagerExecutionPlanConfigurer() {
-        return () -> {
+    @Configuration(value = "CasCoreServicesStrategyConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreServicesStrategyConfiguration {
+
+        @ConditionalOnMissingBean(name = "registeredServiceReplicationStrategy")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public RegisteredServiceReplicationStrategy registeredServiceReplicationStrategy() {
+            return new NoOpRegisteredServiceReplicationStrategy();
+        }
+
+        @ConditionalOnMissingBean(name = "registeredServiceResourceNamingStrategy")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public RegisteredServiceResourceNamingStrategy registeredServiceResourceNamingStrategy() {
+            return new DefaultRegisteredServiceResourceNamingStrategy();
+        }
+    }
+
+    @Configuration(value = "CasCoreServiceRegistryPlanConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreServiceRegistryPlanConfiguration {
+        @ConditionalOnMissingBean(name = "serviceRegistryExecutionPlan")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public ServiceRegistryExecutionPlan serviceRegistryExecutionPlan(
+            final ObjectProvider<List<ServiceRegistryExecutionPlanConfigurer>> provider) {
+            val plan = new DefaultServiceRegistryExecutionPlan();
+            provider.ifAvailable(configurers -> configurers
+                .stream()
+                .filter(BeanSupplier::isNotProxy)
+                .forEach(Unchecked.consumer(c -> {
+                    LOGGER.trace("Configuring service registry [{}]", c.getName());
+                    c.configureServiceRegistry(plan);
+                })));
+            return plan;
+        }
+    }
+
+    @Configuration(value = "CasCoreServicesListenerConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreServicesListenerConfiguration {
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = "defaultServiceRegistryListener")
+        public ServiceRegistryListener defaultServiceRegistryListener() {
+            return ServiceRegistryListener.noOp();
+        }
+
+    }
+
+    @Configuration(value = "CasCoreServiceRegistryConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreServiceRegistryConfiguration {
+
+        private static Optional<List<RegisteredService>> getInMemoryRegisteredServices(final ApplicationContext applicationContext) {
+            if (applicationContext.containsBean("inMemoryRegisteredServices")) {
+                return Optional.of(applicationContext.getBean("inMemoryRegisteredServices", List.class));
+            }
+            return Optional.empty();
+        }
+
+        @ConditionalOnMissingBean(name = ServiceRegistry.BEAN_NAME)
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public ChainingServiceRegistry serviceRegistry(
+            final ConfigurableApplicationContext applicationContext,
+            final ObjectProvider<List<ServiceRegistryListener>> serviceRegistryListeners,
+            @Qualifier("serviceRegistryExecutionPlan") final ServiceRegistryExecutionPlan serviceRegistryExecutionPlan) throws Exception {
+            val filter = (Predicate) Predicates.not(Predicates.instanceOf(ImmutableServiceRegistry.class));
+            val chainingRegistry = new DefaultChainingServiceRegistry(applicationContext);
+            if (serviceRegistryExecutionPlan.find(filter).isEmpty()) {
+                LOGGER.info("Runtime memory is used as the persistence storage for retrieving and persisting service definitions. "
+                            + "Changes that are made to service definitions during runtime WILL be LOST when the CAS server is restarted. "
+                            + "Ideally for production, you should choose a storage option (JSON, JDBC, MongoDb, etc) to track service definitions.");
+                val services = getInMemoryRegisteredServices(applicationContext).orElseGet(ArrayList::new);
+                val inMemoryServiceRegistry = new InMemoryServiceRegistry(applicationContext, services,
+                    Optional.ofNullable(serviceRegistryListeners.getIfAvailable()).orElseGet(ArrayList::new));
+                chainingRegistry.addServiceRegistry(inMemoryServiceRegistry);
+            }
+            chainingRegistry.addServiceRegistries(serviceRegistryExecutionPlan.getServiceRegistries());
+            return chainingRegistry;
+        }
+    }
+
+    @Configuration(value = "CasCoreServicesManagerExecutionPlanConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreServicesManagerExecutionPlanConfiguration {
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public ServicesManagerConfigurationContext servicesManagerConfigurationContext(
+            @Qualifier(ServiceRegistry.BEAN_NAME) final ChainingServiceRegistry serviceRegistry,
+            @Qualifier("servicesManagerCache") final Cache<Long, RegisteredService> servicesManagerCache,
+            final List<ServicesManagerRegisteredServiceLocator> servicesManagerRegisteredServiceLocators,
+            final Environment environment,
+            final ConfigurableApplicationContext applicationContext) {
+            AnnotationAwareOrderComparator.sortIfNecessary(servicesManagerRegisteredServiceLocators);
             val activeProfiles = Arrays.stream(environment.getActiveProfiles()).collect(Collectors.toSet());
-            val context = ServicesManagerConfigurationContext.builder()
-                .serviceRegistry(serviceRegistry())
+            return ServicesManagerConfigurationContext.builder()
+                .serviceRegistry(serviceRegistry)
                 .applicationContext(applicationContext)
                 .environments(activeProfiles)
-                .servicesCache(servicesManagerCache())
-                .registeredServiceLocators(servicesManagerRegisteredServiceLocators())
+                .servicesCache(servicesManagerCache)
+                .registeredServiceLocators(servicesManagerRegisteredServiceLocators)
                 .build();
-            return new DefaultServicesManager(context);
-        };
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(name = "servicesManagerRegisteredServiceLocators")
-    public List<ServicesManagerRegisteredServiceLocator> servicesManagerRegisteredServiceLocators() {
-        val locators = applicationContext.getBeansOfType(ServicesManagerRegisteredServiceLocator.class, false, true);
-        val sortedLocators = new ArrayList<>(locators.values());
-        AnnotationAwareOrderComparator.sortIfNecessary(sortedLocators);
-        return sortedLocators;
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(name = "defaultServicesManagerRegisteredServiceLocator")
-    public ServicesManagerRegisteredServiceLocator defaultServicesManagerRegisteredServiceLocator() {
-        return new DefaultServicesManagerRegisteredServiceLocator();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(name = "domainServicesManagerExecutionPlanConfigurer")
-    @ConditionalOnProperty(prefix = "cas.service-registry", name = "management-type", havingValue = "DOMAIN")
-    public ServicesManagerExecutionPlanConfigurer domainServicesManagerExecutionPlanConfigurer() {
-        return () -> {
-            val activeProfiles = Arrays.stream(environment.getActiveProfiles()).collect(Collectors.toSet());
-            val context = ServicesManagerConfigurationContext.builder()
-                .serviceRegistry(serviceRegistry())
-                .applicationContext(applicationContext)
-                .environments(activeProfiles)
-                .servicesCache(servicesManagerCache())
-                .build();
-            return new DefaultDomainAwareServicesManager(context, new DefaultRegisteredServiceDomainExtractor());
-        };
-    }
-
-    private Optional<List<RegisteredService>> getInMemoryRegisteredServices() {
-        if (applicationContext.containsBean("inMemoryRegisteredServices")) {
-            return Optional.of(applicationContext.getBean("inMemoryRegisteredServices", List.class));
         }
-        return Optional.empty();
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = "defaultServicesManagerExecutionPlanConfigurer")
+        public ServicesManagerExecutionPlanConfigurer defaultServicesManagerExecutionPlanConfigurer(
+            final CasConfigurationProperties casProperties,
+            @Qualifier("servicesManagerConfigurationContext") final ServicesManagerConfigurationContext configurationContext) throws Exception {
+            return BeanSupplier.of(ServicesManagerExecutionPlanConfigurer.class)
+                .alwaysMatch()
+                .supply(() -> {
+                    val managementType = casProperties.getServiceRegistry().getCore().getManagementType();
+                    if (managementType == ServiceRegistryCoreProperties.ServiceManagementTypes.DOMAIN) {
+                        return () -> new DefaultDomainAwareServicesManager(configurationContext,
+                            new DefaultRegisteredServiceDomainExtractor());
+                    }
+                    return () -> new DefaultServicesManager(configurationContext);
+                })
+                .get();
+        }
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = "defaultServicesManagerRegisteredServiceLocator")
+        public ServicesManagerRegisteredServiceLocator defaultServicesManagerRegisteredServiceLocator() {
+            return new DefaultServicesManagerRegisteredServiceLocator();
+        }
+    }
+
+    @Configuration(value = "CasCoreServicesManagerConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    @AutoConfigureAfter(CasCoreServiceRegistryConfiguration.class)
+    public static class CasCoreServicesManagerConfiguration {
+        @ConditionalOnMissingBean(name = ServicesManager.BEAN_NAME)
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public ChainingServicesManager servicesManager(final List<ServicesManagerExecutionPlanConfigurer> configurers) {
+            val chain = new DefaultChainingServicesManager();
+            AnnotationAwareOrderComparator.sortIfNecessary(configurers);
+            configurers.forEach(c -> chain.registerServiceManager(c.configureServicesManager()));
+            return chain;
+        }
+
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @Bean
+        @ConditionalOnMissingBean(name = "servicesManagerCache")
+        public Cache<Long, RegisteredService> servicesManagerCache(final CasConfigurationProperties casProperties) {
+            val cacheProperties = casProperties.getServiceRegistry().getCache();
+            val duration = Beans.newDuration(cacheProperties.getDuration());
+            return Beans.newCache(casProperties.getServiceRegistry().getCache(), duration);
+        }
+
+        @EventListener
+        public void refreshServicesManagerWhenReady(final ApplicationReadyEvent event) {
+            val servicesManager = event.getApplicationContext().getBean(ServicesManager.BEAN_NAME, ChainingServicesManager.class);
+            servicesManager.load();
+        }
+    }
+
+    @Configuration(value = "CasCoreServicesSchedulingConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    @AutoConfigureOrder(Ordered.LOWEST_PRECEDENCE)
+    @AutoConfigureAfter({CasCoreServicesManagerConfiguration.class, CasCoreServiceRegistryConfiguration.class})
+    public static class CasCoreServicesSchedulingConfiguration {
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public Runnable servicesManagerScheduledLoader(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("serviceRegistryExecutionPlan") final ServiceRegistryExecutionPlan serviceRegistryExecutionPlan,
+            final CasConfigurationProperties casProperties,
+            @Qualifier(ServicesManager.BEAN_NAME) final ServicesManager servicesManager) throws Exception {
+
+            return BeanSupplier.of(Runnable.class)
+                .when(BeanCondition.on("cas.service-registry.schedule.enabled").isTrue().evenIfMissing()
+                    .given(applicationContext.getEnvironment()))
+                .supply(() -> {
+                    val filter = (Predicate) Predicates.not(Predicates.instanceOf(ImmutableServiceRegistry.class));
+                    if (!serviceRegistryExecutionPlan.find(filter).isEmpty()) {
+                        LOGGER.trace("Background task to load services is enabled to run every [{}]",
+                            casProperties.getServiceRegistry().getSchedule().getRepeatInterval());
+                        return new ServicesManagerScheduledLoader(servicesManager);
+                    }
+                    LOGGER.trace("Background task to load services is disabled");
+                    return ServicesManagerScheduledLoader.noOp();
+                })
+                .otherwiseProxy()
+                .get();
+        }
     }
 }

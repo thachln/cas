@@ -4,8 +4,11 @@ import org.apereo.cas.config.CasAcceptableUsagePolicyCouchDbConfiguration;
 import org.apereo.cas.config.CasCouchDbCoreConfiguration;
 import org.apereo.cas.couchdb.core.CouchDbConnectorFactory;
 import org.apereo.cas.couchdb.core.ProfileCouchDbRepository;
+import org.apereo.cas.mock.MockTicketGrantingTicket;
+import org.apereo.cas.services.RegisteredServiceTestUtils;
 import org.apereo.cas.util.CollectionUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
+import org.apereo.cas.web.support.WebUtils;
 
 import lombok.Getter;
 import lombok.val;
@@ -19,6 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 @Tag("CouchDb")
 @Getter
-@EnabledIfPortOpen(port = 5984)
+@EnabledIfListeningOnPort(port = 5984)
 public class CouchDbAcceptableUsagePolicyRepositoryTests extends BaseAcceptableUsagePolicyRepositoryTests {
 
     @Autowired
@@ -52,13 +56,13 @@ public class CouchDbAcceptableUsagePolicyRepositoryTests extends BaseAcceptableU
     private ProfileCouchDbRepository couchDbRepository;
 
     @Autowired
-    @Qualifier("acceptableUsagePolicyRepository")
+    @Qualifier(AcceptableUsagePolicyRepository.BEAN_NAME)
     private AcceptableUsagePolicyRepository acceptableUsagePolicyRepository;
 
     @BeforeEach
     public void setUp() {
         aupCouchDbFactory.getCouchDbInstance().createDatabaseIfNotExists(aupCouchDbFactory.getCouchDbConnector().getDatabaseName());
-        couchDbRepository.initStandardDesignDocument();
+        couchDbRepository.initialize();
     }
 
     @AfterEach
@@ -72,7 +76,7 @@ public class CouchDbAcceptableUsagePolicyRepositoryTests extends BaseAcceptableU
     }
 
     @Test
-    public void verifyOperation() {
+    public void verifyOperation() throws Exception {
         assertNotNull(acceptableUsagePolicyRepository);
         val attributes = CollectionUtils.<String, List<Object>>wrap("aupAccepted", List.of("false"),
             "email", List.of("CASuser@example.org"));
@@ -80,7 +84,17 @@ public class CouchDbAcceptableUsagePolicyRepositoryTests extends BaseAcceptableU
 
         val c = getCredential("casuser");
         val context = getRequestContext("casuser", attributes, c);
-        acceptableUsagePolicyRepository.submit(context, c);
-        assertTrue(getAcceptableUsagePolicyRepository().verify(context, c).isAccepted());
+        acceptableUsagePolicyRepository.submit(context);
+        assertTrue(getAcceptableUsagePolicyRepository().verify(context).isAccepted());
+
+        val principal = RegisteredServiceTestUtils.getPrincipal("casuser", Map.of("aupAccepted", List.of("true")));
+        val authentication = RegisteredServiceTestUtils.getAuthentication(principal);
+        WebUtils.putAuthentication(authentication, context);
+
+        val tgt = new MockTicketGrantingTicket(authentication);
+        WebUtils.putTicketGrantingTicketInScopes(context, tgt);
+        ticketRegistry.addTicket(tgt);
+        
+        assertTrue(getAcceptableUsagePolicyRepository().verify(context).isAccepted());
     }
 }

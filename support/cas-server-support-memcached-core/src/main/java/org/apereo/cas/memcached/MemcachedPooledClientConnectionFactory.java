@@ -2,9 +2,9 @@ package org.apereo.cas.memcached;
 
 import org.apereo.cas.configuration.model.support.memcached.BaseMemcachedProperties;
 import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import net.spy.memcached.ConnectionFactoryBuilder;
@@ -34,7 +34,6 @@ public class MemcachedPooledClientConnectionFactory extends BasePooledObjectFact
     private final Transcoder transcoder;
 
     @Override
-    @SneakyThrows
     public MemcachedClientIF create() {
         val factoryBean = new MemcachedClientFactoryBean();
         factoryBean.setServers(memcachedProperties.getServers());
@@ -48,6 +47,9 @@ public class MemcachedPooledClientConnectionFactory extends BasePooledObjectFact
         }
         if (StringUtils.isNotBlank(memcachedProperties.getHashAlgorithm())) {
             factoryBean.setHashAlg(DefaultHashAlgorithm.valueOf(memcachedProperties.getHashAlgorithm()));
+        }
+        if (StringUtils.isNotBlank(memcachedProperties.getProtocol())) {
+            factoryBean.setProtocol(ConnectionFactoryBuilder.Protocol.valueOf(memcachedProperties.getProtocol()));
         }
 
         factoryBean.setDaemon(memcachedProperties.isDaemon());
@@ -66,8 +68,10 @@ public class MemcachedPooledClientConnectionFactory extends BasePooledObjectFact
         if (memcachedProperties.getTimeoutExceptionThreshold() > 0) {
             factoryBean.setTimeoutExceptionThreshold(memcachedProperties.getTimeoutExceptionThreshold());
         }
-        factoryBean.afterPropertiesSet();
-        return (MemcachedClientIF) factoryBean.getObject();
+        return FunctionUtils.doUnchecked(() -> {
+            factoryBean.afterPropertiesSet();
+            return (MemcachedClientIF) factoryBean.getObject();
+        });
     }
 
     @Override
@@ -92,7 +96,7 @@ public class MemcachedPooledClientConnectionFactory extends BasePooledObjectFact
      * @return the object pool
      */
     public ObjectPool<MemcachedClientIF> getObjectPool() {
-        val pool = new GenericObjectPool<MemcachedClientIF>(this);
+        val pool = new GenericObjectPool<>(this);
         pool.setMaxIdle(memcachedProperties.getMaxIdle());
         pool.setMinIdle(memcachedProperties.getMinIdle());
         pool.setMaxTotal(memcachedProperties.getMaxTotal());

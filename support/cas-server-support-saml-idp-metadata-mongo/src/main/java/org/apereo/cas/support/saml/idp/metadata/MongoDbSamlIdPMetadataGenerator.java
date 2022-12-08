@@ -1,15 +1,14 @@
 package org.apereo.cas.support.saml.idp.metadata;
 
 import org.apereo.cas.support.saml.idp.metadata.generator.BaseSamlIdPMetadataGenerator;
+import org.apereo.cas.support.saml.idp.metadata.generator.SamlIdPMetadataGenerator;
 import org.apereo.cas.support.saml.idp.metadata.generator.SamlIdPMetadataGeneratorConfigurationContext;
 import org.apereo.cas.support.saml.services.SamlRegisteredService;
 import org.apereo.cas.support.saml.services.idp.metadata.SamlIdPMetadataDocument;
 
-import lombok.SneakyThrows;
-import lombok.val;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.MongoOperations;
 
 import java.util.Optional;
 
@@ -20,46 +19,36 @@ import java.util.Optional;
  * @since 6.0.0
  */
 public class MongoDbSamlIdPMetadataGenerator extends BaseSamlIdPMetadataGenerator implements InitializingBean {
-    private final transient MongoTemplate mongoTemplate;
+    private final MongoOperations mongoTemplate;
 
     private final String collectionName;
 
     public MongoDbSamlIdPMetadataGenerator(final SamlIdPMetadataGeneratorConfigurationContext samlIdPMetadataGeneratorConfigurationContext,
-                                           final MongoTemplate mongoTemplate, final String collectionName) {
+                                           final MongoOperations mongoTemplate, final String collectionName) {
         super(samlIdPMetadataGeneratorConfigurationContext);
         this.mongoTemplate = mongoTemplate;
         this.collectionName = collectionName;
     }
 
-    private static String getAppliesToFor(final Optional<SamlRegisteredService> result) {
-        if (result.isPresent()) {
-            val registeredService = result.get();
-            return registeredService.getName() + '-' + registeredService.getId();
-        }
-        return "CAS";
-    }
-
     @Override
-    public void afterPropertiesSet() {
+    public void afterPropertiesSet() throws Exception {
         generate(Optional.empty());
     }
 
     @Override
     protected SamlIdPMetadataDocument finalizeMetadataDocument(final SamlIdPMetadataDocument doc,
                                                                final Optional<SamlRegisteredService> registeredService) {
-        doc.setAppliesTo(getAppliesToFor(registeredService));
+        doc.setAppliesTo(SamlIdPMetadataGenerator.getAppliesToFor(registeredService));
         return this.mongoTemplate.save(doc, this.collectionName);
     }
 
     @Override
-    @SneakyThrows
-    public Pair<String, String> buildSelfSignedEncryptionCert(final Optional<SamlRegisteredService> registeredService) {
+    public Pair<String, String> buildSelfSignedEncryptionCert(final Optional<SamlRegisteredService> registeredService) throws Exception {
         return generateCertificateAndKey();
     }
 
     @Override
-    @SneakyThrows
-    public Pair<String, String> buildSelfSignedSigningCert(final Optional<SamlRegisteredService> registeredService) {
+    public Pair<String, String> buildSelfSignedSigningCert(final Optional<SamlRegisteredService> registeredService) throws Exception {
         return generateCertificateAndKey();
     }
 }

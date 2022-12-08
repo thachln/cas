@@ -4,6 +4,7 @@ import org.apereo.cas.authentication.AuthenticationEventExecutionPlanConfigurer;
 import org.apereo.cas.authentication.AuthenticationHandlerResolver;
 import org.apereo.cas.authentication.AuthenticationServiceSelectionPlan;
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.authentication.principal.PrincipalResolver;
 import org.apereo.cas.authentication.principal.RegisteredServicePrincipalAttributesRepository;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -34,7 +36,9 @@ import static org.mockito.Mockito.*;
  */
 @SpringBootTest(classes = {
     RefreshAutoConfiguration.class,
+    WebMvcAutoConfiguration.class,
     CasCoreAuthenticationSupportConfigurationTests.CasCoreAuthenticationSupportConfigurationTestConfiguration.class,
+    CasPersonDirectoryTestConfiguration.class,
     CasCoreServicesConfiguration.class,
     CasCoreUtilConfiguration.class,
     CasCoreNotificationsConfiguration.class,
@@ -52,7 +56,7 @@ import static org.mockito.Mockito.*;
         "cas.authn.core.engine.groovy-pre-processor.location=classpath:GroovyPostProcessor.groovy",
         "cas.authn.core.engine.groovy-post-processor.location=classpath:GroovyPreProcessor.groovy",
         "cas.authn.authentication-attribute-release.enabled=false",
-        "cas.authn.attribute-repository.expiration-time=0",
+        "cas.authn.attribute-repository.core.expiration-time=0",
         "cas.authn.policy.source-selection-enabled=true"
     })
 @EnableConfigurationProperties(CasConfigurationProperties.class)
@@ -60,11 +64,11 @@ import static org.mockito.Mockito.*;
 public class CasCoreAuthenticationSupportConfigurationTests {
 
     @Autowired
-    @Qualifier("globalPrincipalAttributeRepository")
+    @Qualifier(PrincipalResolver.BEAN_NAME_GLOBAL_PRINCIPAL_ATTRIBUTE_REPOSITORY)
     private RegisteredServicePrincipalAttributesRepository globalPrincipalAttributeRepository;
 
     @Autowired
-    @Qualifier("authenticationAttributeReleasePolicy")
+    @Qualifier(AuthenticationAttributeReleasePolicy.BEAN_NAME)
     private AuthenticationAttributeReleasePolicy authenticationAttributeReleasePolicy;
 
     @Autowired
@@ -81,15 +85,15 @@ public class CasCoreAuthenticationSupportConfigurationTests {
         assertNotNull(globalPrincipalAttributeRepository);
         assertNotNull(groovyAuthenticationProcessorExecutionPlanConfigurer);
         assertTrue(authenticationAttributeReleasePolicy.getAuthenticationAttributesForRelease(
-            CoreAuthenticationTestUtils.getAuthentication(),
-            mock(Assertion.class), Map.of(), CoreAuthenticationTestUtils.getRegisteredService())
+                CoreAuthenticationTestUtils.getAuthentication(),
+                mock(Assertion.class), Map.of(), CoreAuthenticationTestUtils.getRegisteredService())
             .isEmpty());
     }
 
-    @TestConfiguration("CasCoreAuthenticationSupportConfigurationTestConfiguration")
+    @TestConfiguration(value = "CasCoreAuthenticationSupportConfigurationTestConfiguration", proxyBeanMethods = false)
     public static class CasCoreAuthenticationSupportConfigurationTestConfiguration {
         @Bean
-        @ConditionalOnMissingBean(name = "authenticationServiceSelectionPlan")
+        @ConditionalOnMissingBean(name = AuthenticationServiceSelectionPlan.BEAN_NAME)
         public AuthenticationServiceSelectionPlan authenticationServiceSelectionPlan() {
             return mock(AuthenticationServiceSelectionPlan.class);
         }

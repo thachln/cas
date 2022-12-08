@@ -5,7 +5,7 @@ import org.apereo.cas.config.SurrogateCouchDbAuthenticationServiceConfiguration;
 import org.apereo.cas.couchdb.core.CouchDbConnectorFactory;
 import org.apereo.cas.couchdb.surrogate.CouchDbSurrogateAuthorization;
 import org.apereo.cas.couchdb.surrogate.SurrogateAuthorizationCouchDbRepository;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import org.junit.jupiter.api.AfterEach;
@@ -32,11 +32,11 @@ import org.springframework.boot.test.context.SpringBootTest;
         "cas.authn.surrogate.couch-db.password=password"
     })
 @Getter
-@EnabledIfPortOpen(port = 5984)
+@EnabledIfListeningOnPort(port = 5984)
 public class SurrogateCouchDbAuthenticationTests extends BaseSurrogateAuthenticationServiceTests {
 
     @Autowired
-    @Qualifier("surrogateAuthenticationService")
+    @Qualifier(SurrogateAuthenticationService.BEAN_NAME)
     private SurrogateAuthenticationService service;
 
     @Autowired
@@ -52,6 +52,7 @@ public class SurrogateCouchDbAuthenticationTests extends BaseSurrogateAuthentica
         couchDbFactory.getCouchDbInstance().createDatabaseIfNotExists(couchDbFactory.getCouchDbConnector().getDatabaseName());
         repository.initStandardDesignDocument();
         repository.add(new CouchDbSurrogateAuthorization("banderson", "casuser"));
+        repository.add(new CouchDbSurrogateAuthorization(SurrogateAuthenticationService.WILDCARD_ACCOUNT, "casadmin"));
     }
 
     @AfterEach

@@ -1,12 +1,18 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 import java.util.function.Function;
 
@@ -16,21 +22,25 @@ import java.util.function.Function;
  * @author Misagh Moayyed
  * @since 5.1.0
  */
-@Configuration(value = "dynamoDbTicketRegistryTicketCatalogConfiguration", proxyBeanMethods = false)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.TicketRegistry, module = "dynamodb")
+@AutoConfiguration
 public class DynamoDbTicketRegistryTicketCatalogConfiguration extends BaseTicketDefinitionBuilderSupportConfiguration {
 
-    public DynamoDbTicketRegistryTicketCatalogConfiguration(final CasConfigurationProperties casProperties,
-                                                            @Qualifier("dynamoDbTicketCatalogConfigurationValuesProvider")
-                                                            final CasTicketCatalogConfigurationValuesProvider configProvider) {
-        super(casProperties, configProvider);
+    public DynamoDbTicketRegistryTicketCatalogConfiguration(
+        final ConfigurableApplicationContext applicationContext,
+        final CasConfigurationProperties casProperties,
+        @Qualifier("dynamoDbTicketCatalogConfigurationValuesProvider")
+        final CasTicketCatalogConfigurationValuesProvider configProvider) {
+        super(casProperties, configProvider, applicationContext);
     }
 
-    @Configuration("dynamoDbTicketCatalogConfigValuesProviderConfiguration")
-    static class Config {
-
-        @ConditionalOnMissingBean
+    @Configuration(value = "DynamoDbTicketRegistryTicketCatalogProviderConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class DynamoDbTicketRegistryTicketCatalogProviderConfiguration {
+        @ConditionalOnMissingBean(name = "dynamoDbTicketCatalogConfigurationValuesProvider")
         @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
         public CasTicketCatalogConfigurationValuesProvider dynamoDbTicketCatalogConfigurationValuesProvider() {
             return new CasTicketCatalogConfigurationValuesProvider() {
                 @Override
@@ -60,4 +70,5 @@ public class DynamoDbTicketRegistryTicketCatalogConfiguration extends BaseTicket
             };
         }
     }
+
 }

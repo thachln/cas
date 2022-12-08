@@ -10,6 +10,8 @@ import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -18,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.3.0
  */
-@Tag("FileSystem")
+@Tag("Git")
 public class DefaultGitRepositoryRegisteredServiceLocatorTests {
 
     @Test
@@ -28,7 +30,7 @@ public class DefaultGitRepositoryRegisteredServiceLocatorTests {
             FileUtils.getTempDirectory(), new GitServiceRegistryProperties().setRootDirectory("sample-root"));
         val service = RegisteredServiceTestUtils.getRegisteredService();
         val file = locator.determine(service, "json");
-        assertTrue(file.getCanonicalPath().endsWith("sample-root/" + strategy.build(service, "json")));
+        assertTrue(file.getCanonicalPath().endsWith("sample-root" + File.separator + strategy.build(service, "json")));
     }
 
 }

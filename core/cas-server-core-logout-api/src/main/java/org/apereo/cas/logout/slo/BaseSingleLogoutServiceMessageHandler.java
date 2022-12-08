@@ -9,13 +9,14 @@ import org.apereo.cas.logout.SingleLogoutExecutionRequest;
 import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.services.RegisteredServiceLogoutType;
 import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.services.WebBasedRegisteredService;
 import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 import org.apereo.cas.util.http.HttpClient;
 
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
@@ -77,14 +78,12 @@ public abstract class BaseSingleLogoutServiceMessageHandler implements SingleLog
     @Override
     public boolean supports(final SingleLogoutExecutionRequest context, final WebApplicationService singleLogoutService) {
         val selectedService = (WebApplicationService) authenticationRequestServiceSelectionStrategies.resolveService(singleLogoutService);
-        val registeredService = this.servicesManager.findServiceBy(selectedService);
+        val registeredService = (WebBasedRegisteredService) this.servicesManager.findServiceBy(selectedService);
 
-        if (registeredService != null
-            && registeredService.getAccessStrategy().isServiceAccessAllowed()
-            && registeredService.getLogoutType() != RegisteredServiceLogoutType.NONE) {
-            return supportsInternal(singleLogoutService, registeredService, context);
-        }
-        return false;
+        return registeredService != null
+               && registeredService.getAccessStrategy().isServiceAccessAllowed()
+               && registeredService.getLogoutType() != RegisteredServiceLogoutType.NONE
+               && supportsInternal(singleLogoutService, registeredService, context);
     }
 
     @Override
@@ -150,7 +149,6 @@ public abstract class BaseSingleLogoutServiceMessageHandler implements SingleLog
      * @param context           the context
      * @return the logout request
      */
-    @SneakyThrows
     protected SingleLogoutRequestContext createLogoutRequest(final String ticketId,
                                                              final WebApplicationService selectedService,
                                                              final RegisteredService registeredService,
@@ -159,7 +157,7 @@ public abstract class BaseSingleLogoutServiceMessageHandler implements SingleLog
         val logoutRequest = DefaultSingleLogoutRequestContext.builder()
             .ticketId(ticketId)
             .service(selectedService)
-            .logoutUrl(new URL(logoutUrl.getUrl()))
+            .logoutUrl(FunctionUtils.doUnchecked(() -> new URL(logoutUrl.getUrl())))
             .logoutType(logoutUrl.getLogoutType())
             .registeredService(registeredService)
             .executionRequest(context)
@@ -175,7 +173,8 @@ public abstract class BaseSingleLogoutServiceMessageHandler implements SingleLog
                 LOGGER.warn("Logout message is not sent to [{}]; Continuing processing...", selectedService);
             }
         } else {
-            LOGGER.trace("Logout operation is not yet attempted for [{}] given logout type is set to [{}]", selectedService, logoutRequest.getLogoutType());
+            LOGGER.trace("Logout operation is not yet attempted for [{}] given logout type is set to [{}]",
+                selectedService, logoutRequest.getLogoutType());
             logoutRequest.setStatus(LogoutRequestStatus.NOT_ATTEMPTED);
         }
         return logoutRequest;

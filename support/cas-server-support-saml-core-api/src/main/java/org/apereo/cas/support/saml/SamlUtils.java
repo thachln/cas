@@ -3,13 +3,14 @@ package org.apereo.cas.support.saml;
 import org.apereo.cas.support.saml.util.credential.BasicResourceCredentialFactoryBean;
 import org.apereo.cas.support.saml.util.credential.BasicX509CredentialFactoryBean;
 import org.apereo.cas.util.CollectionUtils;
+import org.apereo.cas.util.LoggingUtils;
 import org.apereo.cas.util.ResourceUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import net.shibboleth.utilities.java.support.resolver.CriteriaSet;
+import net.shibboleth.shared.resolver.CriteriaSet;
 import org.cryptacular.util.CertUtil;
 import org.opensaml.core.xml.XMLObject;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
@@ -48,6 +49,7 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -59,6 +61,13 @@ import java.util.Objects;
 @Slf4j
 @UtilityClass
 public class SamlUtils {
+    private static final ThreadLocal<TransformerFactory> TRANSFORMER_FACTORY_INSTANCE = new ThreadLocal<>() {
+        @Override
+        protected synchronized TransformerFactory initialValue() {
+            return TransformerFactory.newInstance();
+        }
+    };
+
     /**
      * The constant DEFAULT_ELEMENT_NAME_FIELD.
      */
@@ -88,7 +97,6 @@ public class SamlUtils {
      * @param objectType the object type
      * @return the t
      */
-    @SneakyThrows
     public <T extends SOAPObject> T newSoapObject(final Class<T> objectType) {
         val qName = getSamlObjectQName(objectType);
         LOGGER.trace("Attempting to create SOAPObject for type: [{}] and QName: [{}]", objectType, qName);
@@ -104,12 +112,19 @@ public class SamlUtils {
      * @param objectType the object type
      * @return the t
      */
-    @SneakyThrows
     public static <T extends SAMLObject> T newSamlObject(final Class<T> objectType) {
         val qName = getSamlObjectQName(objectType);
         return newSamlObject(objectType, qName);
     }
 
+    /**
+     * New saml object and provide type.
+     *
+     * @param <T>        the type parameter
+     * @param objectType the object type
+     * @param qName      the q name
+     * @return the t
+     */
     public static <T extends SAMLObject> T newSamlObject(final Class<T> objectType, final QName qName) {
         LOGGER.trace("Attempting to create SAMLObject for type: [{}] and QName: [{}]", objectType, qName);
         val builder = (SAMLObjectBuilder<T>) XMLObjectProviderRegistrySupport.getBuilderFactory().getBuilder(qName);
@@ -123,10 +138,11 @@ public class SamlUtils {
      * @param configBean       the config bean
      * @return the root element from
      */
-    @SneakyThrows
     public static Element getRootElementFrom(final InputStream metadataResource, final OpenSamlConfigBean configBean) {
-        val document = configBean.getParserPool().parse(metadataResource);
-        return document.getDocumentElement();
+        return FunctionUtils.doUnchecked(() -> {
+            val document = configBean.getParserPool().parse(metadataResource);
+            return document.getDocumentElement();
+        });
     }
 
     /**
@@ -178,21 +194,25 @@ public class SamlUtils {
      * @param clazz      the clazz
      * @return the type
      */
-    public static <T extends XMLObject> T transformSamlObject(final OpenSamlConfigBean configBean, final byte[] data,
+    public static <T extends XMLObject> T transformSamlObject(final OpenSamlConfigBean configBean,
+                                                              final byte[] data,
                                                               final Class<T> clazz) {
-        try (InputStream in = new ByteArrayInputStream(data)) {
-            val document = configBean.getParserPool().parse(in);
-            val root = document.getDocumentElement();
-            val marshaller = configBean.getUnmarshallerFactory().getUnmarshaller(root);
-            if (marshaller != null) {
-                val result = marshaller.unmarshall(root);
-                if (!clazz.isAssignableFrom(result.getClass())) {
-                    throw new ClassCastException("Result [" + result + " is of type " + result.getClass() + " when we were expecting " + clazz);
+        if (data != null && data.length > 0) {
+            try (val in = new ByteArrayInputStream(data)) {
+                val document = configBean.getParserPool().parse(in);
+                val root = document.getDocumentElement();
+                val marshaller = configBean.getUnmarshallerFactory().getUnmarshaller(root);
+                if (marshaller != null) {
+                    val result = marshaller.unmarshall(root);
+                    if (!clazz.isAssignableFrom(result.getClass())) {
+                        throw new ClassCastException("Result [" + result + " is of type "
+                                                     + result.getClass() + " when we were expecting " + clazz);
+                    }
+                    return (T) result;
                 }
-                return (T) result;
+            } catch (final Exception e) {
+                throw new SamlException(e.getMessage(), e);
             }
-        } catch (final Exception e) {
-            throw new SamlException(e.getMessage(), e);
         }
         return null;
     }
@@ -216,7 +236,7 @@ public class SamlUtils {
                 val domSource = new DOMSource(element);
 
                 val result = new StreamResult(writer);
-                val tf = TransformerFactory.newInstance();
+                val tf = TRANSFORMER_FACTORY_INSTANCE.get();
                 tf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
                 val transformer = tf.newTransformer();
 
@@ -302,18 +322,20 @@ public class SamlUtils {
      *
      * @param configBean the config bean
      * @param samlObject the saml object
-     * @return the string
      * @throws SamlException the saml exception
      */
-    public static String logSamlObject(final OpenSamlConfigBean configBean, final XMLObject samlObject) throws SamlException {
-        val repeat = "*".repeat(SAML_OBJECT_LOG_ASTERIXLINE_LENGTH);
-        LOGGER.debug(repeat);
-        try (val writer = transformSamlObject(configBean, samlObject, true)) {
-            LOGGER.debug("Logging [{}]\n\n[{}]\n\n", samlObject.getClass().getName(), writer);
+    public static void logSamlObject(final OpenSamlConfigBean configBean, final XMLObject samlObject) throws SamlException {
+        if (LOGGER.isDebugEnabled() || LoggingUtils.isProtocolMessageLoggerEnabled()) {
+            val repeat = "*".repeat(SAML_OBJECT_LOG_ASTERIXLINE_LENGTH);
             LOGGER.debug(repeat);
-            return writer.toString();
-        } catch (final Exception e) {
-            throw new SamlException(e.getMessage(), e);
+            try (val writer = transformSamlObject(configBean, samlObject, true)) {
+                LOGGER.debug("Logging [{}]\n\n[{}]\n\n", samlObject.getClass().getName(), writer);
+                LOGGER.debug(repeat);
+                LoggingUtils.protocolMessage("SAML " + samlObject.getClass().getName(),
+                    Map.of(), writer.toString());
+            } catch (final Exception e) {
+                throw new SamlException(e.getMessage(), e);
+            }
         }
     }
 
@@ -348,7 +370,6 @@ public class SamlUtils {
         }
     }
 
-    @SneakyThrows
     private static CriteriaSet buildSignatureValidationFilterCriteria() {
         val criteriaSet = new CriteriaSet();
 
@@ -359,7 +380,7 @@ public class SamlUtils {
             val paramsResolver = new BasicSignatureValidationParametersResolver();
 
             val configCriteria = new CriteriaSet(new SignatureValidationConfigurationCriterion(sigConfigs));
-            val params = paramsResolver.resolveSingle(configCriteria);
+            val params = FunctionUtils.doUnchecked(() -> paramsResolver.resolveSingle(configCriteria));
             if (params != null) {
                 criteriaSet.add(new SignatureValidationParametersCriterion(params), true);
             }

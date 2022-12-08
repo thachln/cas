@@ -1,12 +1,15 @@
 package org.apereo.cas.configuration.model.core.authentication;
 
-import org.apereo.cas.configuration.model.SpringResourceProperties;
+import org.apereo.cas.configuration.support.ExpressionLanguageCapable;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -22,18 +25,22 @@ import java.io.Serializable;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("PrincipalTransformationProperties")
 public class PrincipalTransformationProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1678602647607236322L;
 
     /**
      * Prefix to add to the principal id prior to authentication.
      */
+    @ExpressionLanguageCapable
     private String prefix;
 
     /**
      * Suffix to add to the principal id prior to authentication.
      */
+    @ExpressionLanguageCapable
     private String suffix;
 
     /**
@@ -41,22 +48,35 @@ public class PrincipalTransformationProperties implements Serializable {
      * for username extractions. On a successful match, the first matched group
      * in the pattern will be used as the extracted username.
      */
+    @ExpressionLanguageCapable
     private String pattern;
+
+    /**
+     * A regular expression that will be used against the username
+     * to match for blocking/forbidden values.
+     * If a match is found, an exception will be thrown
+     * and principal transformation will fail.
+     */
+    @ExpressionLanguageCapable
+    private String blockingPattern;
 
     /**
      * Transform usernames using a Groovy resource.
      */
-    private Groovy groovy = new Groovy();
+    @NestedConfigurationProperty
+    private GroovyPrincipalTransformationProperties groovy = new GroovyPrincipalTransformationProperties();
 
     /**
      * Indicate whether the principal identifier should be transformed
      * into upper-case, lower-case, etc.
-     * Accepted values are {@code NONE, UPPERCASE, LOWERCASE}.
      */
     private CaseConversion caseConversion = CaseConversion.NONE;
 
+    /**
+     * Indicate whether the principal identifier should be transformed
+     * into upper-case, lower-case, etc.
+     */
     public enum CaseConversion {
-
         /**
          * No conversion.
          */
@@ -71,12 +91,4 @@ public class PrincipalTransformationProperties implements Serializable {
         UPPERCASE
     }
 
-    @RequiresModule(name = "cas-server-core-authentication", automated = true)
-    @Getter
-    @Setter
-    @Accessors(chain = true)
-    public static class Groovy extends SpringResourceProperties {
-
-        private static final long serialVersionUID = 8079027843747126083L;
-    }
 }

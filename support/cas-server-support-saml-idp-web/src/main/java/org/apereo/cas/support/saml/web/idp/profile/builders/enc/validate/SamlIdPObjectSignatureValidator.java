@@ -4,7 +4,7 @@ import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.support.saml.SamlIdPUtils;
 
 import lombok.val;
-import net.shibboleth.utilities.java.support.resolver.CriteriaSet;
+import net.shibboleth.shared.resolver.CriteriaSet;
 import org.opensaml.core.criterion.EntityIdCriterion;
 import org.opensaml.messaging.context.MessageContext;
 import org.opensaml.saml.criterion.EntityRoleCriterion;
@@ -40,7 +40,7 @@ public class SamlIdPObjectSignatureValidator extends SamlObjectSignatureValidato
                                                                final RequestAbstractType profileRequest) throws Exception {
 
         val idp = casProperties.getAuthn().getSamlIdp();
-        return SamlIdPUtils.getRoleDescriptorResolver(casSamlIdPMetadataResolver, idp.getMetadata().isRequireValidMetadata());
+        return SamlIdPUtils.getRoleDescriptorResolver(casSamlIdPMetadataResolver, idp.getMetadata().getCore().isRequireValidMetadata());
     }
 
     @Override

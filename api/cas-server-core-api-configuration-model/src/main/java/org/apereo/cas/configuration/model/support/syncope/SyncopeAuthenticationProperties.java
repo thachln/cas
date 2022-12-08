@@ -1,9 +1,9 @@
 package org.apereo.cas.configuration.model.support.syncope;
 
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.configuration.model.core.authentication.AuthenticationHandlerStates;
 import org.apereo.cas.configuration.model.core.authentication.PasswordEncoderProperties;
 import org.apereo.cas.configuration.model.core.authentication.PrincipalTransformationProperties;
-import org.apereo.cas.configuration.support.CasFeatureModule;
-import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
 import com.fasterxml.jackson.annotation.JsonFilter;
@@ -12,7 +12,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
-import java.io.Serializable;
+import java.io.Serial;
 
 /**
  * This is {@link SyncopeAuthenticationProperties}.
@@ -25,26 +25,21 @@ import java.io.Serializable;
 @Setter
 @Accessors(chain = true)
 @JsonFilter("SyncopeAuthenticationProperties")
-public class SyncopeAuthenticationProperties implements Serializable, CasFeatureModule {
+public class SyncopeAuthenticationProperties extends BaseSyncopeProperties implements CasFeatureModule {
 
+    @Serial
     private static final long serialVersionUID = -2446926316502297496L;
+
+    /**
+     * Define the scope and state of this authentication handler
+     * and the lifecycle in which it can be invoked or activated.
+     */
+    private AuthenticationHandlerStates state = AuthenticationHandlerStates.ACTIVE;
 
     /**
      * Name of the authentication handler.
      */
     private String name;
-
-    /**
-     * Syncope domain used for authentication, etc.
-     */
-    @RequiredProperty
-    private String domain = "Master";
-
-    /**
-     * Syncope instance URL primary used for REST.
-     */
-    @RequiredProperty
-    private String url;
 
     /**
      * Password encoder settings for the authentication handler.
@@ -57,7 +52,7 @@ public class SyncopeAuthenticationProperties implements Serializable, CasFeature
      * and as such lend themselves to be tried and tested during the authentication handler selection phase.
      * The credential criteria may be one of the following options:<ul>
      * <li>1) A regular expression pattern that is tested against the credential identifier.</li>
-     * <li>2) A fully qualified class name of your own design that implements {@code Predicate<Credential>}.</li>
+     * <li>2) A fully qualified class name of your own design that implements {@code Predicate}.</li>
      * <li>3) Path to an external Groovy script that implements the same interface.</li>
      * </ul>
      */
@@ -68,4 +63,10 @@ public class SyncopeAuthenticationProperties implements Serializable, CasFeature
      */
     @NestedConfigurationProperty
     private PrincipalTransformationProperties principalTransformation = new PrincipalTransformationProperties();
+
+    /**
+     * Handling just-in-time provisioning settings.
+     */
+    @NestedConfigurationProperty
+    private SyncopePrincipalProvisioningProperties provisioning = new SyncopePrincipalProvisioningProperties();
 }

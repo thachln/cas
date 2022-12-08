@@ -2,18 +2,21 @@ package org.apereo.cas.oidc.web;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.oidc.OidcConstants;
+import org.apereo.cas.oidc.issuer.OidcIssuerService;
 import org.apereo.cas.services.OidcRegisteredService;
 import org.apereo.cas.support.oauth.web.response.accesstoken.response.OAuth20AccessTokenResponseResult;
 import org.apereo.cas.support.oauth.web.response.accesstoken.response.OAuth20DefaultAccessTokenResponseGenerator;
+import org.apereo.cas.support.oauth.web.response.accesstoken.response.OAuth20JwtAccessTokenEncoder;
 import org.apereo.cas.ticket.IdTokenGeneratorService;
+import org.apereo.cas.ticket.accesstoken.OAuth20AccessToken;
 import org.apereo.cas.token.JwtBuilder;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.jooq.lambda.Unchecked;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * This is {@link OidcAccessTokenResponseGenerator}.
@@ -23,29 +26,47 @@ import java.util.Map;
  */
 @Slf4j
 public class OidcAccessTokenResponseGenerator extends OAuth20DefaultAccessTokenResponseGenerator {
-    private final IdTokenGeneratorService idTokenGenerator;
+    /**
+     * The ID token generator service.
+     */
+    protected final IdTokenGeneratorService idTokenGenerator;
+
+    private final OidcIssuerService oidcIssuerService;
 
     public OidcAccessTokenResponseGenerator(final IdTokenGeneratorService idTokenGenerator,
                                             final JwtBuilder jwtBuilder,
-                                            final CasConfigurationProperties casProperties) {
+                                            final CasConfigurationProperties casProperties,
+                                            final OidcIssuerService oidcIssuerService) {
         super(jwtBuilder, casProperties);
         this.idTokenGenerator = idTokenGenerator;
+        this.oidcIssuerService = oidcIssuerService;
     }
 
     @Override
-    protected Map<String, Object> getAccessTokenResponseModel(final HttpServletRequest request,
-                                                              final HttpServletResponse response,
-                                                              final OAuth20AccessTokenResponseResult result) {
-        val model = super.getAccessTokenResponseModel(request, response, result);
-        val accessToken = result.getGeneratedToken().getAccessToken();
-        accessToken.ifPresent(token -> {
-            val oidcRegisteredService = (OidcRegisteredService) result.getRegisteredService();
-            val idToken = this.idTokenGenerator.generate(request, response, accessToken.get(),
-                result.getAccessTokenTimeout(), result.getResponseType(), oidcRegisteredService);
+    protected OAuth20JwtAccessTokenEncoder.OAuth20JwtAccessTokenEncoderBuilder getAccessTokenBuilder(
+        final OAuth20AccessToken accessToken,
+        final OAuth20AccessTokenResponseResult result) {
+        val builder = super.getAccessTokenBuilder(accessToken, result);
+        val service = Optional.ofNullable(result.getRegisteredService())
+            .filter(OidcRegisteredService.class::isInstance)
+            .map(OidcRegisteredService.class::cast);
+        return builder.issuer(oidcIssuerService.determineIssuer(service));
+    }
 
-            LOGGER.debug("Generated ID token [{}]", idToken);
-            model.put(OidcConstants.ID_TOKEN, idToken);
-        });
+    @Override
+    protected Map<String, Object> getAccessTokenResponseModel(final OAuth20AccessTokenResponseResult result) {
+        val model = super.getAccessTokenResponseModel(result);
+        val accessToken = result.getGeneratedToken().getAccessToken();
+        accessToken.ifPresent(Unchecked.consumer(token -> {
+            if (!token.getScopes().contains(OidcConstants.CLIENT_REGISTRATION_SCOPE)) {
+                val oidcRegisteredService = (OidcRegisteredService) result.getRegisteredService();
+                val idToken = idTokenGenerator.generate(accessToken.get(),
+                    result.getUserProfile(), result.getResponseType(),
+                    result.getGrantType(), oidcRegisteredService);
+                LOGGER.debug("Generated ID token [{}]", idToken);
+                model.put(OidcConstants.ID_TOKEN, idToken);
+            }
+        }));
         return model;
     }
 }

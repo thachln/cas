@@ -1,10 +1,12 @@
 package org.apereo.cas.adaptors.authy;
 
 import org.apereo.cas.authentication.AbstractMultifactorAuthenticationProvider;
-import org.apereo.cas.configuration.model.support.mfa.AuthyMultifactorProperties;
+import org.apereo.cas.configuration.model.support.mfa.AuthyMultifactorAuthenticationProperties;
 
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+
+import java.io.Serial;
 
 /**
  * The authentication provider for google authenticator.
@@ -15,11 +17,12 @@ import org.apache.commons.lang3.StringUtils;
 @NoArgsConstructor
 public class AuthyMultifactorAuthenticationProvider extends AbstractMultifactorAuthenticationProvider {
 
+    @Serial
     private static final long serialVersionUID = 4789727148634156909L;
 
     @Override
     public String getId() {
-        return StringUtils.defaultIfBlank(super.getId(), AuthyMultifactorProperties.DEFAULT_IDENTIFIER);
+        return StringUtils.defaultIfBlank(super.getId(), AuthyMultifactorAuthenticationProperties.DEFAULT_IDENTIFIER);
     }
 
     @Override

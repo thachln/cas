@@ -4,6 +4,7 @@ import org.apereo.cas.authentication.credential.UsernamePasswordCredential;
 import org.apereo.cas.authentication.exceptions.AccountDisabledException;
 import org.apereo.cas.authentication.exceptions.AccountPasswordMustChangeException;
 import org.apereo.cas.authentication.principal.PrincipalFactoryUtils;
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.authentication.soap.generated.GetSoapAuthenticationResponse;
 import org.apereo.cas.config.CasCoreNotificationsConfiguration;
 import org.apereo.cas.config.CasCoreServicesConfiguration;
@@ -21,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.ServletWebServerFactoryAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
@@ -43,6 +45,7 @@ import static org.mockito.Mockito.*;
 @SpringBootTest(classes = {
     RefreshAutoConfiguration.class,
     MailSenderAutoConfiguration.class,
+    WebMvcAutoConfiguration.class,
     ServletWebServerFactoryAutoConfiguration.class,
     SoapAuthenticationServerTestConfiguration.class,
     CasCoreServicesConfiguration.class,
@@ -57,10 +60,10 @@ import static org.mockito.Mockito.*;
     },
     webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@Tag("Authentication")
+@Tag("AuthenticationHandler")
 public class SoapAuthenticationHandlerTests {
     @Autowired
-    @Qualifier("servicesManager")
+    @Qualifier(ServicesManager.BEAN_NAME)
     private ServicesManager servicesManager;
 
     @Autowired
@@ -70,7 +73,7 @@ public class SoapAuthenticationHandlerTests {
     @Test
     public void verifyAction() throws Exception {
         val creds = CoreAuthenticationTestUtils.getCredentialsWithDifferentUsernameAndPassword("casuser", "Mellon");
-        val result = soapAuthenticationAuthenticationHandler.authenticate(creds);
+        val result = soapAuthenticationAuthenticationHandler.authenticate(creds, mock(Service.class));
         assertNotNull(result);
         assertEquals("CAS", result.getPrincipal().getId());
         assertEquals(1, result.getPrincipal().getAttributes().size());
@@ -96,6 +99,6 @@ public class SoapAuthenticationHandlerTests {
         when(client.sendRequest(any())).thenReturn(response);
         val result = new SoapAuthenticationHandler("Handler", servicesManager,
             PrincipalFactoryUtils.newPrincipalFactory(), 0, client);
-        assertThrows(clazz, () -> result.authenticate(creds));
+        assertThrows(clazz, () -> result.authenticate(creds, mock(Service.class)));
     }
 }

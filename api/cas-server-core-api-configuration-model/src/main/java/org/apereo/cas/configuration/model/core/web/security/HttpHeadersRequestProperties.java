@@ -1,11 +1,14 @@
 package org.apereo.cas.configuration.model.core.web.security;
 
+import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -18,14 +21,17 @@ import java.io.Serializable;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("HttpHeadersRequestProperties")
 public class HttpHeadersRequestProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 5993704062519851359L;
 
     /**
      * Allow CAS to inject and enforce http security headers via an http filter
      * that are outlined here for caching, HSTS, etc.
      */
+    @RequiredProperty
     private boolean enabled = true;
 
     /**
@@ -76,4 +82,9 @@ public class HttpHeadersRequestProperties implements Serializable {
      * Multiple directives are separated with a semicolon.
      */
     private String contentSecurityPolicy;
+
+    /**
+     * Files with these extensions are considered static, so they will be cached by browsers. The value is part of a RegEx.
+     */
+    private String cacheControlStaticResources = "css|js|png|txt|jpg|ico|jpeg|bmp|gif";
 }

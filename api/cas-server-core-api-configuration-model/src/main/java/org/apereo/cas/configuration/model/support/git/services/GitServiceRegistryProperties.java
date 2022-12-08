@@ -2,12 +2,16 @@ package org.apereo.cas.configuration.model.support.git.services;
 
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import lombok.val;
 import org.apache.commons.io.FileUtils;
+import org.springframework.core.io.FileSystemResource;
 
 import java.io.File;
+import java.io.Serial;
 
 /**
  * This is {@link GitServiceRegistryProperties}.
@@ -19,7 +23,15 @@ import java.io.File;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("GitServiceRegistryProperties")
 public class GitServiceRegistryProperties extends BaseGitProperties {
+
+    /**
+     * Default name used for git service registry clone directory.
+     */
+    public static final String DEFAULT_CAS_SERVICE_REGISTRY_NAME = "cas-service-registry";
+
+    @Serial
     private static final long serialVersionUID = 4194689836396653458L;
 
     /**
@@ -44,6 +56,7 @@ public class GitServiceRegistryProperties extends BaseGitProperties {
     private boolean groupByType = true;
 
     public GitServiceRegistryProperties() {
-        setCloneDirectory(new File(FileUtils.getTempDirectory(), "cas-service-registry"));
+        val location = new FileSystemResource(new File(FileUtils.getTempDirectory(), DEFAULT_CAS_SERVICE_REGISTRY_NAME));
+        getCloneDirectory().setLocation(location);
     }
 }

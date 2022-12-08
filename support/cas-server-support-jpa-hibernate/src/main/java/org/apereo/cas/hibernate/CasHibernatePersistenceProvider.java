@@ -12,8 +12,8 @@ import org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl;
 import org.hibernate.jpa.boot.internal.PersistenceUnitInfoDescriptor;
 import org.springframework.orm.jpa.persistenceunit.SmartPersistenceUnitInfo;
 
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.spi.PersistenceUnitInfo;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.spi.PersistenceUnitInfo;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +33,9 @@ public class CasHibernatePersistenceProvider extends HibernatePersistenceProvide
     @Override
     public EntityManagerFactory createContainerEntityManagerFactory(final PersistenceUnitInfo info, final Map properties) {
         val filtered = CollectionUtils.intersection(info.getManagedClassNames(), providerContext.getIncludeEntityClasses());
+        if (info.getManagedClassNames().isEmpty() && !providerContext.getIncludeEntityClasses().isEmpty()) {
+            filtered.addAll(providerContext.getIncludeEntityClasses());
+        }
         LOGGER.trace("Filtered entity classes for entity manager are [{}]", filtered);
         val mergedClassesAndPackages = new HashSet<String>(filtered);
         if (info instanceof SmartPersistenceUnitInfo) {

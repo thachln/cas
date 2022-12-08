@@ -6,14 +6,12 @@ import org.apereo.cas.web.flow.authentication.CasWebflowExceptionHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.action.EventFactorySupport;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Performs two important error handling functions on an
@@ -31,24 +29,8 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class AuthenticationExceptionHandlerAction extends AbstractAction {
+public class AuthenticationExceptionHandlerAction extends BaseCasWebflowAction {
     private final List<CasWebflowExceptionHandler> webflowExceptionHandlers;
-
-    @Override
-    protected Event doExecute(final RequestContext requestContext) {
-        val currentEvent = requestContext.getCurrentEvent();
-        LOGGER.debug("Located current event [{}]", currentEvent);
-
-        val error = currentEvent.getAttributes().get(CasWebflowConstants.TRANSITION_ID_ERROR, Exception.class);
-        if (error != null) {
-            LOGGER.debug("Located error attribute [{}] with message [{}] from the current event", error.getClass(), error.getMessage());
-
-            val event = handle(error, requestContext);
-            LOGGER.debug("Final event id resolved from the error is [{}]", event);
-            return new EventFactorySupport().event(this, event, currentEvent.getAttributes());
-        }
-        return error();
-    }
 
     /**
      * Maps an authentication exception onto a state name.
@@ -61,8 +43,7 @@ public class AuthenticationExceptionHandlerAction extends AbstractAction {
     public String handle(final Exception e, final RequestContext requestContext) {
         val handlers = webflowExceptionHandlers
             .stream()
-            .filter(handler -> handler.supports(e, requestContext))
-            .collect(Collectors.toList());
+            .filter(handler -> handler.supports(e, requestContext)).toList();
 
         return handlers
             .stream()
@@ -71,5 +52,20 @@ public class AuthenticationExceptionHandlerAction extends AbstractAction {
             .findFirst()
             .orElseGet(this::error)
             .getId();
+    }
+
+    @Override
+    protected Event doExecute(final RequestContext requestContext) {
+        val currentEvent = requestContext.getCurrentEvent();
+        LOGGER.debug("Located current event [{}]", currentEvent);
+
+        val error = currentEvent.getAttributes().get(CasWebflowConstants.TRANSITION_ID_ERROR, Exception.class);
+        if (error != null) {
+            LOGGER.debug("Located error attribute [{}] with message [{}] from the current event", error.getClass(), error.getMessage());
+            val event = handle(error, requestContext);
+            LOGGER.debug("Final event id resolved from the error is [{}]", event);
+            return new EventFactorySupport().event(this, event, currentEvent.getAttributes());
+        }
+        return error();
     }
 }

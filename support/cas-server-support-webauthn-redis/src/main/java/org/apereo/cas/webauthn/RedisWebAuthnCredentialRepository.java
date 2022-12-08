@@ -1,17 +1,18 @@
 package org.apereo.cas.webauthn;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.redis.core.CasRedisTemplate;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.function.FunctionUtils;
 import org.apereo.cas.webauthn.storage.BaseWebAuthnCredentialRepository;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.yubico.webauthn.data.CredentialRegistration;
-import lombok.SneakyThrows;
+import com.yubico.data.CredentialRegistration;
 import lombok.val;
 import org.jooq.lambda.Unchecked;
-import org.springframework.data.redis.core.RedisTemplate;
 
-import java.util.ArrayList;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
@@ -30,57 +31,60 @@ public class RedisWebAuthnCredentialRepository extends BaseWebAuthnCredentialRep
      */
     public static final String CAS_WEB_AUTHN_PREFIX = RedisWebAuthnCredentialRepository.class.getSimpleName() + ':';
 
-    private final RedisTemplate<String, RedisWebAuthnCredentialRegistration> redisTemplate;
+    private final CasRedisTemplate<String, RedisWebAuthnCredentialRegistration> redisTemplate;
+
+    private final long scanCount;
 
     public RedisWebAuthnCredentialRepository(
-        final RedisTemplate<String, RedisWebAuthnCredentialRegistration> redisTemplate,
+        final CasRedisTemplate<String, RedisWebAuthnCredentialRegistration> redisTemplate,
         final CasConfigurationProperties properties,
         final CipherExecutor<String, String> cipherExecutor) {
         super(properties, cipherExecutor);
         this.redisTemplate = redisTemplate;
+        this.scanCount = properties.getAuthn().getMfa().getWebAuthn().getRedis().getScanCount();
     }
 
     @Override
     public Collection<CredentialRegistration> getRegistrationsByUsername(final String username) {
-        val keys = (Set<String>) this.redisTemplate.keys(buildRedisKeyForRecord(username));
-        if (keys != null) {
-            return toCredentialRegistrationsAsStream(keys).collect(Collectors.toSet());
-        }
-        return new ArrayList<>(0);
+        val keys = redisTemplate.scan(buildRedisKeyForRecord(username), this.scanCount);
+        return toCredentialRegistrationsAsStream(keys).collect(Collectors.toSet());
     }
 
     @Override
-    protected Stream<CredentialRegistration> load() {
-        val keys = (Set<String>) this.redisTemplate.keys(getPatternRedisKey());
-        if (keys != null) {
-            return toCredentialRegistrationsAsStream(keys);
-        }
-        return Stream.empty();
+    public Stream<CredentialRegistration> stream() {
+        val keys = redisTemplate.scan(getPatternRedisKey(), this.scanCount);
+        return toCredentialRegistrationsAsStream(keys);
     }
 
     @Override
-    @SneakyThrows
-    protected void update(final String username, final Collection<CredentialRegistration> records) {
+    protected void update(final String username, final Collection<CredentialRegistration> givenRecords) {
         val redisKey = buildRedisKeyForRecord(username);
-        if (records.isEmpty()) {
+        if (givenRecords.isEmpty()) {
             redisTemplate.delete(redisKey);
         } else {
-            val jsonRecords = getCipherExecutor().encode(getObjectMapper().writeValueAsString(records));
+            val records = givenRecords.stream()
+                .map(record -> {
+                    if (record.getRegistrationTime() == null) {
+                        return record.withRegistrationTime(Instant.now(Clock.systemUTC()));
+                    }
+                    return record;
+                })
+                .collect(Collectors.toList());
+            val jsonRecords = FunctionUtils.doUnchecked(() -> getCipherExecutor().encode(WebAuthnUtils.getObjectMapper().writeValueAsString(records)));
             val entry = RedisWebAuthnCredentialRegistration.builder()
                 .records(jsonRecords)
-                .username(username)
+                .username(username.trim().toLowerCase())
                 .build();
             redisTemplate.boundValueOps(redisKey).set(entry);
         }
     }
 
-    private Stream<CredentialRegistration> toCredentialRegistrationsAsStream(final Set<String> keys) {
+    private Stream<CredentialRegistration> toCredentialRegistrationsAsStream(final Stream<String> keys) {
         return keys
-            .stream()
             .map(redisKey -> this.redisTemplate.boundValueOps(redisKey).get())
             .filter(Objects::nonNull)
             .map(record -> getCipherExecutor().decode(record.getRecords()))
-            .map(Unchecked.function(record -> getObjectMapper().readValue(record, new TypeReference<Set<CredentialRegistration>>() {
+            .map(Unchecked.function(record -> WebAuthnUtils.getObjectMapper().readValue(record, new TypeReference<Set<CredentialRegistration>>() {
             })))
             .flatMap(Collection::stream);
     }
@@ -90,6 +94,6 @@ public class RedisWebAuthnCredentialRepository extends BaseWebAuthnCredentialRep
     }
 
     private static String buildRedisKeyForRecord(final String username) {
-        return CAS_WEB_AUTHN_PREFIX + username;
+        return CAS_WEB_AUTHN_PREFIX + username.trim().toLowerCase();
     }
 }

@@ -29,7 +29,7 @@ public class SpnegoKnownClientSystemsFilterActionTests {
     private static final String ALTERNATE_REMOTE_IP = "74.125.136.102";
 
     @Test
-    public void ensureRemoteIpShouldBeChecked() {
+    public void ensureRemoteIpShouldBeChecked() throws Exception {
         val action =new BaseSpnegoKnownClientSystemsFilterAction(RegexUtils.createPattern("^192\\.158\\..+"),
             StringUtils.EMPTY, 0);
 
@@ -42,11 +42,11 @@ public class SpnegoKnownClientSystemsFilterActionTests {
         ctx.setExternalContext(extCtx);
 
         val ev = action.doExecute(ctx);
-        assertEquals(ev.getId(), new EventFactorySupport().yes(this).getId());
+        assertEquals(new EventFactorySupport().yes(this).getId(), ev.getId());
     }
 
     @Test
-    public void ensureRemoteIpShouldNotBeChecked() {
+    public void ensureRemoteIpShouldNotBeChecked() throws Exception {
         val action = new BaseSpnegoKnownClientSystemsFilterAction(RegexUtils.createPattern("^192\\.158\\..+"),
                 StringUtils.EMPTY, 0);
 
@@ -59,11 +59,11 @@ public class SpnegoKnownClientSystemsFilterActionTests {
         ctx.setExternalContext(extCtx);
 
         val ev = action.doExecute(ctx);
-        assertNotEquals(ev.getId(), new EventFactorySupport().yes(this).getId());
+        assertNotEquals(new EventFactorySupport().yes(this).getId(), ev.getId());
     }
 
     @Test
-    public void ensureAltRemoteIpHeaderShouldBeChecked() {
+    public void ensureAltRemoteIpHeaderShouldBeChecked() throws Exception {
         val action = new BaseSpnegoKnownClientSystemsFilterAction(RegexUtils.createPattern("^74\\.125\\..+"),
                 "alternateRemoteIp", 120);
 
@@ -77,11 +77,11 @@ public class SpnegoKnownClientSystemsFilterActionTests {
         ctx.setExternalContext(extCtx);
 
         val ev = action.doExecute(ctx);
-        assertEquals(ev.getId(), new EventFactorySupport().yes(this).getId());
+        assertEquals(new EventFactorySupport().yes(this).getId(), ev.getId());
     }
 
     @Test
-    public void ensureHostnameShouldDoSpnego() {
+    public void ensureHostnameShouldDoSpnego() throws Exception {
         val action = new HostNameSpnegoKnownClientSystemsFilterAction(RegexUtils.createPattern(".+"),
                 StringUtils.EMPTY, 0, "\\w+\\.\\w+\\.\\w+");
 
@@ -94,11 +94,11 @@ public class SpnegoKnownClientSystemsFilterActionTests {
         ctx.setExternalContext(extCtx);
 
         val ev = action.doExecute(ctx);
-        assertEquals(ev.getId(), new EventFactorySupport().yes(this).getId());
+        assertEquals(new EventFactorySupport().yes(this).getId(), ev.getId());
     }
 
     @Test
-    public void ensureHostnameAndIpShouldDoSpnego() {
+    public void ensureHostnameAndIpShouldDoSpnego() throws Exception {
         val action =
             new HostNameSpnegoKnownClientSystemsFilterAction(RegexUtils.createPattern("74\\..+"),
                 StringUtils.EMPTY, 0, "\\w+\\.\\w+\\.\\w+");
@@ -112,12 +112,12 @@ public class SpnegoKnownClientSystemsFilterActionTests {
         ctx.setExternalContext(extCtx);
 
         val ev = action.doExecute(ctx);
-        assertEquals(ev.getId(), new EventFactorySupport().yes(this).getId());
+        assertEquals(new EventFactorySupport().yes(this).getId(), ev.getId());
 
     }
 
     @Test
-    public void verifyIpMismatchWhenCheckingHostnameForSpnego() {
+    public void verifyIpMismatchWhenCheckingHostnameForSpnego() throws Exception {
         val action =
             new HostNameSpnegoKnownClientSystemsFilterAction(RegexUtils.createPattern("14\\..+"),
                 StringUtils.EMPTY, 0, "\\w+\\.\\w+\\.\\w+");
@@ -131,7 +131,7 @@ public class SpnegoKnownClientSystemsFilterActionTests {
         ctx.setExternalContext(extCtx);
 
         val ev = action.doExecute(ctx);
-        assertEquals(ev.getId(), new EventFactorySupport().no(this).getId());
+        assertEquals(new EventFactorySupport().no(this).getId(), ev.getId());
 
     }
 }

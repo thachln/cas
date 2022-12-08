@@ -6,10 +6,11 @@ import org.apereo.cas.util.RandomUtils;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.SneakyThrows;
 
+import java.io.Serial;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
@@ -22,6 +23,7 @@ import java.time.temporal.ChronoUnit;
 @Getter
 @Setter
 public class CouchDbConsentDecision extends ConsentDecision {
+    @Serial
     private static final long serialVersionUID = -685282558102325489L;
 
     @JsonProperty("_rev")
@@ -78,7 +80,7 @@ public class CouchDbConsentDecision extends ConsentDecision {
      * @param other decision to copy details from.
      * @return CouchDb capable consent decision.
      */
-    @SneakyThrows
+    @CanIgnoreReturnValue
     public CouchDbConsentDecision copyDetailsFrom(final ConsentDecision other) {
         setAttributes(other.getAttributes());
         setPrincipal(other.getPrincipal());

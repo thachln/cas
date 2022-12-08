@@ -3,6 +3,8 @@ layout: default
 title: CAS - Configuring Ticketing Components
 category: Ticketing
 ---
+{% include variables.html %}
+
 
 # Ticket Registry Replication Encryption
 
@@ -10,7 +12,6 @@ The following ticket registries are able to support secure ticket replication
 by encrypting and signing tickets:
 
 * [Hazelcast](../ticketing/Hazelcast-Ticket-Registry.html)
-* [Ehcache](../ticketing/Ehcache-Ticket-Registry.html)
 * [Ignite](../ticketing/Ignite-Ticket-Registry.html)
 * [CouchDb](../ticketing/CouchDb-Ticket-Registry.html)
 * [Memcached](../ticketing/Memcached-Ticket-Registry.html)

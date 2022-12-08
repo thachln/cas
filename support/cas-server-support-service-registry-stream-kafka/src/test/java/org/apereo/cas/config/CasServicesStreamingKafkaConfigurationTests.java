@@ -10,7 +10,7 @@ import org.apereo.cas.support.events.service.CasRegisteredServiceSavedEvent;
 import org.apereo.cas.util.PublisherIdentifier;
 import org.apereo.cas.util.cache.DistributedCacheManager;
 import org.apereo.cas.util.cache.DistributedCacheObject;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
 import org.apache.commons.io.FileUtils;
@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
+import org.springframework.context.support.StaticApplicationContext;
 
 import java.io.File;
 import java.util.UUID;
@@ -39,9 +40,9 @@ import static org.junit.jupiter.api.Assertions.*;
     CasServicesStreamingConfiguration.class
 }, properties = {
     "cas.service-registry.stream.kafka.bootstrap-address=localhost:9092",
-    "cas.service-registry.stream.enabled=true"
+    "cas.service-registry.stream.core.enabled=true"
 })
-@EnabledIfPortOpen(port = 9092)
+@EnabledIfListeningOnPort(port = 9092)
 public class CasServicesStreamingKafkaConfigurationTests {
     @Autowired
     @Qualifier("registeredServiceDistributedCacheManager")
@@ -67,8 +68,10 @@ public class CasServicesStreamingKafkaConfigurationTests {
             .value(RegisteredServiceTestUtils.getRegisteredService())
             .publisherIdentifier(new PublisherIdentifier())
             .build();
-        val file = new File(FileUtils.getTempDirectoryPath(), UUID.randomUUID().toString() + ".json");
-        val mapper = new RegisteredServiceJsonSerializer().getObjectMapper();
+        val appCtx = new StaticApplicationContext();
+        appCtx.refresh();
+        val file = new File(FileUtils.getTempDirectoryPath(), UUID.randomUUID() + ".json");
+        val mapper = new RegisteredServiceJsonSerializer(appCtx).getObjectMapper();
         mapper.writeValue(file, o);
         val readPolicy = mapper.readValue(file, DistributedCacheObject.class);
         assertEquals(o, readPolicy);
@@ -88,7 +91,7 @@ public class CasServicesStreamingKafkaConfigurationTests {
             new CasRegisteredServiceDeletedEvent(this, registeredService), publisherId);
 
         Thread.sleep(2500);
-
+        registeredServiceDistributedCacheManager.clear();
         assertTrue(registeredServiceDistributedCacheManager.getAll().isEmpty());
     }
 
@@ -112,12 +115,14 @@ public class CasServicesStreamingKafkaConfigurationTests {
         obj = registeredServiceDistributedCacheManager.get(registeredService);
         assertNotNull(obj);
 
-        val c = registeredServiceDistributedCacheManager.findAll(obj1 -> obj1.getValue().equals(registeredService));
+        var c = registeredServiceDistributedCacheManager.findAll(obj1 -> obj1.getValue().equals(registeredService));
         assertFalse(c.isEmpty());
 
         registeredServiceDistributedCacheManager.remove(registeredService, cache, true);
-        Thread.sleep(2000);
-        
+        Thread.sleep(5000);
+        c = registeredServiceDistributedCacheManager.findAll(obj1 -> obj1.getValue().equals(registeredService));
+        assertTrue(c.isEmpty());
+        registeredServiceDistributedCacheManager.clear();
         assertTrue(registeredServiceDistributedCacheManager.getAll().isEmpty());
     }
 

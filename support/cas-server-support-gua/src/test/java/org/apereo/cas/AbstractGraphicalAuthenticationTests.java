@@ -36,6 +36,7 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.annotation.Import;
@@ -48,24 +49,25 @@ import org.springframework.webflow.execution.Action;
  * @since 5.3.0
  */
 @SpringBootTest(classes = AbstractGraphicalAuthenticationTests.SharedTestConfiguration.class,
-    properties = "cas.authn.gua.resource.location=classpath:image.jpg")
+    properties = "cas.authn.gua.simple.casuser=classpath:image.jpg")
 public abstract class AbstractGraphicalAuthenticationTests {
     @Autowired
-    @Qualifier(CasWebflowConstants.ACTION_ID_INIT_LOGIN_ACTION)
-    protected Action initializeLoginAction;
+    @Qualifier(CasWebflowConstants.ACTION_ID_GUA_PREPARE_LOGIN)
+    protected Action prepareLoginAction;
 
     @Autowired
-    @Qualifier("displayUserGraphicsBeforeAuthenticationAction")
+    @Qualifier(CasWebflowConstants.ACTION_ID_GUA_DISPLAY_USER_GRAPHICS_BEFORE_AUTHENTICATION)
     protected Action displayUserGraphicsBeforeAuthenticationAction;
 
     @Autowired
-    @Qualifier("acceptUserGraphicsForAuthenticationAction")
+    @Qualifier(CasWebflowConstants.ACTION_ID_GUA_ACCEPT_USER)
     protected Action acceptUserGraphicsForAuthenticationAction;
-    
+
     @ImportAutoConfiguration({
         RefreshAutoConfiguration.class,
         MailSenderAutoConfiguration.class,
         SecurityAutoConfiguration.class,
+        WebMvcAutoConfiguration.class,
         AopAutoConfiguration.class
     })
     @SpringBootConfiguration

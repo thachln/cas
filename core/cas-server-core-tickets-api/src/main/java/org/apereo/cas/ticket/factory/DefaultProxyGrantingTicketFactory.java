@@ -1,10 +1,12 @@
 package org.apereo.cas.ticket.factory;
 
 import org.apereo.cas.authentication.Authentication;
+import org.apereo.cas.services.CasModelRegisteredService;
 import org.apereo.cas.services.RegisteredServiceProxyGrantingTicketExpirationPolicy;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.ticket.AbstractTicketException;
 import org.apereo.cas.ticket.ExpirationPolicyBuilder;
+import org.apereo.cas.ticket.ProxyGrantingTicketIssuerTicket;
 import org.apereo.cas.ticket.ServiceTicket;
 import org.apereo.cas.ticket.Ticket;
 import org.apereo.cas.ticket.TicketGrantingTicket;
@@ -75,15 +77,12 @@ public class DefaultProxyGrantingTicketFactory implements ProxyGrantingTicketFac
                                                               final String pgtId, final Class<T> clazz) {
 
         val proxyGrantingTicketExpirationPolicy = getProxyGrantingTicketExpirationPolicy(serviceTicket);
-        val result = produceTicketWithAdequateExpirationPolicy(proxyGrantingTicketExpirationPolicy, serviceTicket, authentication, pgtId);
-
-        if (result == null) {
-            throw new IllegalArgumentException("Unable to create the proxy-granting ticket object for identifier " + pgtId);
-        }
+        val pgtIssuer = (ProxyGrantingTicketIssuerTicket) serviceTicket;
+        val result = produceTicketWithAdequateExpirationPolicy(proxyGrantingTicketExpirationPolicy, pgtIssuer, authentication, pgtId);
         if (!clazz.isAssignableFrom(result.getClass())) {
             throw new ClassCastException("Result [" + result
-                + " is of type " + result.getClass()
-                + " when we were expecting " + clazz);
+                                         + " is of type " + result.getClass()
+                                         + " when we were expecting " + clazz);
         }
         return (T) result;
     }
@@ -96,7 +95,7 @@ public class DefaultProxyGrantingTicketFactory implements ProxyGrantingTicketFac
      */
     protected RegisteredServiceProxyGrantingTicketExpirationPolicy getProxyGrantingTicketExpirationPolicy(
         final ServiceTicket serviceTicket) {
-        val service = servicesManager.findServiceBy(serviceTicket.getService());
+        val service = servicesManager.findServiceBy(serviceTicket.getService(), CasModelRegisteredService.class);
         if (service != null) {
             return service.getProxyGrantingTicketExpirationPolicy();
         }
@@ -114,7 +113,7 @@ public class DefaultProxyGrantingTicketFactory implements ProxyGrantingTicketFac
      */
     protected ProxyGrantingTicket produceTicketWithAdequateExpirationPolicy(
         final RegisteredServiceProxyGrantingTicketExpirationPolicy servicePgtPolicy,
-        final ServiceTicket serviceTicket,
+        final ProxyGrantingTicketIssuerTicket serviceTicket,
         final Authentication authentication,
         final String pgtId) {
         if (servicePgtPolicy != null) {
@@ -129,7 +128,7 @@ public class DefaultProxyGrantingTicketFactory implements ProxyGrantingTicketFac
     }
 
     /**
-     * Produce ticket identifier string.
+     * Produce ticket identifier.
      *
      * @return the ticket
      */

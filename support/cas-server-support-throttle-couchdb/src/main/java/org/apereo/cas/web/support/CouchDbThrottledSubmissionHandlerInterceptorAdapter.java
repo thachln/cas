@@ -3,10 +3,9 @@ package org.apereo.cas.web.support;
 import org.apereo.cas.couchdb.audit.AuditActionContextCouchDbRepository;
 
 import lombok.val;
-import org.apereo.inspektr.audit.AuditActionContext;
 import org.apereo.inspektr.common.web.ClientInfoHolder;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.stream.Collectors;
@@ -18,8 +17,6 @@ import java.util.stream.Collectors;
  * @since 6.0.0
  */
 public class CouchDbThrottledSubmissionHandlerInterceptorAdapter extends AbstractInspektrAuditHandlerInterceptorAdapter {
-
-    private static final String NAME = "CouchDbThrottle";
 
     private final AuditActionContextCouchDbRepository repository;
 
@@ -33,19 +30,23 @@ public class CouchDbThrottledSubmissionHandlerInterceptorAdapter extends Abstrac
     public boolean exceedsThreshold(final HttpServletRequest request) {
         val clientInfo = ClientInfoHolder.getClientInfo();
         val remoteAddress = clientInfo.getClientIpAddress();
+        val throttle = getConfigurationContext().getCasProperties().getAuthn().getThrottle();
 
+        val username = getUsernameParameterFromRequest(request);
         val failures = repository.findByThrottleParams(remoteAddress,
-            getUsernameParameterFromRequest(request),
-            getConfigurationContext().getAuthenticationFailureCode(),
-            getConfigurationContext().getApplicationCode(),
-            LocalDateTime.now(ZoneOffset.UTC).minusSeconds(getConfigurationContext().getFailureRangeInSeconds()))
-            .stream().map(AuditActionContext::getWhenActionWasPerformed).collect(Collectors.toList());
+                username,
+                throttle.getFailure().getCode(),
+                throttle.getCore().getAppCode(),
+                LocalDateTime.now(ZoneOffset.UTC).minusSeconds(throttle.getFailure().getRangeSeconds()))
+            .stream()
+            .map(this::toThrottledSubmission)
+            .collect(Collectors.toList());
 
         return calculateFailureThresholdRateAndCompare(failures);
     }
 
     @Override
     public String getName() {
-        return NAME;
+        return "CouchDbThrottle";
     }
 }

@@ -8,21 +8,30 @@ package org.apereo.cas.support.saml;
  * @since 5.0.0
  */
 public interface SamlIdPConstants {
+    /**
+     * Base context path for all SAML IDP related endpoints.
+     */
+    String BASE_ENDPOINT_IDP = "/idp";
+
+    /**
+     * The IdP error endpoint.
+     */
+    String ENDPOINT_IDP_ERROR = BASE_ENDPOINT_IDP + "/error";
 
     /**
      * The IdP metadata endpoint.
      */
-    String ENDPOINT_IDP_METADATA = "/idp/metadata";
+    String ENDPOINT_IDP_METADATA = BASE_ENDPOINT_IDP + "/metadata";
 
     /**
      * Base endpoint url for saml2 requests.
      */
-    String BASE_ENDPOINT_SAML2 = "/idp/profile/SAML2";
+    String BASE_ENDPOINT_SAML2 = BASE_ENDPOINT_IDP + "/profile/SAML2";
 
     /**
      * Base endpoint url for saml1 requests.
      */
-    String BASE_ENDPOINT_SAML1 = "/idp/profile/SAML1";
+    String BASE_ENDPOINT_SAML1 = BASE_ENDPOINT_IDP + "/profile/SAML1";
 
     /**
      * The SAML2 SSO simple-sign post profile endpoint.
@@ -73,7 +82,7 @@ public interface SamlIdPConstants {
     /**
      * The SAML2 callback profile endpoint.
      */
-    String ENDPOINT_SAML2_SSO_PROFILE_POST_CALLBACK = BASE_ENDPOINT_SAML2 + "/Callback";
+    String ENDPOINT_SAML2_SSO_PROFILE_CALLBACK = BASE_ENDPOINT_SAML2 + "/Callback";
 
     /**
      * The shire constant.

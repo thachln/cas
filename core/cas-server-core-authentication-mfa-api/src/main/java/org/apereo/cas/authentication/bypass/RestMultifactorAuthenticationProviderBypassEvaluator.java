@@ -10,10 +10,12 @@ import org.apereo.cas.util.LoggingUtils;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
-import javax.servlet.http.HttpServletRequest;
-import java.util.HashMap;
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.io.Serial;
 
 /**
  * This is {@link RestMultifactorAuthenticationProviderBypassEvaluator}.
@@ -24,6 +26,7 @@ import java.util.HashMap;
 @Slf4j
 public class RestMultifactorAuthenticationProviderBypassEvaluator extends BaseMultifactorAuthenticationProviderBypassEvaluator {
 
+    @Serial
     private static final long serialVersionUID = -7553888418344342672L;
 
     private final MultifactorAuthenticationProviderBypassProperties bypassProperties;
@@ -35,24 +38,32 @@ public class RestMultifactorAuthenticationProviderBypassEvaluator extends BaseMu
     }
 
     @Override
-    public boolean shouldMultifactorAuthenticationProviderExecuteInternal(final Authentication authentication, final RegisteredService registeredService,
-                                                                  final MultifactorAuthenticationProvider provider,
-                                                                  final HttpServletRequest request) {
+    public boolean shouldMultifactorAuthenticationProviderExecuteInternal(final Authentication authentication,
+                                                                          final RegisteredService registeredService,
+                                                                          final MultifactorAuthenticationProvider provider,
+                                                                          final HttpServletRequest request) {
         try {
-            val principal = authentication.getPrincipal();
+            val principal = resolvePrincipal(authentication.getPrincipal());
             val rest = bypassProperties.getRest();
             LOGGER.debug("Evaluating multifactor authentication bypass properties for principal [{}], "
-                    + "service [{}] and provider [{}] via REST endpoint [{}]",
+                         + "service [{}] and provider [{}] via REST endpoint [{}]",
                 principal.getId(), registeredService, provider, rest.getUrl());
 
-            val parameters = CollectionUtils.wrap("principal", principal.getId(), "provider", provider.getId());
+            val parameters = CollectionUtils.<String, String>wrap("principal", principal.getId(), "provider", provider.getId());
             if (registeredService != null) {
                 parameters.put("service", registeredService.getServiceId());
             }
 
-            val response = HttpUtils.execute(rest.getUrl(), rest.getMethod(),
-                rest.getBasicAuthUsername(), rest.getBasicAuthPassword(), parameters, new HashMap<>(0));
-            return response.getStatusLine().getStatusCode() == HttpStatus.ACCEPTED.value();
+            val exec = HttpUtils.HttpExecutionRequest.builder()
+                .basicAuthPassword(rest.getBasicAuthPassword())
+                .basicAuthUsername(rest.getBasicAuthUsername())
+                .method(HttpMethod.valueOf(rest.getMethod().toUpperCase().trim()))
+                .url(rest.getUrl())
+                .parameters(parameters)
+                .build();
+
+            val response = HttpUtils.execute(exec);
+            return response != null && HttpStatus.valueOf(response.getStatusLine().getStatusCode()).is2xxSuccessful();
         } catch (final Exception e) {
             LoggingUtils.error(LOGGER, e);
             return true;

@@ -10,13 +10,17 @@ import org.apereo.cas.config.CasCoreAuthenticationPolicyConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationPrincipalConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationSupportConfiguration;
 import org.apereo.cas.config.CasCoreHttpConfiguration;
+import org.apereo.cas.config.CasCoreTicketCatalogConfiguration;
+import org.apereo.cas.config.CasCoreTicketsConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
 import org.apereo.cas.config.CasCoreWebConfiguration;
+import org.apereo.cas.config.CasPersonDirectoryTestConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.util.spring.beans.BeanContainer;
 
-import lombok.SneakyThrows;
 import lombok.val;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apereo.services.persondir.IPersonAttributeDao;
 import org.apereo.services.persondir.support.StubPersonAttributeDao;
@@ -36,7 +40,6 @@ import java.io.File;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -47,13 +50,16 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 6.3.0
  */
-@Tag("Authentication")
+@Tag("AuthenticationHandler")
 @SpringBootTest(classes = {
     RefreshAutoConfiguration.class,
     JaasAuthenticationHandlersConfigurationTests.JaasAuthenticationHandlersConfigurationTestConfiguration.class,
     CasCoreWebConfiguration.class,
     CasCoreHttpConfiguration.class,
     CasCoreUtilConfiguration.class,
+    CasPersonDirectoryTestConfiguration.class,
+    CasCoreTicketCatalogConfiguration.class,
+    CasCoreTicketsConfiguration.class,
     CasWebApplicationServiceFactoryConfiguration.class,
     CasCoreAuthenticationPrincipalConfiguration.class,
     CasCoreAuthenticationHandlersConfiguration.class,
@@ -70,11 +76,11 @@ import static org.mockito.Mockito.*;
 public class JaasAuthenticationHandlersConfigurationTests {
     @Autowired
     @Qualifier("jaasAuthenticationHandlers")
-    private List<AuthenticationHandler> jaasAuthenticationHandlers;
+    private BeanContainer<AuthenticationHandler> jaasAuthenticationHandlers;
 
     @Autowired
     @Qualifier("jaasPersonDirectoryPrincipalResolvers")
-    private List<PrincipalResolver> jaasPersonDirectoryPrincipalResolvers;
+    private BeanContainer<PrincipalResolver> jaasPersonDirectoryPrincipalResolvers;
 
     @Test
     public void verifyOperation() {
@@ -83,10 +89,9 @@ public class JaasAuthenticationHandlersConfigurationTests {
     }
 
     @BeforeEach
-    @SneakyThrows
-    public void initialize() {
+    public void initialize() throws Exception {
         val resource = new ClassPathResource("jaas-system.conf");
-        val fileName = new File(System.getProperty("java.io.tmpdir"), "jaas-authn.conf");
+        val fileName = new File(FileUtils.getTempDirectory(), "jaas-authn.conf");
         try (val writer = Files.newBufferedWriter(fileName.toPath(), StandardCharsets.UTF_8)) {
             IOUtils.copy(resource.getInputStream(), writer, Charset.defaultCharset());
             writer.flush();
@@ -96,23 +101,23 @@ public class JaasAuthenticationHandlersConfigurationTests {
         }
     }
 
-    @TestConfiguration("JaasAuthenticationHandlersConfigurationTestConfiguration")
+    @TestConfiguration(value = "JaasAuthenticationHandlersConfigurationTestConfiguration", proxyBeanMethods = false)
     public static class JaasAuthenticationHandlersConfigurationTestConfiguration {
 
         @Bean
-        @ConditionalOnMissingBean(name = "attributeRepository")
+        @ConditionalOnMissingBean(name = PrincipalResolver.BEAN_NAME_ATTRIBUTE_REPOSITORY)
         public IPersonAttributeDao attributeRepository() {
             return new StubPersonAttributeDao();
         }
-        
+
         @Bean
-        @ConditionalOnMissingBean(name = "authenticationServiceSelectionPlan")
+        @ConditionalOnMissingBean(name = AuthenticationServiceSelectionPlan.BEAN_NAME)
         public AuthenticationServiceSelectionPlan authenticationServiceSelectionPlan() {
             return new DefaultAuthenticationServiceSelectionPlan();
         }
 
         @Bean
-        @ConditionalOnMissingBean(name = "servicesManager")
+        @ConditionalOnMissingBean(name = ServicesManager.BEAN_NAME)
         public ServicesManager servicesManager() {
             return mock(ServicesManager.class);
         }

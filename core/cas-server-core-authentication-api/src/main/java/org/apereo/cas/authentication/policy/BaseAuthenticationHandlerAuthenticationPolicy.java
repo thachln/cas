@@ -2,6 +2,7 @@ package org.apereo.cas.authentication.policy;
 
 import org.apereo.cas.authentication.Authentication;
 import org.apereo.cas.authentication.AuthenticationHandler;
+import org.apereo.cas.authentication.AuthenticationPolicyExecutionResult;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.AccessLevel;
@@ -15,6 +16,7 @@ import lombok.val;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.util.StringUtils;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +38,7 @@ import java.util.Set;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class BaseAuthenticationHandlerAuthenticationPolicy extends BaseAuthenticationPolicy {
 
+    @Serial
     private static final long serialVersionUID = -3871692225877293627L;
 
     /**
@@ -47,16 +50,16 @@ public abstract class BaseAuthenticationHandlerAuthenticationPolicy extends Base
      * Flag to try all credentials before policy is satisfied.
      */
     private boolean tryAll;
-    
+
     protected BaseAuthenticationHandlerAuthenticationPolicy(final String requiredHandlerNames) {
         this(StringUtils.commaDelimitedListToSet(requiredHandlerNames), false);
     }
 
     @Override
-    public boolean isSatisfiedBy(final Authentication authn,
-        final Set<AuthenticationHandler> authenticationHandlers,
-        final ConfigurableApplicationContext applicationContext,
-        final Optional<Serializable> assertion) {
+    public AuthenticationPolicyExecutionResult isSatisfiedBy(final Authentication authn,
+                                                             final Set<AuthenticationHandler> authenticationHandlers,
+                                                             final ConfigurableApplicationContext applicationContext,
+                                                             final Optional<Serializable> assertion) {
         var credsOk = true;
         val sum = authn.getSuccesses().size() + authn.getFailures().size();
         if (this.tryAll) {
@@ -65,8 +68,8 @@ public abstract class BaseAuthenticationHandlerAuthenticationPolicy extends Base
 
         if (!credsOk) {
             LOGGER.warn("Number of provided credentials [{}] does not match the sum of authentication successes and failures [{}]. "
-                + "Successful authentication handlers are [{}]", authn.getCredentials().size(), sum, authn.getSuccesses().keySet());
-            return false;
+                        + "Successful authentication handlers are [{}]", authn.getCredentials().size(), sum, authn.getSuccesses().keySet());
+            return AuthenticationPolicyExecutionResult.failure();
         }
 
         return isSatisfiedByInternal(authn);
@@ -76,7 +79,7 @@ public abstract class BaseAuthenticationHandlerAuthenticationPolicy extends Base
      * Is satisfied by internal checks.
      *
      * @param authn the authn
-     * @return the boolean
+     * @return the policy execution result
      */
-    abstract boolean isSatisfiedByInternal(Authentication authn);
+    abstract AuthenticationPolicyExecutionResult isSatisfiedByInternal(Authentication authn);
 }

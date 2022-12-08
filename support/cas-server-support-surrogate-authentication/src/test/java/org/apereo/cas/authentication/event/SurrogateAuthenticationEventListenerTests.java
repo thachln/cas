@@ -5,11 +5,11 @@ import org.apereo.cas.config.CasCoreNotificationsConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.notifications.CommunicationsManager;
+import org.apereo.cas.notifications.sms.MockSmsSender;
 import org.apereo.cas.notifications.sms.SmsSender;
-import org.apereo.cas.sms.MockSmsSender;
 import org.apereo.cas.support.events.authentication.surrogate.CasSurrogateAuthenticationFailureEvent;
 import org.apereo.cas.support.events.authentication.surrogate.CasSurrogateAuthenticationSuccessfulEvent;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
 import org.junit.jupiter.api.Tag;
@@ -19,11 +19,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
 import org.springframework.boot.autoconfigure.mail.MailSenderValidatorAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
 import java.util.Map;
@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.*;
     RefreshAutoConfiguration.class,
     CasCoreNotificationsConfiguration.class,
     CasCoreUtilConfiguration.class,
+    WebMvcAutoConfiguration.class,
     MailSenderAutoConfiguration.class,
     MailSenderValidatorAutoConfiguration.class
 },
@@ -51,22 +52,21 @@ import static org.junit.jupiter.api.Assertions.*;
         "cas.authn.surrogate.sms.from=3487244312"
     })
 @Tag("Mail")
-@EnabledIfPortOpen(port = 25000)
+@EnabledIfListeningOnPort(port = 25000)
 public class SurrogateAuthenticationEventListenerTests {
 
     @Autowired
     private CasConfigurationProperties casProperties;
 
     @Autowired
-    @Qualifier("communicationsManager")
+    @Qualifier(CommunicationsManager.BEAN_NAME)
     private CommunicationsManager communicationsManager;
 
     @Test
     public void verifyOperation() {
-        val listener = new SurrogateAuthenticationEventListener(communicationsManager, casProperties);
+        val listener = new DefaultSurrogateAuthenticationEventListener(communicationsManager, casProperties);
         val principal = CoreAuthenticationTestUtils.getPrincipal("casuser",
             Map.of("phone", List.of("1234567890"), "mail", List.of("cas@example.org")));
-
         assertDoesNotThrow(new Executable() {
             @Override
             public void execute() {
@@ -78,9 +78,23 @@ public class SurrogateAuthenticationEventListenerTests {
         });
     }
 
-    @TestConfiguration("SurrogateAuthenticationEventListenerTestConfiguration")
-    @Lazy(false)
-    public static class SurrogateAuthenticationEventListenerTestConfiguration {
+    @Test
+    public void verifyFailsOperation() {
+        val listener = new DefaultSurrogateAuthenticationEventListener(communicationsManager, casProperties);
+        val principal = CoreAuthenticationTestUtils.getPrincipal("casuser", Map.of());
+        assertDoesNotThrow(new Executable() {
+            @Override
+            public void execute() {
+                listener.handleSurrogateAuthenticationFailureEvent(new CasSurrogateAuthenticationFailureEvent(this,
+                    principal, "surrogate"));
+                listener.handleSurrogateAuthenticationSuccessEvent(new CasSurrogateAuthenticationSuccessfulEvent(this,
+                    principal, "surrogate"));
+            }
+        });
+    }
+
+    @TestConfiguration(value = "SurrogateAuthenticationEventListenerTestConfiguration", proxyBeanMethods = false)
+        public static class SurrogateAuthenticationEventListenerTestConfiguration {
 
         @Bean
         public SmsSender smsSender() {

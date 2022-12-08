@@ -3,9 +3,12 @@ package org.apereo.cas.configuration.model.support.passwordless.account;
 import org.apereo.cas.configuration.model.support.ldap.AbstractLdapSearchProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+
+import java.io.Serial;
 
 /**
  * This is {@link PasswordlessAuthenticationLdapAccountsProperties}.
@@ -17,7 +20,9 @@ import lombok.experimental.Accessors;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("PasswordlessAuthenticationLdapAccountsProperties")
 public class PasswordlessAuthenticationLdapAccountsProperties extends AbstractLdapSearchProperties {
+    @Serial
     private static final long serialVersionUID = -1102345678378393382L;
 
     /**
@@ -31,4 +36,10 @@ public class PasswordlessAuthenticationLdapAccountsProperties extends AbstractLd
      * indicates the user's phone.
      */
     private String phoneAttribute = "phoneNumber";
+
+    /**
+     * Name of the LDAP attribute that
+     * indicates the user's name.
+     */
+    private String nameAttribute = "cn";
 }

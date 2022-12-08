@@ -4,18 +4,20 @@ title: CAS - InMemory Service Registry
 category: Services
 ---
 
+{% include variables.html %}
+
 # InMemory Service Registry
 
 This is an in-memory services management tool seeded from registration beans wired via Spring beans.
 
 ```java
-@Configuration("myConfiguration")
+@AutoConfiguration
 public class MyConfiguration {
 
   @Bean
   public List inMemoryRegisteredServices() {
-      final List services = new ArrayList<>();
-      final RegexRegisteredService service = new RegexRegisteredService();
+      var services = new ArrayList<>();
+      var service = new CasRegisteredService();
       ...
       services.add(service);
       return services;

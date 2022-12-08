@@ -4,6 +4,7 @@ import org.apereo.cas.authentication.Authentication;
 import org.apereo.cas.authentication.principal.AbstractWebApplicationServiceResponseBuilder;
 import org.apereo.cas.authentication.principal.Response;
 import org.apereo.cas.authentication.principal.WebApplicationService;
+import org.apereo.cas.configuration.support.Beans;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.services.UnauthorizedServiceException;
 import org.apereo.cas.support.saml.SamlProtocolConstants;
@@ -12,6 +13,7 @@ import org.apereo.cas.support.saml.util.GoogleSaml20ObjectBuilder;
 import org.apereo.cas.util.RandomUtils;
 import org.apereo.cas.util.crypto.PrivateKeyFactoryBean;
 import org.apereo.cas.util.crypto.PublicKeyFactoryBean;
+import org.apereo.cas.web.UrlValidator;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -21,13 +23,14 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.opensaml.saml.saml2.core.AuthnContext;
-import org.opensaml.saml.saml2.core.NameID;
+import org.opensaml.saml.saml2.core.NameIDType;
 import org.opensaml.saml.saml2.core.StatusCode;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.util.ResourceUtils;
 
+import java.io.Serial;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.time.ZoneOffset;
@@ -50,15 +53,22 @@ import java.util.stream.Stream;
     of = {"publicKeyLocation", "privateKeyLocation", "keyAlgorithm", "samlObjectBuilder", "skewAllowance"})
 public class GoogleAccountsServiceResponseBuilder extends AbstractWebApplicationServiceResponseBuilder {
 
+    @Serial
     private static final long serialVersionUID = -4584732364007702423L;
+
     private final String publicKeyLocation;
+
     private final String privateKeyLocation;
+
     private final String keyAlgorithm;
+
     private PrivateKey privateKey;
+
     private PublicKey publicKey;
+
     private GoogleSaml20ObjectBuilder samlObjectBuilder;
 
-    private int skewAllowance;
+    private String skewAllowance;
 
     private String casServerPrefix;
 
@@ -67,8 +77,9 @@ public class GoogleAccountsServiceResponseBuilder extends AbstractWebApplication
                                                 final String publicKeyLocation, final String keyAlgorithm,
                                                 final ServicesManager servicesManager,
                                                 final GoogleSaml20ObjectBuilder samlObjectBuilder,
-                                                final int skewAllowance, final String casServerPrefix) {
-        super(servicesManager);
+                                                final String skewAllowance, final String casServerPrefix,
+                                                final UrlValidator urlValidator) {
+        super(servicesManager, urlValidator);
         this.privateKeyLocation = privateKeyLocation;
         this.publicKeyLocation = publicKeyLocation;
         this.keyAlgorithm = keyAlgorithm;
@@ -91,6 +102,11 @@ public class GoogleAccountsServiceResponseBuilder extends AbstractWebApplication
         parameters.put(SamlProtocolConstants.PARAMETER_SAML_RESPONSE, signedResponse);
         parameters.put(SamlProtocolConstants.PARAMETER_SAML_RELAY_STATE, service.getRelayState());
         return buildPost(service, parameters);
+    }
+
+    @Override
+    public boolean supports(final WebApplicationService service) {
+        return service instanceof GoogleAccountsService;
     }
 
     /**
@@ -123,12 +139,13 @@ public class GoogleAccountsServiceResponseBuilder extends AbstractWebApplication
         val assertion = this.samlObjectBuilder.newAssertion(authnStatement, casServerPrefix,
             notBeforeIssueInstant, this.samlObjectBuilder.generateSecureRandomId());
 
+        val skew = Beans.newDuration(this.skewAllowance).toSeconds();
         val conditions = this.samlObjectBuilder.newConditions(notBeforeIssueInstant,
-            currentDateTime.plusSeconds(this.skewAllowance), service.getId());
+            currentDateTime.plusSeconds(skew), service.getId());
         assertion.setConditions(conditions);
 
-        val subject = this.samlObjectBuilder.newSubject(NameID.EMAIL, userId,
-            service.getId(), currentDateTime.plusSeconds(this.skewAllowance), service.getRequestId(), null);
+        val subject = this.samlObjectBuilder.newSubject(NameIDType.EMAIL, userId,
+            service.getId(), currentDateTime.plusSeconds(skew), service.getRequestId(), null);
         assertion.setSubject(subject);
 
         response.getAssertions().add(assertion);
@@ -196,10 +213,5 @@ public class GoogleAccountsServiceResponseBuilder extends AbstractWebApplication
 
     private boolean isValidConfiguration() {
         return Stream.of(this.privateKeyLocation, this.publicKeyLocation, this.keyAlgorithm).anyMatch(StringUtils::isNotBlank);
-    }
-
-    @Override
-    public boolean supports(final WebApplicationService service) {
-        return service instanceof GoogleAccountsService;
     }
 }

@@ -36,13 +36,27 @@ public class InMemoryServiceRegistry extends AbstractServiceRegistry {
     }
 
     @Override
-    public boolean delete(final RegisteredService registeredService) {
-        return this.registeredServices.remove(registeredService);
+    public RegisteredService save(final RegisteredService registeredService) {
+        if (registeredService.getId() == RegisteredService.INITIAL_IDENTIFIER_VALUE) {
+            registeredService.setId(findHighestId() + 1);
+        }
+        invokeServiceRegistryListenerPreSave(registeredService);
+        val svc = findServiceById(registeredService.getId());
+        if (svc != null) {
+            this.registeredServices.remove(svc);
+        }
+        this.registeredServices.add(registeredService);
+        return registeredService;
     }
 
     @Override
-    public RegisteredService findServiceById(final long id) {
-        return this.registeredServices.stream().filter(r -> r.getId() == id).findFirst().orElse(null);
+    public boolean delete(final RegisteredService registeredService) {
+        return !registeredServices.contains(registeredService) || this.registeredServices.remove(registeredService);
+    }
+
+    @Override
+    public void deleteAll() {
+        this.registeredServices.clear();
     }
 
     @Override
@@ -60,17 +74,18 @@ public class InMemoryServiceRegistry extends AbstractServiceRegistry {
     }
 
     @Override
-    public RegisteredService save(final RegisteredService registeredService) {
-        if (registeredService.getId() == RegisteredService.INITIAL_IDENTIFIER_VALUE) {
-            registeredService.setId(findHighestId() + 1);
-        }
-        invokeServiceRegistryListenerPreSave(registeredService);
-        val svc = findServiceById(registeredService.getId());
-        if (svc != null) {
-            this.registeredServices.remove(svc);
-        }
-        this.registeredServices.add(registeredService);
-        return registeredService;
+    public Stream<? extends RegisteredService> getServicesStream() {
+        return this.registeredServices.stream();
+    }
+
+    @Override
+    public RegisteredService findServiceById(final long id) {
+        return this.registeredServices.stream().filter(r -> r.getId() == id).findFirst().orElse(null);
+    }
+
+    @Override
+    public long size() {
+        return registeredServices.size();
     }
 
     /**
@@ -80,15 +95,5 @@ public class InMemoryServiceRegistry extends AbstractServiceRegistry {
      */
     private long findHighestId() {
         return this.registeredServices.stream().map(RegisteredService::getId).max(Comparator.naturalOrder()).orElse(0L);
-    }
-
-    @Override
-    public long size() {
-        return registeredServices.size();
-    }
-
-    @Override
-    public Stream<? extends RegisteredService> getServicesStream() {
-        return this.registeredServices.stream();
     }
 }

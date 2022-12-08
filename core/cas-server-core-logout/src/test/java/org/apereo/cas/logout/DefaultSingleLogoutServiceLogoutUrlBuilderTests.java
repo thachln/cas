@@ -3,11 +3,12 @@ package org.apereo.cas.logout;
 import org.apereo.cas.authentication.principal.AbstractWebApplicationService;
 import org.apereo.cas.authentication.principal.WebApplicationServiceFactory;
 import org.apereo.cas.logout.slo.DefaultSingleLogoutServiceLogoutUrlBuilder;
-import org.apereo.cas.services.AbstractRegisteredService;
+import org.apereo.cas.services.BaseRegisteredService;
+import org.apereo.cas.services.CasRegisteredService;
 import org.apereo.cas.services.DefaultServicesManager;
+import org.apereo.cas.services.DefaultServicesManagerRegisteredServiceLocator;
 import org.apereo.cas.services.InMemoryServiceRegistry;
 import org.apereo.cas.services.RegexMatchingRegisteredServiceProxyPolicy;
-import org.apereo.cas.services.RegexRegisteredService;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.services.ServicesManagerConfigurationContext;
 import org.apereo.cas.util.RandomUtils;
@@ -24,6 +25,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.net.URL;
 import java.util.HashSet;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -44,12 +46,12 @@ public class DefaultSingleLogoutServiceLogoutUrlBuilderTests {
     }
 
     @SneakyThrows
-    public AbstractRegisteredService getRegisteredService(final String id) {
-        val s = new RegexRegisteredService();
+    public BaseRegisteredService getRegisteredService(final String id) {
+        val s = new CasRegisteredService();
         s.setServiceId(id);
         s.setName("Test service " + id);
         s.setDescription("Registered service description");
-        s.setProxyPolicy(new RegexMatchingRegisteredServiceProxyPolicy("^https?://.+"));
+        s.setProxyPolicy(new RegexMatchingRegisteredServiceProxyPolicy().setPattern("^https?://.+"));
         s.setId(RandomUtils.getNativeInstance().nextInt());
         servicesManager.save(s);
         return s;
@@ -64,6 +66,7 @@ public class DefaultSingleLogoutServiceLogoutUrlBuilderTests {
             .applicationContext(appCtx)
             .environments(new HashSet<>(0))
             .servicesCache(Caffeine.newBuilder().build())
+            .registeredServiceLocators(List.of(new DefaultServicesManagerRegisteredServiceLocator()))
             .build();
         this.servicesManager = new DefaultServicesManager(context);
     }

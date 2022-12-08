@@ -6,7 +6,7 @@ import org.apereo.cas.couchdb.core.CouchDbConnectorFactory;
 import org.apereo.cas.couchdb.core.CouchDbProfileDocument;
 import org.apereo.cas.couchdb.core.ProfileCouchDbRepository;
 import org.apereo.cas.util.CollectionUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import lombok.val;
@@ -37,11 +37,11 @@ import org.springframework.boot.test.context.SpringBootTest;
     "cas.authn.surrogate.couch-db.password=password"
 })
 @Getter
-@EnabledIfPortOpen(port = 5984)
+@EnabledIfListeningOnPort(port = 5984)
 public class SurrogateCouchDbProfileAuthenticationServiceTests extends BaseSurrogateAuthenticationServiceTests {
 
     @Autowired
-    @Qualifier("surrogateAuthenticationService")
+    @Qualifier(SurrogateAuthenticationService.BEAN_NAME)
     private SurrogateAuthenticationService service;
 
     @Autowired
@@ -55,12 +55,17 @@ public class SurrogateCouchDbProfileAuthenticationServiceTests extends BaseSurro
     @BeforeEach
     public void setUp() {
         couchDbFactory.getCouchDbInstance().createDatabaseIfNotExists(couchDbFactory.getCouchDbConnector().getDatabaseName());
-        repository.initStandardDesignDocument();
+        repository.initialize();
 
-        val profile = new CouchDbProfileDocument();
-        profile.setUsername("casuser");
-        profile.setAttribute("surrogateFor", CollectionUtils.wrapList("banderson"));
-        repository.add(profile);
+        val profile1 = new CouchDbProfileDocument();
+        profile1.setUsername("casuser");
+        profile1.setAttribute("surrogateFor", CollectionUtils.wrapList("banderson"));
+        repository.add(profile1);
+
+        val profile2 = new CouchDbProfileDocument();
+        profile2.setUsername("casadmin");
+        profile2.setAttribute("surrogateFor", CollectionUtils.wrapList(SurrogateAuthenticationService.WILDCARD_ACCOUNT));
+        repository.add(profile2);
     }
 
     @AfterEach

@@ -1,5 +1,7 @@
 package org.apereo.cas.util;
 
+import org.apereo.cas.util.function.FunctionUtils;
+
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
@@ -28,8 +30,7 @@ import java.nio.file.Files;
 import java.util.Objects;
 import java.util.jar.JarFile;
 
-import static org.springframework.util.ResourceUtils.CLASSPATH_URL_PREFIX;
-import static org.springframework.util.ResourceUtils.FILE_URL_PREFIX;
+import static org.springframework.util.ResourceUtils.*;
 
 /**
  * Utility class to assist with resource operations.
@@ -88,6 +89,9 @@ public class ResourceUtils {
 
     /**
      * Does resource exist?
+     * <p>
+     * On Windows, reading one byte from a directory does not return length greater than zero so an explicit directory
+     * check is needed.
      *
      * @param res the res
      * @return true/false
@@ -97,6 +101,9 @@ public class ResourceUtils {
             return false;
         }
         try {
+            if (res.isFile() && FileUtils.isDirectory(res.getFile())) {
+                return true;
+            }
             IOUtils.read(res.getInputStream(), new byte[1]);
             return res.contentLength() > 0;
         } catch (final FileNotFoundException e) {
@@ -116,8 +123,8 @@ public class ResourceUtils {
      */
     public static boolean doesResourceExist(final String location) {
         try {
-            getResourceFrom(location);
-            return true;
+            val resource = getResourceFrom(location);
+            return doesResourceExist(resource);
         } catch (final Exception e) {
             LOGGER.trace(e.getMessage());
         }
@@ -133,13 +140,19 @@ public class ResourceUtils {
      */
     public static AbstractResource getResourceFrom(final String location) throws IOException {
         val resource = getRawResourceFrom(location);
-        if (!resource.exists() || !resource.isReadable()) {
+        if (!resource.exists() || (resource.isFile() && resource.getFile().isFile() && !resource.isReadable())) {
             throw new FileNotFoundException("Resource " + location + " does not exist or is unreadable");
         }
         return resource;
     }
 
-    @SneakyThrows
+    /**
+     * Export classpath resource to file.
+     *
+     * @param parentDirectory the parent directory
+     * @param resource        the resource
+     * @return the resource
+     */
     public static Resource exportClasspathResourceToFile(final File parentDirectory, final Resource resource) {
         LOGGER.trace("Preparing classpath resource [{}]", resource);
         if (resource == null) {
@@ -150,13 +163,15 @@ public class ResourceUtils {
             LOGGER.warn("Unable to create folder [{}]", parentDirectory);
         }
         val destination = new File(parentDirectory, Objects.requireNonNull(resource.getFilename()));
-        if (destination.exists()) {
-            LOGGER.trace("Deleting resource directory [{}]", destination);
-            FileUtils.forceDelete(destination);
-        }
-        try (val out = new FileOutputStream(destination)) {
-            resource.getInputStream().transferTo(out);
-        }
+        FunctionUtils.doUnchecked(__ -> {
+            if (destination.exists()) {
+                LOGGER.trace("Deleting resource directory [{}]", destination);
+                FileUtils.forceDelete(destination);
+            }
+            try (val out = new FileOutputStream(destination)) {
+                resource.getInputStream().transferTo(out);
+            }
+        });
         return new FileSystemResource(destination);
     }
 
@@ -292,5 +307,15 @@ public class ResourceUtils {
             LOGGER.trace(e.getMessage(), e);
         }
         return false;
+    }
+
+    /**
+     * Is url boolean.
+     *
+     * @param resource the resource
+     * @return true/false
+     */
+    public static boolean isUrl(final String resource) {
+        return StringUtils.isNotBlank(resource) && resource.startsWith("http");
     }
 }

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,13 +17,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 6.0.0
  */
 @Tag("Audits")
-@SuppressWarnings("JdkObsolete")
+@SuppressWarnings("JavaUtilDate")
 public class AuditActionContextJsonSerializerTests {
     @Test
     public void verifyOperation() {
         val ctx = new AuditActionContext("casuser", "TEST", "TEST",
             "CAS", new Date(), "1.2.3.4",
-            "1.2.3.4");
+            "1.2.3.4", UUID.randomUUID().toString());
         val serializer = new AuditActionContextJsonSerializer();
         val result = serializer.toString(ctx);
         assertNotNull(result);

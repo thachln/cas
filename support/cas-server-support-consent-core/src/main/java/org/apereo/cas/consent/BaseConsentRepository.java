@@ -7,12 +7,15 @@ import org.apereo.cas.util.RandomUtils;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.val;
 
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -26,9 +29,12 @@ import java.util.stream.Collectors;
 @Setter
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
 public abstract class BaseConsentRepository implements ConsentRepository {
+    @Serial
     private static final long serialVersionUID = 1736846688546785564L;
-    private transient Set<ConsentDecision> consentDecisions = new LinkedHashSet<>(0);
+
+    private Set<ConsentDecision> consentDecisions = Collections.synchronizedSet(new LinkedHashSet<>(0));
 
     @Override
     public ConsentDecision findConsentDecision(final Service service, final RegisteredService registeredService,
@@ -60,22 +66,24 @@ public abstract class BaseConsentRepository implements ConsentRepository {
         if (consent) {
             getConsentDecisions().remove(decision);
         } else {
-            decision.setId(RandomUtils.getNativeInstance().nextInt());
+            decision.setId(RandomUtils.nextLong());
         }
         getConsentDecisions().add(decision);
         return decision;
     }
 
-
     @Override
     public boolean deleteConsentDecision(final long decisionId, final String principal) {
-        val decisions = findConsentDecisions(principal);
-        val result = decisions.stream().filter(d -> d.getId() == decisionId).findFirst();
-        result.ifPresent(value -> this.consentDecisions.remove(value));
-        return result.isPresent();
+        return this.consentDecisions.removeIf(d -> d.getId() == decisionId && d.getPrincipal().equalsIgnoreCase(principal));
     }
 
-    protected Set<ConsentDecision> getConsentDecisions() {
-        return this.consentDecisions;
+    @Override
+    public void deleteAll() {
+        consentDecisions.clear();
+    }
+
+    @Override
+    public boolean deleteConsentDecisions(final String principal) {
+        return consentDecisions.removeIf(consentDecision -> consentDecision.getPrincipal().equalsIgnoreCase(principal));
     }
 }

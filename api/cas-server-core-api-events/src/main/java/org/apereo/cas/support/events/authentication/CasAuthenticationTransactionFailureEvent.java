@@ -5,6 +5,7 @@ import org.apereo.cas.support.events.AbstractCasEvent;
 
 import lombok.Getter;
 
+import java.io.Serial;
 import java.util.Collection;
 import java.util.Map;
 
@@ -17,19 +18,13 @@ import java.util.Map;
 @Getter
 public class CasAuthenticationTransactionFailureEvent extends AbstractCasEvent {
 
+    @Serial
     private static final long serialVersionUID = 8059647975948452375L;
 
     private final Map<String, Throwable> failures;
 
     private final Collection<Credential> credential;
 
-    /**
-     * Instantiates a new Abstract cas sso event.
-     *
-     * @param source     the source
-     * @param failures   the failures
-     * @param credential the credential
-     */
     public CasAuthenticationTransactionFailureEvent(final Object source, final Map<String, Throwable> failures,
                                                     final Collection<Credential> credential) {
         super(source);

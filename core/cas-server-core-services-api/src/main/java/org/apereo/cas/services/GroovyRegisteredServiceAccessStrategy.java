@@ -1,6 +1,8 @@
 package org.apereo.cas.services;
 
+import org.apereo.cas.configuration.support.ExpressionLanguageCapable;
 import org.apereo.cas.util.ResourceUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 import org.apereo.cas.util.scripting.ScriptingUtils;
 import org.apereo.cas.util.spring.SpringExpressionLanguageValueResolver;
 
@@ -9,10 +11,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.SneakyThrows;
+import lombok.experimental.Accessors;
 import lombok.val;
 
-import javax.persistence.Transient;
+import jakarta.persistence.Transient;
+
+import java.io.Serial;
 import java.net.URI;
 import java.util.Map;
 import java.util.Set;
@@ -25,10 +29,12 @@ import java.util.Set;
  */
 @Getter
 @Setter
+@Accessors(chain = true)
 @NoArgsConstructor
-@EqualsAndHashCode(of = {"order", "groovyScript"})
-public class GroovyRegisteredServiceAccessStrategy implements RegisteredServiceAccessStrategy {
+@EqualsAndHashCode(of = {"order", "groovyScript"}, callSuper = true)
+public class GroovyRegisteredServiceAccessStrategy extends BaseRegisteredServiceAccessStrategy {
 
+    @Serial
     private static final long serialVersionUID = -2407494148882123062L;
 
     /**
@@ -36,6 +42,7 @@ public class GroovyRegisteredServiceAccessStrategy implements RegisteredServiceA
      */
     private int order;
 
+    @ExpressionLanguageCapable
     private String groovyScript;
 
     @JsonIgnore
@@ -52,13 +59,6 @@ public class GroovyRegisteredServiceAccessStrategy implements RegisteredServiceA
 
     @Override
     @JsonIgnore
-    public void setServiceAccessAllowed(final boolean enabled) {
-        buildGroovyAccessStrategyInstanceIfNeeded();
-        this.groovyStrategyInstance.setServiceAccessAllowed(enabled);
-    }
-
-    @Override
-    @JsonIgnore
     public boolean isServiceAccessAllowedForSso() {
         buildGroovyAccessStrategyInstanceIfNeeded();
         return this.groovyStrategyInstance.isServiceAccessAllowedForSso();
@@ -66,9 +66,9 @@ public class GroovyRegisteredServiceAccessStrategy implements RegisteredServiceA
 
     @Override
     @JsonIgnore
-    public boolean doPrincipalAttributesAllowServiceAccess(final String principal, final Map<String, Object> attributes) {
+    public boolean doPrincipalAttributesAllowServiceAccess(final RegisteredServiceAccessStrategyRequest request) {
         buildGroovyAccessStrategyInstanceIfNeeded();
-        return this.groovyStrategyInstance.doPrincipalAttributesAllowServiceAccess(principal, attributes);
+        return this.groovyStrategyInstance.doPrincipalAttributesAllowServiceAccess(request);
     }
 
     @JsonIgnore
@@ -91,10 +91,12 @@ public class GroovyRegisteredServiceAccessStrategy implements RegisteredServiceA
         return this.groovyStrategyInstance.getRequiredAttributes();
     }
 
-    @SneakyThrows
     private void buildGroovyAccessStrategyInstanceIfNeeded() {
         if (this.groovyStrategyInstance == null) {
-            val groovyResource = ResourceUtils.getResourceFrom(SpringExpressionLanguageValueResolver.getInstance().resolve(this.groovyScript));
+            val groovyResource = FunctionUtils.doUnchecked(() -> {
+                val location = SpringExpressionLanguageValueResolver.getInstance().resolve(this.groovyScript);
+                return ResourceUtils.getResourceFrom(location);
+            });
             this.groovyStrategyInstance = ScriptingUtils.getObjectInstanceFromGroovyResource(groovyResource, RegisteredServiceAccessStrategy.class);
         }
     }

@@ -1,14 +1,18 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.metadata.CasConfigurationMetadataRepository;
 import org.apereo.cas.metadata.rest.CasConfigurationMetadataServerEndpoint;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.actuate.autoconfigure.endpoint.condition.ConditionalOnAvailableEndpoint;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 /**
  * This is {@link CasCoreConfigurationMetadataConfiguration}.
@@ -16,19 +20,21 @@ import org.springframework.context.annotation.Configuration;
  * @author Misagh Moayyed
  * @since 5.2.0
  */
-@Configuration("casCoreConfigurationMetadataConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.CasConfiguration)
+@AutoConfiguration
 public class CasCoreConfigurationMetadataConfiguration {
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
     @Bean
     @ConditionalOnAvailableEndpoint
-    public CasConfigurationMetadataServerEndpoint configurationMetadataServerEndpoint() {
-        return new CasConfigurationMetadataServerEndpoint(casProperties, casConfigurationMetadataRepository());
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public CasConfigurationMetadataServerEndpoint configurationMetadataServerEndpoint(
+        @Qualifier("casConfigurationMetadataRepository") final CasConfigurationMetadataRepository casConfigurationMetadataRepository,
+        final CasConfigurationProperties casProperties) {
+        return new CasConfigurationMetadataServerEndpoint(casProperties, casConfigurationMetadataRepository);
     }
 
     @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     public CasConfigurationMetadataRepository casConfigurationMetadataRepository() {
         return new CasConfigurationMetadataRepository();
     }

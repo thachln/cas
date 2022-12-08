@@ -3,9 +3,12 @@ package org.apereo.cas.configuration.model.support.aup;
 import org.apereo.cas.configuration.model.support.couchbase.BaseCouchbaseProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+
+import java.io.Serial;
 
 /**
  * This is {@link CouchbaseAcceptableUsagePolicyProperties}.
@@ -17,6 +20,8 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 @Getter
 @Setter
+@JsonFilter("CouchbaseAcceptableUsagePolicyProperties")
 public class CouchbaseAcceptableUsagePolicyProperties extends BaseCouchbaseProperties {
+    @Serial
     private static final long serialVersionUID = 2323894615409106853L;
 }

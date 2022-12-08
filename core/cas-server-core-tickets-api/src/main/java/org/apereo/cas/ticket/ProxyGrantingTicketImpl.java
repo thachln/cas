@@ -11,8 +11,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.NoArgsConstructor;
 import lombok.val;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
+import java.io.Serial;
 
 /**
  * Concrete implementation of a proxy granting ticket (PGT). A PGT is
@@ -28,12 +27,11 @@ import javax.persistence.Entity;
  * @author Misagh Moayyed
  * @since 4.1
  */
-@Entity
-@DiscriminatorValue(ProxyGrantingTicket.PROXY_GRANTING_TICKET_PREFIX)
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 @NoArgsConstructor
 public class ProxyGrantingTicketImpl extends TicketGrantingTicketImpl implements ProxyGrantingTicket {
 
+    @Serial
     private static final long serialVersionUID = -8126909926138945649L;
 
     /**
@@ -65,9 +63,11 @@ public class ProxyGrantingTicketImpl extends TicketGrantingTicketImpl implements
     }
 
     @Override
-    public ProxyTicket grantProxyTicket(final String id, final Service service, final ExpirationPolicy expirationPolicy, final boolean onlyTrackMostRecentSession) {
+    public ProxyTicket grantProxyTicket(final String id, final Service service,
+                                        final ExpirationPolicy expirationPolicy,
+                                        final ServiceTicketSessionTrackingPolicy trackingPolicy) {
         val serviceTicket = new ProxyTicketImpl(id, this, service, false, expirationPolicy);
-        trackServiceSession(serviceTicket.getId(), service, onlyTrackMostRecentSession);
+        trackingPolicy.track(this, serviceTicket);
         return serviceTicket;
     }
 

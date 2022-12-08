@@ -1,6 +1,7 @@
 package org.apereo.cas.authentication.policy;
 
 import org.apereo.cas.authentication.Authentication;
+import org.apereo.cas.authentication.AuthenticationPolicyExecutionResult;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
@@ -10,6 +11,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
+import java.io.Serial;
 import java.util.Set;
 
 /**
@@ -27,6 +29,7 @@ import java.util.Set;
 @Getter
 public class ExcludedAuthenticationHandlerAuthenticationPolicy extends BaseAuthenticationHandlerAuthenticationPolicy {
 
+    @Serial
     private static final long serialVersionUID = -3871692225877293627L;
 
     public ExcludedAuthenticationHandlerAuthenticationPolicy(final Set<String> handlerNames, final boolean tryAll) {
@@ -34,7 +37,7 @@ public class ExcludedAuthenticationHandlerAuthenticationPolicy extends BaseAuthe
     }
 
     @Override
-    boolean isSatisfiedByInternal(final Authentication authn) {
+    public AuthenticationPolicyExecutionResult isSatisfiedByInternal(final Authentication authn) {
         if (!getHandlerNames().isEmpty()) {
             val credsOk = authn.getSuccesses()
                 .keySet()
@@ -43,10 +46,10 @@ public class ExcludedAuthenticationHandlerAuthenticationPolicy extends BaseAuthe
 
             if (credsOk) {
                 LOGGER.warn("Excluded authentication handler(s) [{}] found in authentication attempt", getHandlerNames());
-                return false;
+                return AuthenticationPolicyExecutionResult.failure();
             }
         }
         LOGGER.trace("Authentication policy is satisfied");
-        return true;
+        return AuthenticationPolicyExecutionResult.success();
     }
 }

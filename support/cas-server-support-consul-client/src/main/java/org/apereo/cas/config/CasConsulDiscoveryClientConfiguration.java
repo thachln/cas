@@ -1,6 +1,9 @@
 package org.apereo.cas.config;
 
-import org.springframework.context.annotation.Configuration;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
+
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 
 /**
  * This is {@link CasConsulDiscoveryClientConfiguration}.
@@ -8,6 +11,6 @@ import org.springframework.context.annotation.Configuration;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@Configuration(value = "casConsulDiscoveryClientConfiguration", proxyBeanMethods = false)
-public class CasConsulDiscoveryClientConfiguration {
-}
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.Discovery, module = "consul")
+@AutoConfiguration
+public class CasConsulDiscoveryClientConfiguration {}

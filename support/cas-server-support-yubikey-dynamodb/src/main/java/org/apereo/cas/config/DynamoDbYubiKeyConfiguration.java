@@ -3,21 +3,21 @@ package org.apereo.cas.config;
 import org.apereo.cas.adaptors.yubikey.YubiKeyAccountRegistry;
 import org.apereo.cas.adaptors.yubikey.YubiKeyAccountValidator;
 import org.apereo.cas.adaptors.yubikey.dao.DynamoDbYubiKeyAccountRegistry;
-import org.apereo.cas.adaptors.yubikey.dao.YubiKeyDynamoDbFacilitator;
+import org.apereo.cas.adaptors.yubikey.dao.DynamoDbYubiKeyFacilitator;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.dynamodb.AmazonDynamoDbClientFactory;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
-import lombok.SneakyThrows;
 import lombok.val;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 /**
@@ -26,47 +26,45 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
  * @author Misagh Moayyed
  * @since 6.3.0
  */
-@Configuration("dynamoDbYubiKeyConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.YubiKey, module = "dynamodb")
+@AutoConfiguration
 public class DynamoDbYubiKeyConfiguration {
-    @Autowired
-    @Qualifier("yubiKeyAccountValidator")
-    private ObjectProvider<YubiKeyAccountValidator> yubiKeyAccountValidator;
 
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("yubikeyAccountCipherExecutor")
-    private ObjectProvider<CipherExecutor> yubikeyAccountCipherExecutor;
-
-    @RefreshScope
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @Bean
-    public YubiKeyDynamoDbFacilitator yubikeyDynamoDbFacilitator() {
+    public DynamoDbYubiKeyFacilitator yubikeyDynamoDbFacilitator(
+        final CasConfigurationProperties casProperties,
+        @Qualifier("yubikeyDynamoDbClient")
+        final DynamoDbClient yubikeyDynamoDbClient) {
         val db = casProperties.getAuthn().getMfa().getYubikey().getDynamoDb();
-        val f = new YubiKeyDynamoDbFacilitator(db, yubikeyDynamoDbClient());
+        val f = new DynamoDbYubiKeyFacilitator(db, yubikeyDynamoDbClient);
         if (!db.isPreventTableCreationOnStartup()) {
             f.createTable(db.isDropTablesOnStartup());
         }
         return f;
     }
 
-    @RefreshScope
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @Bean
-    @SneakyThrows
     @ConditionalOnMissingBean(name = "yubikeyDynamoDbClient")
-    public DynamoDbClient yubikeyDynamoDbClient() {
+    public DynamoDbClient yubikeyDynamoDbClient(final CasConfigurationProperties casProperties) {
         val db = casProperties.getAuthn().getMfa().getYubikey().getDynamoDb();
         val factory = new AmazonDynamoDbClientFactory();
         return factory.createAmazonDynamoDb(db);
     }
 
-    @RefreshScope
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @Bean
-    public YubiKeyAccountRegistry yubiKeyAccountRegistry() {
-        val registry = new DynamoDbYubiKeyAccountRegistry(yubiKeyAccountValidator.getObject(), yubikeyDynamoDbFacilitator());
-        registry.setCipherExecutor(yubikeyAccountCipherExecutor.getObject());
+    public YubiKeyAccountRegistry yubiKeyAccountRegistry(
+        @Qualifier("yubikeyDynamoDbFacilitator")
+        final DynamoDbYubiKeyFacilitator yubikeyDynamoDbFacilitator,
+        @Qualifier("yubiKeyAccountValidator")
+        final YubiKeyAccountValidator yubiKeyAccountValidator,
+        @Qualifier("yubikeyAccountCipherExecutor")
+        final CipherExecutor yubikeyAccountCipherExecutor) {
+        val registry = new DynamoDbYubiKeyAccountRegistry(yubiKeyAccountValidator, yubikeyDynamoDbFacilitator);
+        registry.setCipherExecutor(yubikeyAccountCipherExecutor);
         return registry;
     }
-
 }

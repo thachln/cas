@@ -1,17 +1,21 @@
 package org.apereo.cas.oidc.token;
 
 import org.apereo.cas.oidc.discovery.OidcServerDiscoverySettings;
+import org.apereo.cas.oidc.issuer.OidcIssuerService;
+import org.apereo.cas.oidc.jwks.OidcJsonWebKeyCacheKey;
 import org.apereo.cas.services.OidcRegisteredService;
 import org.apereo.cas.support.oauth.services.OAuthRegisteredService;
+import org.apereo.cas.util.jwt.JsonWebTokenEncryptor;
 
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
-import org.jose4j.jwk.PublicJsonWebKey;
+import org.jose4j.jwk.JsonWebKeySet;
 import org.jose4j.jws.AlgorithmIdentifiers;
 
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * This is {@link OidcIdTokenSigningAndEncryptionService}.
@@ -23,11 +27,12 @@ import java.util.Optional;
 public class OidcIdTokenSigningAndEncryptionService extends BaseOidcJsonWebKeyTokenSigningAndEncryptionService {
     private final OidcServerDiscoverySettings discoverySettings;
 
-    public OidcIdTokenSigningAndEncryptionService(final LoadingCache<String, Optional<PublicJsonWebKey>> defaultJsonWebKeystoreCache,
-                                                  final LoadingCache<OAuthRegisteredService, Optional<PublicJsonWebKey>> serviceJsonWebKeystoreCache,
-                                                  final String issuer,
-                                                  final OidcServerDiscoverySettings discoverySettings) {
-        super(defaultJsonWebKeystoreCache, serviceJsonWebKeystoreCache, issuer);
+    public OidcIdTokenSigningAndEncryptionService(
+        final LoadingCache<OidcJsonWebKeyCacheKey, Optional<JsonWebKeySet>> defaultJsonWebKeystoreCache,
+        final LoadingCache<OidcJsonWebKeyCacheKey, Optional<JsonWebKeySet>> serviceJsonWebKeystoreCache,
+        final OidcIssuerService issuerService,
+        final OidcServerDiscoverySettings discoverySettings) {
+        super(defaultJsonWebKeystoreCache, serviceJsonWebKeystoreCache, issuerService);
         this.discoverySettings = discoverySettings;
     }
 
@@ -40,16 +45,9 @@ public class OidcIdTokenSigningAndEncryptionService extends BaseOidcJsonWebKeyTo
         return svc.getIdTokenSigningAlg();
     }
 
-    /**
-     * Should sign token for service?
-     *
-     * @param svc the svc
-     * @return true/false
-     */
     @Override
     public boolean shouldSignToken(final OAuthRegisteredService svc) {
-        if (svc instanceof OidcRegisteredService) {
-            val service = (OidcRegisteredService) svc;
+        if (svc instanceof OidcRegisteredService service) {
             if (!service.isSignIdToken()) {
                 LOGGER.trace("Service [{}] does not require ID token to be signed", svc.getServiceId());
                 return false;
@@ -57,8 +55,8 @@ public class OidcIdTokenSigningAndEncryptionService extends BaseOidcJsonWebKeyTo
             if (service.isSignIdToken() && AlgorithmIdentifiers.NONE.equalsIgnoreCase(service.getIdTokenSigningAlg())) {
                 if (!discoverySettings.getIdTokenSigningAlgValuesSupported().contains(AlgorithmIdentifiers.NONE)) {
                     LOGGER.error("Service [{}] has defined 'none' for ID token signing algorithm, "
-                            + "yet CAS is configured to support the following signing algorithms: [{}]. "
-                            + "This is quite likely due to misconfiguration of the CAS server or the service definition",
+                                 + "yet CAS is configured to support the following signing algorithms: [{}]. "
+                                 + "This is quite likely due to misconfiguration of the CAS server or the service definition",
                         svc.getServiceId(), discoverySettings.getIdTokenSigningAlgValuesSupported());
                     throw new IllegalArgumentException("Unable to use 'none' as ID token signing algorithm");
                 }
@@ -72,14 +70,13 @@ public class OidcIdTokenSigningAndEncryptionService extends BaseOidcJsonWebKeyTo
 
     @Override
     public boolean shouldEncryptToken(final OAuthRegisteredService svc) {
-        if (svc instanceof OidcRegisteredService) {
-            val service = (OidcRegisteredService) svc;
-            
+        if (svc instanceof OidcRegisteredService service) {
+
             if (service.isEncryptIdToken() && AlgorithmIdentifiers.NONE.equalsIgnoreCase(service.getIdTokenEncryptionAlg())) {
                 if (!discoverySettings.getIdTokenSigningAlgValuesSupported().contains(AlgorithmIdentifiers.NONE)) {
                     LOGGER.error("Service [{}] has defined 'none' for ID token encryption algorithm, "
-                            + "yet CAS is configured to support the following encryption algorithms: [{}]. "
-                            + "This is quite likely due to misconfiguration of the CAS server or the service definition",
+                                 + "yet CAS is configured to support the following encryption algorithms: [{}]. "
+                                 + "This is quite likely due to misconfiguration of the CAS server or the service definition",
                         svc.getServiceId(), discoverySettings.getIdTokenEncryptionAlgValuesSupported());
                     throw new IllegalArgumentException("Unable to use 'none' as ID token encryption algorithm");
                 }
@@ -88,10 +85,15 @@ public class OidcIdTokenSigningAndEncryptionService extends BaseOidcJsonWebKeyTo
             }
 
             return service.isEncryptIdToken()
-                && StringUtils.isNotBlank(service.getIdTokenEncryptionAlg())
-                && StringUtils.isNotBlank(service.getIdTokenEncryptionEncoding());
+                   && StringUtils.isNotBlank(service.getIdTokenEncryptionAlg())
+                   && StringUtils.isNotBlank(service.getIdTokenEncryptionEncoding());
         }
         return false;
+    }
+
+    @Override
+    public Set<String> getAllowedSigningAlgorithms(final OAuthRegisteredService svc) {
+        return this.discoverySettings.getIdTokenSigningAlgValuesSupported();
     }
 
     @Override
@@ -99,8 +101,16 @@ public class OidcIdTokenSigningAndEncryptionService extends BaseOidcJsonWebKeyTo
         if (service instanceof OidcRegisteredService) {
             val svc = OidcRegisteredService.class.cast(service);
             val jsonWebKey = getJsonWebKeyForEncryption(svc);
-            return encryptToken(svc.getIdTokenEncryptionAlg(), svc.getIdTokenEncryptionEncoding(),
-                jsonWebKey.getKeyId(), jsonWebKey.getPublicKey(), innerJwt);
+
+            return JsonWebTokenEncryptor.builder()
+                .key(jsonWebKey.getPublicKey())
+                .keyId(jsonWebKey.getKeyId())
+                .algorithm(svc.getIdTokenEncryptionAlg())
+                .encryptionMethod(svc.getIdTokenEncryptionEncoding())
+                .allowedAlgorithms(discoverySettings.getIdTokenEncryptionAlgValuesSupported())
+                .allowedContentEncryptionAlgorithms(discoverySettings.getIdTokenEncryptionEncodingValuesSupported())
+                .build()
+                .encrypt(innerJwt);
         }
         return innerJwt;
     }

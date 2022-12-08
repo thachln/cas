@@ -4,9 +4,13 @@ import org.apereo.cas.support.saml.services.idp.metadata.SamlMetadataDocument;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
+
+import java.io.Serial;
 
 /**
  * This is {@link CouchDbSamlMetadataDocument}.
@@ -16,7 +20,11 @@ import lombok.Setter;
  */
 @Getter
 @Setter
+@SuperBuilder
 public class CouchDbSamlMetadataDocument extends SamlMetadataDocument {
+    @Serial
+    private static final long serialVersionUID = 6558457970842836213L;
+
     @JsonProperty("_id")
     private String cid;
 
@@ -36,7 +44,8 @@ public class CouchDbSamlMetadataDocument extends SamlMetadataDocument {
     }
 
     public CouchDbSamlMetadataDocument(final SamlMetadataDocument document) {
-        this(null, null, document.getId(), document.getName(), document.getValue(), document.getSignature());
+        this(null, null, document.getId(), document.getName(),
+            document.getValue(), document.getSignature());
     }
 
     /**
@@ -44,6 +53,7 @@ public class CouchDbSamlMetadataDocument extends SamlMetadataDocument {
      * @param document other document to merge in
      * @return this
      */
+    @CanIgnoreReturnValue
     public CouchDbSamlMetadataDocument merge(final SamlMetadataDocument document) {
         setId(document.getId());
         setName(document.getName());

@@ -1,9 +1,9 @@
 package org.apereo.cas.adaptors.u2f.web.flow;
 
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.flow.resolver.CasWebflowEventResolver;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
 
@@ -14,7 +14,7 @@ import org.springframework.webflow.execution.RequestContext;
  * @since 5.1.0
  */
 @RequiredArgsConstructor
-public class U2FAuthenticationWebflowAction extends AbstractAction {
+public class U2FAuthenticationWebflowAction extends BaseCasWebflowAction {
 
     private final CasWebflowEventResolver u2fAuthenticationWebflowEventResolver;
 

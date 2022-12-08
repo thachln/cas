@@ -34,36 +34,36 @@ import static org.junit.jupiter.api.Assertions.*;
 public class GroovyAcceptableUsagePolicyRepositoryTests extends BaseAcceptableUsagePolicyRepositoryTests {
 
     @Autowired
-    @Qualifier("acceptableUsagePolicyRepository")
+    @Qualifier(AcceptableUsagePolicyRepository.BEAN_NAME)
     protected AcceptableUsagePolicyRepository acceptableUsagePolicyRepository;
 
     @Test
-    public void verifyRepositoryActionWithAdvancedConfig() {
+    public void verifyRepositoryActionWithAdvancedConfig() throws Exception {
         verifyRepositoryAction("casuser", CollectionUtils.wrap("aupAccepted", "false"));
     }
 
     @Test
-    public void verifyPolicyTerms() {
+    public void verifyPolicyTerms() throws Exception {
         val context = new MockRequestContext();
         val request = new MockHttpServletRequest();
         context.setExternalContext(new ServletExternalContext(new MockServletContext(), request, new MockHttpServletResponse()));
         val credential = CoreAuthenticationTestUtils.getCredentialsWithSameUsernameAndPassword("casuser");
         val tgt = new MockTicketGrantingTicket(credential.getId(), credential, Map.of());
-        ticketRegistry.getObject().addTicket(tgt);
+        ticketRegistry.addTicket(tgt);
 
         WebUtils.putAuthentication(tgt.getAuthentication(), context);
         WebUtils.putTicketGrantingTicketInScopes(context, tgt);
-        assertTrue(acceptableUsagePolicyRepository.fetchPolicy(context, credential).isPresent());
+        assertTrue(acceptableUsagePolicyRepository.fetchPolicy(context).isPresent());
     }
 
     @Test
-    public void verifyPolicyTermsFails() {
+    public void verifyPolicyTermsFails() throws Exception {
         val context = new MockRequestContext();
         val request = new MockHttpServletRequest();
         context.setExternalContext(new ServletExternalContext(new MockServletContext(), request, new MockHttpServletResponse()));
         val credential = CoreAuthenticationTestUtils.getCredentialsWithSameUsernameAndPassword("casuser");
         val tgt = new MockTicketGrantingTicket(credential.getId(), credential, Map.of());
-        ticketRegistry.getObject().addTicket(tgt);
-        assertFalse(acceptableUsagePolicyRepository.fetchPolicy(context, credential).isPresent());
+        ticketRegistry.addTicket(tgt);
+        assertFalse(acceptableUsagePolicyRepository.fetchPolicy(context).isPresent());
     }
 }

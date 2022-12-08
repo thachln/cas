@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Tag("OAuth")
 public class OAuthRegisteredServiceTests {
-
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "oAuthRegisteredService.json");
 
     private static final ClassPathResource RESOURCE = new ClassPathResource("services");
@@ -68,7 +67,7 @@ public class OAuthRegisteredServiceTests {
     }
 
     @Test
-    public void verifySerializeAOAuthRegisteredServiceToJson() {
+    public void verifySerializeOAuthRegisteredServiceToJson() {
         val serviceWritten = new OAuthRegisteredService();
         serviceWritten.setName("checkSaveMethod");
         serviceWritten.setServiceId("testId");
@@ -80,7 +79,9 @@ public class OAuthRegisteredServiceTests {
         serviceWritten.setSupportedGrantTypes(CollectionUtils.wrapHashSet("something"));
         serviceWritten.setSupportedResponseTypes(CollectionUtils.wrapHashSet("something"));
 
-        val serializer = new RegisteredServiceJsonSerializer();
+        val appCtx = new StaticApplicationContext();
+        appCtx.refresh();
+        val serializer = new RegisteredServiceJsonSerializer(appCtx);
         serializer.to(JSON_FILE, serviceWritten);
         val serviceRead = serializer.from(JSON_FILE);
         assertEquals(serviceWritten, serviceRead);

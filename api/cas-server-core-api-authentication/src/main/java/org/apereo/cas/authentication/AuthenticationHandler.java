@@ -1,6 +1,8 @@
 package org.apereo.cas.authentication;
 
 import org.apereo.cas.authentication.principal.Principal;
+import org.apereo.cas.authentication.principal.Service;
+import org.apereo.cas.configuration.model.core.authentication.AuthenticationHandlerStates;
 
 import org.springframework.core.Ordered;
 
@@ -22,6 +24,30 @@ public interface AuthenticationHandler extends Ordered {
     String SUCCESSFUL_AUTHENTICATION_HANDLERS = "successfulAuthenticationHandlers";
 
     /**
+     * Disabled authentication handler.
+     *
+     * @return the authentication handler
+     */
+    static AuthenticationHandler disabled() {
+        return new AuthenticationHandler() {
+            @Override
+            public AuthenticationHandlerExecutionResult authenticate(final Credential credential, final Service service) throws PreventedException {
+                throw new PreventedException("Authentication handler is disabled");
+            }
+
+            @Override
+            public boolean supports(final Credential credential) {
+                return false;
+            }
+
+            @Override
+            public boolean supports(final Class<? extends Credential> clazz) {
+                return false;
+            }
+        };
+    }
+
+    /**
      * Authenticates the given credential. There are three possible outcomes of this process, and implementers
      * MUST adhere to the following contract:
      *
@@ -32,6 +58,7 @@ public interface AuthenticationHandler extends Ordered {
      * </ol>
      *
      * @param credential The credential to authenticate.
+     * @param service    the requesting service, if any.
      * @return A result object containing metadata about a successful authentication event that includes at a minimum the name of the handler that
      * authenticated the credential and some credential metadata. The following data is optional:
      * <ul>
@@ -54,11 +81,11 @@ public interface AuthenticationHandler extends Ordered {
      * @throws PreventedException       On errors that prevented authentication from occurring. Implementing classes SHOULD take care to populate
      *                                  the cause, where applicable, with the error that prevented authentication.
      */
-    AuthenticationHandlerExecutionResult authenticate(Credential credential) throws GeneralSecurityException, PreventedException;
+    AuthenticationHandlerExecutionResult authenticate(Credential credential, Service service) throws GeneralSecurityException, PreventedException;
 
     /**
      * Determines whether the handler has the capability to authenticate the given credential. In practical terms,
-     * the {@link #authenticate(Credential)} method MUST be capable of processing a given credential if
+     * the {@link #authenticate(Credential, Service)} method MUST be capable of processing a given credential if
      * {@code supports} returns true on the same credential.
      *
      * @param credential The credential to check.
@@ -77,7 +104,7 @@ public interface AuthenticationHandler extends Ordered {
     default boolean supports(final Class<? extends Credential> clazz) {
         return false;
     }
-    
+
     /**
      * Gets a unique name for this authentication handler within the Spring context that contains it.
      * For implementations that allow setting a unique name, deployers MUST take care to ensure that every
@@ -95,26 +122,12 @@ public interface AuthenticationHandler extends Ordered {
     }
 
     /**
-     * Disabled authentication handler.
+     * Define the state of the authentication handler.
      *
-     * @return the authentication handler
+     * @return the state
      */
-    static AuthenticationHandler disabled() {
-        return new AuthenticationHandler() {
-            @Override
-            public AuthenticationHandlerExecutionResult authenticate(final Credential credential) throws PreventedException {
-                throw new PreventedException("Authentication handler is disabled");
-            }
-
-            @Override
-            public boolean supports(final Credential credential) {
-                return false;
-            }
-
-            @Override
-            public boolean supports(final Class<? extends Credential> clazz) {
-                return false;
-            }
-        };
+    default AuthenticationHandlerStates getState() {
+        return AuthenticationHandlerStates.ACTIVE;
     }
+
 }

@@ -2,18 +2,19 @@ package org.apereo.cas.web;
 
 import org.apereo.cas.CentralAuthenticationService;
 import org.apereo.cas.authentication.AuthenticationSystemSupport;
-import org.apereo.cas.authentication.MultifactorAuthenticationProvider;
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.ticket.proxy.ProxyHandler;
+import org.apereo.cas.ticket.registry.TicketRegistry;
 import org.apereo.cas.validation.CasProtocolValidationSpecification;
 import org.apereo.cas.validation.RequestedAuthenticationContextValidator;
 import org.apereo.cas.validation.ServiceTicketValidationAuthorizersExecutionPlan;
 import org.apereo.cas.web.support.ArgumentExtractor;
 
-import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 import java.util.Set;
 
@@ -26,7 +27,7 @@ import java.util.Set;
 @ToString
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 public class ServiceValidateConfigurationContext {
     private final Set<CasProtocolValidationSpecification> validationSpecifications;
 
@@ -40,13 +41,13 @@ public class ServiceValidateConfigurationContext {
 
     private final ArgumentExtractor argumentExtractor;
 
-    private final RequestedAuthenticationContextValidator<MultifactorAuthenticationProvider> requestedContextValidator;
+    private final RequestedAuthenticationContextValidator requestedContextValidator;
 
-    private final String authnContextAttribute;
-
-    private final boolean renewEnabled;
+    private final CasConfigurationProperties casProperties;
 
     private final ServiceValidationViewFactory validationViewFactory;
+
+    private final TicketRegistry ticketRegistry;
 
     private ProxyHandler proxyHandler;
 }

@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -15,11 +16,12 @@ import java.io.Serializable;
  * @author Misagh Moayyed
  * @since 6.0.0
  */
-@RequiresModule(name = "cas-server-support-sms-clickatell")
+@RequiresModule(name = "cas-server-support-sms-nexmo")
 @Getter
 @Setter
 @Accessors(chain = true)
 public class NexmoProperties implements Serializable {
+    @Serial
     private static final long serialVersionUID = 7546596773588579321L;
 
     /**

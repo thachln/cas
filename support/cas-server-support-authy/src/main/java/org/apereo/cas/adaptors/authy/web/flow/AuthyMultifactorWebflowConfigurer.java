@@ -46,6 +46,7 @@ public class AuthyMultifactorWebflowConfigurer extends AbstractCasMultifactorWeb
             createFlowVariable(flow, CasWebflowConstants.VAR_ID_CREDENTIAL, AuthyTokenCredential.class);
 
             flow.getStartActionList().add(createEvaluateAction(CasWebflowConstants.ACTION_ID_INITIAL_FLOW_SETUP));
+            createEndState(flow, CasWebflowConstants.STATE_ID_SUCCESS);
 
             val initLoginFormState = createActionState(flow, CasWebflowConstants.STATE_ID_INIT_LOGIN_FORM,
                 createEvaluateAction(CasWebflowConstants.ACTION_ID_INIT_LOGIN_ACTION));
@@ -57,7 +58,7 @@ public class AuthyMultifactorWebflowConfigurer extends AbstractCasMultifactorWeb
             createStateDefaultTransition(registerState, CasWebflowConstants.STATE_ID_VIEW_LOGIN_FORM);
 
             val realSubmitState = createActionState(flow, CasWebflowConstants.STATE_ID_REAL_SUBMIT,
-                createEvaluateAction("authyAuthenticationWebflowAction"));
+                createEvaluateAction(CasWebflowConstants.ACTION_ID_AUTHY_AUTHENTICATION));
             createTransitionForState(realSubmitState, CasWebflowConstants.TRANSITION_ID_SUCCESS, CasWebflowConstants.STATE_ID_SUCCESS);
             createTransitionForState(realSubmitState, CasWebflowConstants.TRANSITION_ID_ERROR, CasWebflowConstants.STATE_ID_VIEW_LOGIN_FORM);
 
@@ -65,14 +66,14 @@ public class AuthyMultifactorWebflowConfigurer extends AbstractCasMultifactorWeb
 
             val loginProperties = CollectionUtils.wrapList("token");
             val loginBinder = createStateBinderConfiguration(loginProperties);
-            val viewLoginFormState = createViewState(flow, CasWebflowConstants.STATE_ID_VIEW_LOGIN_FORM, "casAuthyLoginView", loginBinder);
+            val viewLoginFormState = createViewState(flow, CasWebflowConstants.STATE_ID_VIEW_LOGIN_FORM, "authy/casAuthyLoginView", loginBinder);
             createStateModelBinding(viewLoginFormState, CasWebflowConstants.VAR_ID_CREDENTIAL, AuthyTokenCredential.class);
             viewLoginFormState.getEntryActionList().addAll(setPrincipalAction);
             createTransitionForState(viewLoginFormState, CasWebflowConstants.TRANSITION_ID_SUBMIT,
                 CasWebflowConstants.STATE_ID_REAL_SUBMIT, Map.of("bind", Boolean.TRUE, "validate", Boolean.TRUE));
         });
-        
+
         registerMultifactorProviderAuthenticationWebflow(getLoginFlow(), MFA_AUTHY_EVENT_ID,
-                casProperties.getAuthn().getMfa().getAuthy().getId());
+            casProperties.getAuthn().getMfa().getAuthy().getId());
     }
 }

@@ -11,6 +11,7 @@ import org.apereo.cas.consent.ConsentableAttributeBuilder;
 import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.services.RegisteredServiceAccessStrategyUtils;
 import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.support.WebUtils;
 
 import lombok.AccessLevel;
@@ -19,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.execution.RequestContext;
 
 import java.util.ArrayList;
@@ -35,7 +35,7 @@ import java.util.Optional;
  */
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 @Slf4j
-public abstract class AbstractConsentAction extends AbstractAction {
+public abstract class AbstractConsentAction extends BaseCasWebflowAction {
     /**
      * CAS Settings.
      */
@@ -90,7 +90,7 @@ public abstract class AbstractConsentAction extends AbstractAction {
      * @param requestContext the request context
      */
     protected void prepareConsentForRequestContext(final RequestContext requestContext) {
-        val consentProperties = casProperties.getConsent();
+        val consentProperties = casProperties.getConsent().getCore();
 
         val originalService = WebUtils.getService(requestContext);
         val service = this.authenticationRequestServiceSelectionStrategies.resolveService(originalService);
@@ -123,11 +123,11 @@ public abstract class AbstractConsentAction extends AbstractAction {
      * @param context    the context
      */
     protected void prepareConsentableAttributes(final Map<String, List<Object>> attributes, final RequestContext context) {
-        val builders = new ArrayList<>(applicationContext.getBeansOfType(
-            ConsentableAttributeBuilder.class, false, true).values());
+        val builders = new ArrayList<>(applicationContext.getBeansOfType(ConsentableAttributeBuilder.class).values());
         AnnotationAwareOrderComparator.sortIfNecessary(builders);
 
         val consentableAttributes = new ArrayList<CasConsentableAttribute>();
+        LOGGER.debug("Preparing consentable attributes [{}]", attributes);
         attributes.forEach((key, value) -> {
             var attr = CasConsentableAttribute.builder()
                 .name(key)

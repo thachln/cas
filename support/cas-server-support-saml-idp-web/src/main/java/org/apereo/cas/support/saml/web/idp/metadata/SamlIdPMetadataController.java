@@ -1,5 +1,7 @@
 package org.apereo.cas.support.saml.web.idp.metadata;
 
+import org.apereo.cas.authentication.principal.ServiceFactory;
+import org.apereo.cas.authentication.principal.WebApplicationService;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.support.saml.SamlIdPConstants;
 import org.apereo.cas.support.saml.idp.metadata.generator.SamlIdPMetadataGenerator;
@@ -10,15 +12,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import javax.servlet.http.HttpServletResponse;
-
-import java.io.IOException;
+import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
@@ -32,17 +32,16 @@ import java.util.Optional;
 @Controller("samlIdPMetadataController")
 @Slf4j
 @RequiredArgsConstructor
-public class SamlIdPMetadataController implements InitializingBean {
+public class SamlIdPMetadataController {
     private static final String CONTENT_TYPE = "text/xml;charset=UTF-8";
 
     private final SamlIdPMetadataGenerator metadataAndCertificatesGenerationService;
+
     private final SamlIdPMetadataLocator samlIdPMetadataLocator;
+
     private final ServicesManager servicesManager;
-    
-    @Override
-    public void afterPropertiesSet() {
-        this.metadataAndCertificatesGenerationService.generate(Optional.empty());
-    }
+
+    private final ServiceFactory<WebApplicationService> webApplicationServiceFactory;
 
     /**
      * Displays the identity provider metadata.
@@ -50,14 +49,15 @@ public class SamlIdPMetadataController implements InitializingBean {
      *
      * @param service  the service
      * @param response servlet response
-     * @throws IOException the IO exception
+     * @throws Exception the exception
      */
     @GetMapping(path = SamlIdPConstants.ENDPOINT_IDP_METADATA)
-    public void generateMetadataForIdp(@RequestParam(value = "service", required = false) final String service,
-                                       final HttpServletResponse response) throws IOException {
+    public void generateMetadataForIdp(
+        @RequestParam(value = "service", required = false) final String service,
+        final HttpServletResponse response) throws Exception {
 
         val registeredService = getRegisteredServiceIfAny(service);
-        this.metadataAndCertificatesGenerationService.generate(registeredService);
+        metadataAndCertificatesGenerationService.generate(registeredService);
         val md = this.samlIdPMetadataLocator.resolveMetadata(registeredService).getInputStream();
         val contents = IOUtils.toString(md, StandardCharsets.UTF_8);
         response.setContentType(CONTENT_TYPE);
@@ -71,10 +71,11 @@ public class SamlIdPMetadataController implements InitializingBean {
 
     private Optional<SamlRegisteredService> getRegisteredServiceIfAny(final String service) {
         if (NumberUtils.isDigits(service)) {
-            val svc = this.servicesManager.findServiceBy(Long.parseLong(service), SamlRegisteredService.class);
+            val svc = servicesManager.findServiceBy(Long.parseLong(service), SamlRegisteredService.class);
             return Optional.ofNullable(svc);
         }
-        val svc = this.servicesManager.findServiceBy(service, SamlRegisteredService.class);
-        return Optional.ofNullable(svc);
+        val svc = StringUtils.isNotBlank(service) ? webApplicationServiceFactory.createService(service) : null;
+        val registeredService = servicesManager.findServiceBy(svc, SamlRegisteredService.class);
+        return Optional.ofNullable(registeredService);
     }
 }

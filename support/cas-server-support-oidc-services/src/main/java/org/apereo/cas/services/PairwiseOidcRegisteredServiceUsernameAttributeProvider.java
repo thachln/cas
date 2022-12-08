@@ -8,12 +8,13 @@ import org.apereo.cas.authentication.principal.Service;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import java.io.Serial;
 
 /**
  * This is {@link PairwiseOidcRegisteredServiceUsernameAttributeProvider}.
@@ -43,29 +44,32 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Setter
 public class PairwiseOidcRegisteredServiceUsernameAttributeProvider extends BaseRegisteredServiceUsernameAttributeProvider {
 
+    @Serial
     private static final long serialVersionUID = 469929103943101717L;
 
     private PersistentIdGenerator persistentIdGenerator = new OidcPairwisePersistentIdGenerator();
 
     @Override
-    public String resolveUsernameInternal(final Principal principal, final Service service, final RegisteredService registeredService) {
+    public String resolveUsernameInternal(final Principal principal, final Service service,
+                                          final RegisteredService registeredService) {
         if (registeredService == null || !OidcRegisteredService.class.isAssignableFrom(registeredService.getClass())) {
             LOGGER.warn("Service definition [{}] is undefined or it's not an OpenId Connect relying party", registeredService);
             return principal.getId();
         }
-        val oidcSvc = OidcRegisteredService.class.cast(registeredService);
-        if (StringUtils.isBlank(oidcSvc.getSubjectType()) || StringUtils.equalsIgnoreCase(OidcSubjectTypes.PUBLIC.getType(), oidcSvc.getSubjectType())) {
+        val oidcSvc = (OidcRegisteredService) registeredService;
+        if (StringUtils.isBlank(oidcSvc.getSubjectType())
+            || StringUtils.equalsIgnoreCase(OidcSubjectTypes.PUBLIC.getType(), oidcSvc.getSubjectType())) {
             LOGGER.warn("Service definition [{}] does not request a pairwise subject type", oidcSvc);
             return principal.getId();
         }
         val sectorIdentifier = getSectorIdentifier(oidcSvc);
-        val id = this.persistentIdGenerator.generate(principal, new PairwiseService(sectorIdentifier));
+        val id = this.persistentIdGenerator.generate(principal, sectorIdentifier);
         LOGGER.debug("Resolved username [{}] for pairwise access", id);
         return id;
     }
 
     private static String getSectorIdentifier(final OidcRegisteredService client) {
-        if (!StringUtils.isBlank(client.getSectorIdentifierUri())) {
+        if (StringUtils.isNotBlank(client.getSectorIdentifierUri())) {
             val uri = UriComponentsBuilder.fromUriString(client.getSectorIdentifierUri()).build();
             return uri.getHost();
         }
@@ -73,10 +77,4 @@ public class PairwiseOidcRegisteredServiceUsernameAttributeProvider extends Base
         return uri.getHost();
     }
 
-    @Getter
-    @RequiredArgsConstructor
-    private static class PairwiseService implements Service {
-        private static final long serialVersionUID = -6154643329901712381L;
-        private final String id;
-    }
 }

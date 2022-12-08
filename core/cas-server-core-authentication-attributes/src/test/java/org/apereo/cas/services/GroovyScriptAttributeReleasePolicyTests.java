@@ -1,6 +1,7 @@
 package org.apereo.cas.services;
 
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.val;
@@ -23,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.*;
 public class GroovyScriptAttributeReleasePolicyTests {
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "groovyScriptAttributeReleasePolicy.json");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
     @Test
     public void verifySerializeAGroovyScriptAttributeReleasePolicyToJson() throws IOException {
@@ -37,8 +39,13 @@ public class GroovyScriptAttributeReleasePolicyTests {
     public void verifyAction() {
         val policy = new GroovyScriptAttributeReleasePolicy();
         policy.setGroovyScript("classpath:GroovyAttributeRelease.groovy");
-        val attributes = policy.getAttributes(CoreAuthenticationTestUtils.getPrincipal(), CoreAuthenticationTestUtils.getService(),
-            CoreAuthenticationTestUtils.getRegisteredService());
+
+        val releasePolicyContext = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAuthenticationTestUtils.getRegisteredService())
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(CoreAuthenticationTestUtils.getPrincipal())
+            .build();
+        val attributes = policy.getAttributes(releasePolicyContext);
         assertTrue(attributes.containsKey("username"));
         assertTrue(attributes.containsKey("likes"));
         assertTrue(attributes.containsKey("id"));
@@ -49,9 +56,12 @@ public class GroovyScriptAttributeReleasePolicyTests {
     public void verifyFails() {
         val policy = new GroovyScriptAttributeReleasePolicy();
         policy.setGroovyScript("classpath:bad-path.groovy");
-        val attributes = policy.getAttributes(CoreAuthenticationTestUtils.getPrincipal(),
-            CoreAuthenticationTestUtils.getService(),
-            CoreAuthenticationTestUtils.getRegisteredService());
+        val releasePolicyContext = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAuthenticationTestUtils.getRegisteredService())
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(CoreAuthenticationTestUtils.getPrincipal())
+            .build();
+        val attributes = policy.getAttributes(releasePolicyContext);
         assertTrue(attributes.isEmpty());
     }
 
@@ -65,9 +75,12 @@ public class GroovyScriptAttributeReleasePolicyTests {
         assertTrue(file.exists());
         val policy = new GroovyScriptAttributeReleasePolicy();
         policy.setGroovyScript("file:${#systemProperties['java.io.tmpdir']}/" + file.getName());
-        val attributes = policy.getAttributes(CoreAuthenticationTestUtils.getPrincipal(),
-            CoreAuthenticationTestUtils.getService(),
-            CoreAuthenticationTestUtils.getRegisteredService());
+        val releasePolicyContext = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(CoreAuthenticationTestUtils.getRegisteredService())
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(CoreAuthenticationTestUtils.getPrincipal())
+            .build();
+        val attributes = policy.getAttributes(releasePolicyContext);
         assertTrue(attributes.containsKey("username"));
         assertTrue(attributes.containsKey("likes"));
         assertTrue(attributes.containsKey("id"));

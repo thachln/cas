@@ -1,5 +1,7 @@
 package org.apereo.cas.configuration;
 
+import org.apereo.cas.util.function.FunctionUtils;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
@@ -11,7 +13,6 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import de.cronn.reflection.util.PropertyUtils;
 import de.cronn.reflection.util.TypedPropertyGetter;
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.val;
 import org.springframework.beans.factory.config.YamlProcessor;
@@ -21,12 +22,13 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 
 import java.io.IOException;
+import java.io.Serial;
 import java.io.Serializable;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-import static org.springframework.util.ResourceUtils.CLASSPATH_URL_PREFIX;
+import static org.springframework.util.ResourceUtils.*;
 
 /**
  * This is {@link CasCoreConfigurationUtils}.
@@ -36,6 +38,19 @@ import static org.springframework.util.ResourceUtils.CLASSPATH_URL_PREFIX;
  */
 @UtilityClass
 public final class CasCoreConfigurationUtils {
+
+    /**
+     * Gets property name.
+     *
+     * @param <T>      the type parameter
+     * @param <V>      the type parameter
+     * @param clazz    the clazz
+     * @param supplier the supplier
+     * @return the property name
+     */
+    public static <T, V> String getPropertyName(final Class<T> clazz, final TypedPropertyGetter<T, V> supplier) {
+        return PropertyUtils.getPropertyName(clazz, supplier);
+    }
 
     /**
      * Load yaml properties map.
@@ -59,21 +74,22 @@ public final class CasCoreConfigurationUtils {
      * @param filterProvider the filter provider
      * @return the map
      */
-    @SneakyThrows
     public static Map<String, Object> asMap(final Serializable properties,
                                             final FilterProvider filterProvider) {
-        try (val writer = new StringWriter()) {
-            val mapper = new YAMLMapper();
-            mapper.setFilterProvider(filterProvider);
-            mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-            mapper.setPropertyNamingStrategy(PropertyNamingStrategy.KEBAB_CASE);
-            val module = new SimpleModule();
-            module.addSerializer(Resource.class, new ResourceSerializer());
-            mapper.registerModule(module);
-            mapper.writeValue(writer, properties);
-            val resource = new ByteArrayResource(writer.toString().getBytes(StandardCharsets.UTF_8));
-            return CasCoreConfigurationUtils.loadYamlProperties(resource);
-        }
+        return FunctionUtils.doUnchecked(() -> {
+            try (val writer = new StringWriter()) {
+                val mapper = new YAMLMapper();
+                mapper.setFilterProvider(filterProvider);
+                mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+                mapper.setPropertyNamingStrategy(PropertyNamingStrategy.KEBAB_CASE);
+                val module = new SimpleModule();
+                module.addSerializer(Resource.class, new ResourceSerializer());
+                mapper.registerModule(module);
+                mapper.writeValue(writer, properties);
+                val resource = new ByteArrayResource(writer.toString().getBytes(StandardCharsets.UTF_8));
+                return CasCoreConfigurationUtils.loadYamlProperties(resource);
+            }
+        });
     }
 
     /**
@@ -86,20 +102,8 @@ public final class CasCoreConfigurationUtils {
         return asMap(withHolder, new SimpleFilterProvider().setFailOnUnknownId(false));
     }
 
-    /**
-     * Gets property name.
-     *
-     * @param <T>      the type parameter
-     * @param <V>      the type parameter
-     * @param clazz    the clazz
-     * @param supplier the supplier
-     * @return the property name
-     */
-    public static <T, V> String getPropertyName(final Class<T> clazz, final TypedPropertyGetter<T, V> supplier) {
-        return PropertyUtils.getPropertyName(clazz, supplier);
-    }
-
     private static class ResourceSerializer extends StdSerializer<Resource> {
+        @Serial
         private static final long serialVersionUID = 7971411664567411958L;
 
         ResourceSerializer() {

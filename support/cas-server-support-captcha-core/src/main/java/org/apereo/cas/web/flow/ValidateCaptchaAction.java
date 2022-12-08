@@ -1,15 +1,14 @@
 package org.apereo.cas.web.flow;
 
-import org.apereo.cas.configuration.model.support.captcha.GoogleRecaptchaProperties;
+import org.apereo.cas.web.CaptchaActivationStrategy;
 import org.apereo.cas.web.CaptchaValidator;
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.support.WebUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.binding.message.MessageBuilder;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
 
@@ -21,22 +20,26 @@ import org.springframework.webflow.execution.RequestContext;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class ValidateCaptchaAction extends AbstractAction {
-    private final GoogleRecaptchaProperties recaptchaProperties;
+public class ValidateCaptchaAction extends BaseCasWebflowAction {
+    private final CaptchaValidator captchaValidator;
+
+    private final CaptchaActivationStrategy captchaActivationStrategy;
 
     @Override
     protected Event doExecute(final RequestContext requestContext) {
+        if (captchaActivationStrategy.shouldActivate(requestContext, captchaValidator.getRecaptchaProperties()).isEmpty()) {
+            LOGGER.debug("Recaptcha is not set to activate for the current request");
+            return null;
+        }
+
         val request = WebUtils.getHttpServletRequestFromExternalWebflowContext(requestContext);
         val userAgent = WebUtils.getHttpServletRequestUserAgentFromRequestContext();
-
-        val gRecaptchaResponse = CaptchaValidator.getRecaptchaResponse(recaptchaProperties.getVersion(), request);
+        val gRecaptchaResponse = captchaValidator.getRecaptchaResponse(request);
         if (StringUtils.isBlank(gRecaptchaResponse)) {
             LOGGER.warn("Recaptcha response/token is missing from the request");
             return getError(requestContext);
         }
-
-        val validator = new CaptchaValidator(recaptchaProperties.getVerifyUrl(), recaptchaProperties.getSecret(), recaptchaProperties.getScore());
-        val result = validator.validate(gRecaptchaResponse, userAgent);
+        val result = captchaValidator.validate(gRecaptchaResponse, userAgent);
         if (result) {
             LOGGER.debug("Recaptcha has successfully validated the request");
             return null;
@@ -45,12 +48,8 @@ public class ValidateCaptchaAction extends AbstractAction {
     }
 
     private Event getError(final RequestContext requestContext) {
-        val messageContext = requestContext.getMessageContext();
-        messageContext.addMessage(new MessageBuilder()
-            .error()
-            .code(CasWebflowConstants.TRANSITION_ID_CAPTCHA_ERROR)
-            .defaultText(CasWebflowConstants.TRANSITION_ID_CAPTCHA_ERROR)
-            .build());
+        WebUtils.addErrorMessageToContext(requestContext, CasWebflowConstants.TRANSITION_ID_CAPTCHA_ERROR,
+            CasWebflowConstants.TRANSITION_ID_CAPTCHA_ERROR);
         return getEventFactorySupport().event(this, CasWebflowConstants.TRANSITION_ID_CAPTCHA_ERROR);
     }
 }

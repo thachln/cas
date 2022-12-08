@@ -3,10 +3,13 @@ package org.apereo.cas.configuration.model.support.services.yaml;
 import org.apereo.cas.configuration.model.SpringResourceProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.core.io.ClassPathResource;
+
+import java.io.Serial;
 
 /**
  * This is {@link YamlServiceRegistryProperties}.
@@ -18,9 +21,18 @@ import org.springframework.core.io.ClassPathResource;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("YamlServiceRegistryProperties")
 public class YamlServiceRegistryProperties extends SpringResourceProperties {
 
+    @Serial
     private static final long serialVersionUID = 4863603996990314548L;
+
+    /**
+     * Flag indicating whether a background watcher thread is enabled
+     * for the purposes of live reloading of service registry data changes
+     * from persistent data store.
+     */
+    private boolean watcherEnabled = true;
 
     public YamlServiceRegistryProperties() {
         setLocation(new ClassPathResource("services"));

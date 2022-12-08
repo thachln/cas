@@ -63,7 +63,7 @@ public class AmazonCognitoAuthenticationAuthenticationHandler extends AbstractUs
         try {
             val authParams = new HashMap<String, String>();
             authParams.put("USERNAME", credential.getUsername());
-            authParams.put("PASSWORD", credential.getPassword());
+            authParams.put("PASSWORD", credential.toPassword());
             val authRequest = AdminInitiateAuthRequest.builder();
 
             val request = authRequest.authFlow(AuthFlowType.ADMIN_NO_SRP_AUTH)
@@ -82,8 +82,8 @@ public class AmazonCognitoAuthenticationAuthenticationHandler extends AbstractUs
             }
 
             val userResult = cognitoIdentityProvider.adminGetUser(AdminGetUserRequest.builder()
-                .userPoolId(credential.getUsername())
-                .userPoolId(properties.getUserPoolId()).build());
+                .userPoolId(properties.getUserPoolId())
+                .username(credential.getUsername()).build());
 
             val attributes = new LinkedHashMap<String, List<Object>>();
             attributes.put("userStatus", CollectionUtils.wrap(userResult.userStatusAsString()));
@@ -91,7 +91,14 @@ public class AmazonCognitoAuthenticationAuthenticationHandler extends AbstractUs
             attributes.put("userModifiedDate", CollectionUtils.wrap(userResult.userLastModifiedDate().toEpochMilli()));
 
             val userAttributes = userResult.userAttributes();
-            userAttributes.forEach(attr -> attributes.put(attr.name(), CollectionUtils.wrap(attr.value())));
+            userAttributes.forEach(attr -> {
+                if (!properties.getMappedAttributes().isEmpty() && properties.getMappedAttributes().containsKey(attr.name())) {
+                    val newName = properties.getMappedAttributes().get(attr.name());
+                    attributes.put(newName, CollectionUtils.wrap(attr.value()));
+                } else {
+                    attributes.put(attr.name(), CollectionUtils.wrap(attr.value()));
+                }
+            });
 
             val principal = principalFactory.createPrincipal(userResult.username(), attributes);
             return createHandlerResult(credential, principal, new ArrayList<>(0));

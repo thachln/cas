@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.core.collection.LocalAttributeMap;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
@@ -29,7 +28,7 @@ import java.util.HashMap;
  */
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 @Slf4j
-public abstract class AbstractAuthenticationAction extends AbstractAction {
+public abstract class AbstractAuthenticationAction extends BaseCasWebflowAction {
 
     private final CasDelegatingWebflowEventResolver initialAuthenticationAttemptWebflowEventResolver;
 
@@ -55,19 +54,26 @@ public abstract class AbstractAuthenticationAction extends AbstractAction {
             return event;
         }
 
-        val serviceTicketEvent = this.serviceTicketRequestWebflowEventResolver.resolveSingle(requestContext);
+        val serviceTicketEvent = serviceTicketRequestWebflowEventResolver.resolveSingle(requestContext);
         if (serviceTicketEvent != null) {
             fireEventHooks(serviceTicketEvent, requestContext);
             return serviceTicketEvent;
         }
 
-        val finalEvent = this.initialAuthenticationAttemptWebflowEventResolver.resolveSingle(requestContext);
+        val finalEvent = initialAuthenticationAttemptWebflowEventResolver.resolveSingle(requestContext);
         fireEventHooks(finalEvent, requestContext);
         return finalEvent;
     }
 
-    private void fireEventHooks(final Event e, final RequestContext ctx) {
-        val id = e.getId();
+    /**
+     * Fire event hooks.
+     *
+     * @param event the event
+     * @param ctx   the ctx
+     * @return the event
+     */
+    protected Event fireEventHooks(final Event event, final RequestContext ctx) {
+        val id = event.getId();
         if (id.equals(CasWebflowConstants.TRANSITION_ID_ERROR) || id.equals(CasWebflowConstants.TRANSITION_ID_AUTHENTICATION_FAILURE)) {
             onError(ctx);
         }
@@ -77,6 +83,7 @@ public abstract class AbstractAuthenticationAction extends AbstractAction {
         if (id.equals(CasWebflowConstants.TRANSITION_ID_SUCCESS)) {
             onSuccess(ctx);
         }
+        return event;
     }
 
     /**

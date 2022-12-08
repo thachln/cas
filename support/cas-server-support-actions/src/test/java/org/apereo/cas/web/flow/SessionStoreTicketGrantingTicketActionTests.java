@@ -8,8 +8,8 @@ import org.apereo.cas.web.support.WebUtils;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.pac4j.core.context.JEEContext;
-import org.pac4j.core.context.session.JEESessionStore;
+import org.pac4j.jee.context.JEEContext;
+import org.pac4j.jee.context.session.JEESessionStore;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.webflow.context.ExternalContextHolder;
@@ -37,12 +37,11 @@ public class SessionStoreTicketGrantingTicketActionTests extends AbstractWebflow
         RequestContextHolder.setRequestContext(context);
         ExternalContextHolder.setExternalContext(context.getExternalContext());
         WebUtils.putTicketGrantingTicketInScopes(context, new MockTicketGrantingTicket("casuser"));
-        val sessionStore = new JEESessionStore();
-        val action = new SessionStoreTicketGrantingTicketAction(sessionStore);
+        val action = new SessionStoreTicketGrantingTicketAction(JEESessionStore.INSTANCE);
         val result = action.execute(context);
         assertNull(result);
-        val webContext = new JEEContext(request, response, sessionStore);
-        assertTrue(sessionStore.get(webContext, WebUtils.PARAMETER_TICKET_GRANTING_TICKET_ID).isPresent());
+        val webContext = new JEEContext(request, response);
+        assertTrue(JEESessionStore.INSTANCE.get(webContext, WebUtils.PARAMETER_TICKET_GRANTING_TICKET_ID).isPresent());
     }
 
 }

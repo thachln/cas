@@ -1,5 +1,6 @@
 package org.apereo.cas.ticket.accesstoken;
 
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.services.RegisteredServiceCipherExecutor;
 import org.apereo.cas.services.ServicesManager;
@@ -14,11 +15,12 @@ import org.apereo.cas.util.crypto.CipherExecutor;
  * @since 6.1.0
  */
 public class OAuth20JwtBuilder extends JwtBuilder {
-    public OAuth20JwtBuilder(final String casSeverPrefix,
-                             final CipherExecutor defaultTokenCipherExecutor,
+    public OAuth20JwtBuilder(final CipherExecutor defaultTokenCipherExecutor,
                              final ServicesManager servicesManager,
-                             final RegisteredServiceCipherExecutor registeredServiceCipherExecutor) {
-        super(casSeverPrefix, defaultTokenCipherExecutor, servicesManager, registeredServiceCipherExecutor);
+                             final RegisteredServiceCipherExecutor registeredServiceCipherExecutor,
+                             final CasConfigurationProperties casProperties) {
+        super(defaultTokenCipherExecutor, servicesManager,
+            registeredServiceCipherExecutor, casProperties);
     }
 
     @Override

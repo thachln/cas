@@ -17,6 +17,7 @@ import org.apereo.cas.config.CasCoreServicesConfiguration;
 import org.apereo.cas.config.CasCoreTicketCatalogConfiguration;
 import org.apereo.cas.config.CasCoreTicketIdGeneratorsConfiguration;
 import org.apereo.cas.config.CasCoreTicketsConfiguration;
+import org.apereo.cas.config.CasCoreTicketsSerializationConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
 import org.apereo.cas.config.CasCoreWebConfiguration;
 import org.apereo.cas.config.CasDefaultServiceTicketIdGeneratorsConfiguration;
@@ -27,7 +28,7 @@ import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
 import org.apereo.cas.ticket.ExpirationPolicy;
 import org.apereo.cas.ticket.ExpirationPolicyBuilder;
-import org.apereo.cas.ticket.Ticket;
+import org.apereo.cas.ticket.ServiceTicketSessionTrackingPolicy;
 import org.apereo.cas.ticket.expiration.NeverExpiresExpirationPolicy;
 import org.apereo.cas.validation.config.CasCoreValidationConfiguration;
 import org.apereo.cas.web.config.CasCookieConfiguration;
@@ -36,10 +37,12 @@ import org.apereo.cas.web.flow.config.CasMultifactorAuthenticationWebflowConfigu
 import org.apereo.cas.web.flow.config.CasWebflowContextConfiguration;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
@@ -47,7 +50,8 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.test.annotation.DirtiesContext;
+
+import java.io.Serial;
 
 /**
  * This is {@link BaseCasCoreTests}.
@@ -56,8 +60,7 @@ import org.springframework.test.annotation.DirtiesContext;
  * @since 6.0.0
  */
 @SpringBootTest(classes = BaseCasCoreTests.SharedTestConfiguration.class)
-@EnableAspectJAutoProxy(proxyTargetClass = true)
-@DirtiesContext
+@EnableAspectJAutoProxy(proxyTargetClass = false)
 @EnableScheduling
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 public abstract class BaseCasCoreTests {
@@ -68,18 +71,18 @@ public abstract class BaseCasCoreTests {
     @Autowired
     protected ConfigurableApplicationContext applicationContext;
 
+    @Autowired
+    @Qualifier(ServiceTicketSessionTrackingPolicy.BEAN_NAME)
+    protected ServiceTicketSessionTrackingPolicy serviceTicketSessionTrackingPolicy;
+
     public static ExpirationPolicyBuilder neverExpiresExpirationPolicyBuilder() {
         return new ExpirationPolicyBuilder() {
+            @Serial
             private static final long serialVersionUID = -9043565995104313970L;
 
             @Override
             public ExpirationPolicy buildTicketExpirationPolicy() {
                 return NeverExpiresExpirationPolicy.INSTANCE;
-            }
-
-            @Override
-            public Class<Ticket> getTicketType() {
-                return null;
             }
         };
     }
@@ -87,6 +90,7 @@ public abstract class BaseCasCoreTests {
     @ImportAutoConfiguration({
         MailSenderAutoConfiguration.class,
         AopAutoConfiguration.class,
+        WebMvcAutoConfiguration.class,
         RefreshAutoConfiguration.class
     })
     @SpringBootConfiguration
@@ -94,11 +98,11 @@ public abstract class BaseCasCoreTests {
         CasCookieConfiguration.class,
         CasCoreServicesConfiguration.class,
         CasAuthenticationEventExecutionPlanTestConfiguration.class,
-        AbstractCentralAuthenticationServiceTests.CasTestConfiguration.class,
         CasCoreServicesAuthenticationConfiguration.class,
         CasWebApplicationServiceFactoryConfiguration.class,
         CasDefaultServiceTicketIdGeneratorsConfiguration.class,
         CasCoreTicketIdGeneratorsConfiguration.class,
+        CasCoreTicketsSerializationConfiguration.class,
         CasCoreUtilConfiguration.class,
         CasCoreAuthenticationConfiguration.class,
         CasCoreAuthenticationPrincipalConfiguration.class,

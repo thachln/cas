@@ -7,6 +7,8 @@ import org.apereo.cas.support.events.AbstractCasEvent;
 import lombok.Getter;
 import lombok.ToString;
 
+import java.io.Serial;
+
 /**
  * This is {@link CasRiskyAuthenticationMitigatedEvent}.
  *
@@ -17,20 +19,15 @@ import lombok.ToString;
 @Getter
 public class CasRiskyAuthenticationMitigatedEvent extends AbstractCasEvent {
 
+    @Serial
     private static final long serialVersionUID = 291198069766263578L;
 
     private final Authentication authentication;
+
     private final RegisteredService service;
+
     private final Object response;
 
-    /**
-     * Instantiates a new CAS risky authentication mitigated event.
-     *
-     * @param source         the source
-     * @param authentication the authentication
-     * @param service        the service
-     * @param response       the response
-     */
     public CasRiskyAuthenticationMitigatedEvent(final Object source, final Authentication authentication,
                                                 final RegisteredService service, final Object response) {
         super(source);

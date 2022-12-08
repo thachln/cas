@@ -1,8 +1,13 @@
 package org.apereo.cas.ticket.expiration;
 
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
+import org.apereo.cas.ticket.DefaultServiceTicketSessionTrackingPolicy;
+import org.apereo.cas.ticket.ServiceTicketSessionTrackingPolicy;
 import org.apereo.cas.ticket.TicketGrantingTicketImpl;
+import org.apereo.cas.ticket.registry.DefaultTicketRegistry;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 import org.apereo.cas.util.serialization.SerializationUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +26,8 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
+ * Test cases for {@link MultiTimeUseOrTimeoutExpirationPolicy}.
+ *
  * @author Scott Battaglia
  * @since 3.0.0
  */
@@ -28,7 +35,9 @@ import static org.junit.jupiter.api.Assertions.*;
 public class MultiTimeUseOrTimeoutExpirationPolicyTests {
 
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "multiTimeUseOrTimeoutExpirationPolicy.json");
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
     private static final long TIMEOUT_SECONDS = 1;
 
@@ -37,6 +46,12 @@ public class MultiTimeUseOrTimeoutExpirationPolicyTests {
     private MultiTimeUseOrTimeoutExpirationPolicy expirationPolicy;
 
     private TicketGrantingTicketImpl ticket;
+
+    private static ServiceTicketSessionTrackingPolicy getTrackingPolicy() {
+        val props = new CasConfigurationProperties();
+        props.getTicket().getTgt().getCore().setOnlyTrackMostRecentSession(true);
+        return new DefaultServiceTicketSessionTrackingPolicy(props, new DefaultTicketRegistry());
+    }
 
     @BeforeEach
     public void initialize() {
@@ -51,13 +66,14 @@ public class MultiTimeUseOrTimeoutExpirationPolicyTests {
 
     @Test
     public void verifyTicketIsNotExpired() {
-        this.expirationPolicy.setClock(Clock.fixed(this.ticket.getLastTimeUsed().toInstant().plusSeconds(TIMEOUT_SECONDS).minusNanos(1), ZoneOffset.UTC));
+        this.expirationPolicy.setClock(Clock.fixed(this.ticket.getCreationTime().toInstant().plusSeconds(TIMEOUT_SECONDS).minusNanos(1), ZoneOffset.UTC));
         assertFalse(this.ticket.isExpired());
+        assertEquals(0, this.expirationPolicy.getTimeToIdle());
     }
 
     @Test
     public void verifyTicketIsExpiredByTime() {
-        this.expirationPolicy.setClock(Clock.fixed(this.ticket.getLastTimeUsed().toInstant().plusSeconds(TIMEOUT_SECONDS).plusNanos(1), ZoneOffset.UTC));
+        this.expirationPolicy.setClock(Clock.fixed(this.ticket.getCreationTime().toInstant().plusSeconds(TIMEOUT_SECONDS).plusNanos(1), ZoneOffset.UTC));
         assertTrue(this.ticket.isExpired());
     }
 
@@ -65,7 +81,7 @@ public class MultiTimeUseOrTimeoutExpirationPolicyTests {
     public void verifyTicketIsExpiredByCount() {
         IntStream.range(0, NUMBER_OF_USES)
             .forEach(i -> this.ticket.grantServiceTicket("test", RegisteredServiceTestUtils.getService(),
-                NeverExpiresExpirationPolicy.INSTANCE, false, true));
+                NeverExpiresExpirationPolicy.INSTANCE, false, getTrackingPolicy()));
         assertTrue(this.ticket.isExpired());
     }
 

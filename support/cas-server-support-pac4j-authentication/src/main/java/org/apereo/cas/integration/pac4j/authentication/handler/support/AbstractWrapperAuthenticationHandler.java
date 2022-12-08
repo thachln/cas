@@ -4,6 +4,7 @@ import org.apereo.cas.authentication.AuthenticationHandlerExecutionResult;
 import org.apereo.cas.authentication.Credential;
 import org.apereo.cas.authentication.principal.ClientCredential;
 import org.apereo.cas.authentication.principal.PrincipalFactory;
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.util.HttpRequestUtils;
 import org.apereo.cas.util.LoggingUtils;
@@ -12,15 +13,15 @@ import lombok.NonNull;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.pac4j.core.context.JEEContext;
 import org.pac4j.core.context.WebContext;
-import org.pac4j.core.context.session.JEESessionStore;
+import org.pac4j.core.context.session.SessionStore;
 import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.credentials.authenticator.Authenticator;
 import org.pac4j.core.profile.CommonProfile;
 import org.pac4j.core.profile.creator.AuthenticatorProfileCreator;
 import org.pac4j.core.profile.creator.ProfileCreator;
 import org.pac4j.core.util.InitializableObject;
+import org.pac4j.jee.context.JEEContext;
 
 import javax.security.auth.login.FailedLoginException;
 import java.security.GeneralSecurityException;
@@ -28,9 +29,9 @@ import java.security.GeneralSecurityException;
 /**
  * Abstract pac4j authentication handler which uses a pac4j authenticator and profile creator.
  *
+ * @author Jerome Leleu
  * @param <I> the type parameter
  * @param <C> the type parameter
- * @author Jerome Leleu
  * @since 4.2.0
  */
 @Slf4j
@@ -40,10 +41,12 @@ public abstract class AbstractWrapperAuthenticationHandler<I extends Credential,
     /**
      * The pac4j profile creator used for authentication.
      */
-    protected @NonNull ProfileCreator<C> profileCreator = AuthenticatorProfileCreator.INSTANCE;
+    protected @NonNull ProfileCreator profileCreator = AuthenticatorProfileCreator.INSTANCE;
 
-    protected AbstractWrapperAuthenticationHandler(final String name, final ServicesManager servicesManager, final PrincipalFactory principalFactory, final Integer order) {
-        super(name, servicesManager, principalFactory, order);
+    protected AbstractWrapperAuthenticationHandler(final String name, final ServicesManager servicesManager,
+                                                   final PrincipalFactory principalFactory, final Integer order,
+                                                   final SessionStore sessionStore) {
+        super(name, servicesManager, principalFactory, order, sessionStore);
     }
 
     /**
@@ -53,8 +56,7 @@ public abstract class AbstractWrapperAuthenticationHandler<I extends Credential,
      */
     protected static WebContext getWebContext() {
         return new JEEContext(HttpRequestUtils.getHttpServletRequestFromRequestAttributes(),
-            HttpRequestUtils.getHttpServletResponseFromRequestAttributes(),
-            new JEESessionStore());
+            HttpRequestUtils.getHttpServletResponseFromRequestAttributes());
     }
 
     @Override
@@ -63,7 +65,7 @@ public abstract class AbstractWrapperAuthenticationHandler<I extends Credential,
     }
 
     @Override
-    protected AuthenticationHandlerExecutionResult doAuthentication(final Credential credential) throws GeneralSecurityException {
+    protected AuthenticationHandlerExecutionResult doAuthentication(final Credential credential, final Service service) throws GeneralSecurityException {
         val credentials = convertToPac4jCredentials((I) credential);
         LOGGER.trace("Credentials converted to [{}]", credentials);
         try {
@@ -74,17 +76,17 @@ public abstract class AbstractWrapperAuthenticationHandler<I extends Credential,
             }
             val webContext = getWebContext();
             LOGGER.trace("Validating credentials [{}] using authenticator [{}]", credentials, authenticator);
-            authenticator.validate(credentials, webContext);
+            authenticator.validate(credentials, webContext, this.sessionStore);
 
             LOGGER.trace("Creating user profile result for [{}]", credentials);
-            val profileResult = this.profileCreator.create(credentials, webContext);
+            val profileResult = this.profileCreator.create(credentials, webContext, this.sessionStore);
             if (profileResult.isEmpty()) {
                 throw new FailedLoginException("Unable to create common profile instance for credential " + credential);
             }
             val profile = CommonProfile.class.cast(profileResult.get());
             LOGGER.debug("Authenticated profile: [{}]", profile);
             val clientCredential = new ClientCredential(credentials, authenticator.getClass().getSimpleName());
-            return createResult(clientCredential, profile, null);
+            return createResult(clientCredential, profile, null, service);
         } catch (final Exception e) {
             LoggingUtils.error(LOGGER, e);
             throw new FailedLoginException("Failed to validate credentials: " + e.getMessage());
@@ -114,5 +116,5 @@ public abstract class AbstractWrapperAuthenticationHandler<I extends Credential,
      * @param credential the credential
      * @return the authenticator
      */
-    protected abstract Authenticator<C> getAuthenticator(Credential credential);
+    protected abstract Authenticator getAuthenticator(Credential credential);
 }

@@ -7,17 +7,20 @@ import org.apereo.cas.authentication.principal.PrincipalFactoryUtils;
 import org.apereo.cas.authentication.principal.PrincipalNameTransformerUtils;
 import org.apereo.cas.authentication.principal.PrincipalResolver;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.token.authentication.TokenAuthenticationHandler;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import lombok.val;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.pac4j.jee.context.session.JEESessionStore;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 /**
  * This is {@link TokenAuthenticationConfiguration}.
@@ -26,37 +29,42 @@ import org.springframework.context.annotation.Configuration;
  * @author Dmitriy Kopylenko
  * @since 5.2.0
  */
-@Configuration("tokenAuthenticationConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.Authentication, module = "token")
+@AutoConfiguration
 public class TokenAuthenticationConfiguration {
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("servicesManager")
-    private ObjectProvider<ServicesManager> servicesManager;
-
-    @Autowired
-    @Qualifier("defaultPrincipalResolver")
-    private ObjectProvider<PrincipalResolver> defaultPrincipalResolver;
 
     @ConditionalOnMissingBean(name = "tokenPrincipalFactory")
     @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     public PrincipalFactory tokenPrincipalFactory() {
         return PrincipalFactoryUtils.newPrincipalFactory();
     }
 
     @ConditionalOnMissingBean(name = "tokenAuthenticationHandler")
     @Bean
-    public AuthenticationHandler tokenAuthenticationHandler() {
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public AuthenticationHandler tokenAuthenticationHandler(
+        final CasConfigurationProperties casProperties,
+        @Qualifier("tokenPrincipalFactory")
+        final PrincipalFactory tokenPrincipalFactory,
+        @Qualifier(ServicesManager.BEAN_NAME)
+        final ServicesManager servicesManager) {
         val token = casProperties.getAuthn().getToken();
-        return new TokenAuthenticationHandler(token.getName(), servicesManager.getObject(), tokenPrincipalFactory(),
-            PrincipalNameTransformerUtils.newPrincipalNameTransformer(token.getPrincipalTransformation()));
+        val principalNameTransformer = PrincipalNameTransformerUtils.newPrincipalNameTransformer(token.getPrincipalTransformation());
+        val handler = new TokenAuthenticationHandler(token.getName(), servicesManager, tokenPrincipalFactory, principalNameTransformer, JEESessionStore.INSTANCE);
+        handler.setState(token.getState());
+        return handler;
     }
 
     @ConditionalOnMissingBean(name = "tokenAuthenticationEventExecutionPlanConfigurer")
     @Bean
-    public AuthenticationEventExecutionPlanConfigurer tokenAuthenticationEventExecutionPlanConfigurer() {
-        return plan -> plan.registerAuthenticationHandlerWithPrincipalResolver(tokenAuthenticationHandler(), defaultPrincipalResolver.getObject());
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public AuthenticationEventExecutionPlanConfigurer tokenAuthenticationEventExecutionPlanConfigurer(
+        @Qualifier("tokenAuthenticationHandler")
+        final AuthenticationHandler tokenAuthenticationHandler,
+        @Qualifier(PrincipalResolver.BEAN_NAME_PRINCIPAL_RESOLVER)
+        final PrincipalResolver defaultPrincipalResolver) {
+        return plan -> plan.registerAuthenticationHandlerWithPrincipalResolver(tokenAuthenticationHandler, defaultPrincipalResolver);
     }
 }

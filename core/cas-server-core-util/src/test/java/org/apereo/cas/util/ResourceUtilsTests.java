@@ -10,6 +10,12 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.UrlResource;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Objects;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -23,10 +29,12 @@ import static org.mockito.Mockito.*;
 public class ResourceUtilsTests {
     @Test
     public void verifyResourceExists() {
+        assertThrows(IllegalArgumentException.class, () -> ResourceUtils.getRawResourceFrom(null));
         assertFalse(ResourceUtils.doesResourceExist(new FileSystemResource("invalid.json")));
         val resourceLoader = mock(ResourceLoader.class);
         when(resourceLoader.getResource(anyString())).thenThrow(new RuntimeException());
         assertFalse(ResourceUtils.doesResourceExist("bad-resource", resourceLoader));
+        assertFalse(ResourceUtils.doesResourceExist(null, resourceLoader));
         assertFalse(ResourceUtils.doesResourceExist("invalid.json"));
         assertTrue(ResourceUtils.doesResourceExist("classpath:valid.json",
             new DefaultResourceLoader(ResourceUtilsTests.class.getClassLoader())));
@@ -57,11 +65,32 @@ public class ResourceUtilsTests {
     }
 
     @Test
-    public void verifyExport() {
+    public void verifyExport() throws Exception {
         val url = getClass().getClassLoader().getResource("META-INF/additional-spring-configuration-metadata.json");
         assertNotNull(url);
         val parent = FileUtils.getTempDirectory();
         assertNull(ResourceUtils.exportClasspathResourceToFile(parent, null));
         assertNotNull(ResourceUtils.exportClasspathResourceToFile(parent, new UrlResource(url)));
+
+        val res = new ClassPathResource("valid.json");
+        val file = new File(FileUtils.getTempDirectory(), "/one/two");
+        FileUtils.write(new File(file, Objects.requireNonNull(res.getFilename())), "data", StandardCharsets.UTF_8);
+        assertNotNull(ResourceUtils.exportClasspathResourceToFile(file, res));
     }
+
+    /**
+     * Check that doesResourceExist validates existence of directory.
+     */
+    @Test
+    public void verifyResourceExistsDetectsFolder() throws IOException {
+        val path = Files.createTempDirectory("castest-");
+        assertTrue(ResourceUtils.doesResourceExist(ResourceUtils.getResourceFrom(path.toString())));
+        FileUtils.forceDelete(path.toFile());
+        val nonFileResourceMissing = ResourceUtils.getRawResourceFrom("classpath:doesnotexist.json");
+        assertDoesNotThrow(() -> ResourceUtils.doesResourceExist(nonFileResourceMissing));
+        val nonFileExists = ResourceUtils.getRawResourceFrom("classpath:log4j2-test.xml");
+        assertDoesNotThrow(() -> ResourceUtils.doesResourceExist(nonFileExists));
+    }
+
+
 }

@@ -6,6 +6,8 @@ import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.web.flow.CasWebflowConstants;
 import org.apereo.cas.web.support.WebUtils;
 
+import com.authy.AuthyApiClient;
+import com.authy.api.Error;
 import com.authy.api.Hash;
 import com.authy.api.Token;
 import com.authy.api.Tokens;
@@ -35,11 +37,14 @@ public class AuthyAuthenticationRegistrationWebflowActionTests {
     @Test
     public void verifyOperation() throws Exception {
         val authyInstance = mock(AuthyClientInstance.class);
+        val apiClient = mock(AuthyApiClient.class);
+        when(authyInstance.authyClient()).thenReturn(apiClient);
+        
         val tokens = mock(Tokens.class);
         val token = new Token(200, "OK", "Token is valid.");
         when(tokens.verify(eq(123456), eq("token"), anyMap())).thenReturn(token);
 
-        when(authyInstance.getAuthyTokens()).thenReturn(tokens);
+        when(apiClient.getTokens()).thenReturn(tokens);
         val user = new User(200, "token");
         user.setId(123456);
         when(authyInstance.getOrCreateUser(any(Principal.class))).thenReturn(user);
@@ -50,7 +55,7 @@ public class AuthyAuthenticationRegistrationWebflowActionTests {
 
         val users = mock(Users.class);
         when(users.requestSms(anyInt())).thenReturn(hash);
-        when(authyInstance.getAuthyUsers()).thenReturn(users);
+        when(apiClient.getUsers()).thenReturn(users);
 
         val context = new MockRequestContext();
         val request = new MockHttpServletRequest();
@@ -60,7 +65,18 @@ public class AuthyAuthenticationRegistrationWebflowActionTests {
 
         WebUtils.putAuthentication(CoreAuthenticationTestUtils.getAuthentication(), context);
         val action = new AuthyAuthenticationRegistrationWebflowAction(authyInstance);
-        val event = action.doExecute(context);
-        assertEquals(CasWebflowConstants.STATE_ID_SUCCESS, event.getId());
+        var event = action.doExecute(context);
+        assertEquals(CasWebflowConstants.TRANSITION_ID_SUCCESS, event.getId());
+
+        user.setStatus(400);
+        event = action.doExecute(context);
+        assertEquals(CasWebflowConstants.TRANSITION_ID_ERROR, event.getId());
+        
+        user.setStatus(200);
+        hash.setSuccess(false);
+        hash.setError(new Error());
+        hash.setMessage("Message");
+        event = action.doExecute(context);
+        assertEquals(CasWebflowConstants.TRANSITION_ID_ERROR, event.getId());
     }
 }

@@ -1,11 +1,11 @@
 package org.apereo.cas.trusted.authentication.storage;
 
-import org.apereo.cas.configuration.model.support.mfa.TrustedDevicesMultifactorProperties;
+import org.apereo.cas.configuration.model.support.mfa.trusteddevice.TrustedDevicesMultifactorProperties;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustRecord;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustRecordKeyGenerator;
+import org.apereo.cas.util.LoggingUtils;
 import org.apereo.cas.util.crypto.CipherExecutor;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.data.mongodb.core.MongoOperations;
@@ -45,11 +45,7 @@ public class MongoDbMultifactorAuthenticationTrustStorage extends BaseMultifacto
                 getTrustedDevicesMultifactorProperties().getMongo().getCollection());
             LOGGER.info("Found and removed [{}]", res.getDeletedCount());
         } catch (final Exception e) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug(e.getMessage(), e);
-            } else {
-                LOGGER.info("No trusted authentication records could be found");
-            }
+            LoggingUtils.error(LOGGER, e);
         }
     }
 
@@ -62,11 +58,7 @@ public class MongoDbMultifactorAuthenticationTrustStorage extends BaseMultifacto
                 getTrustedDevicesMultifactorProperties().getMongo().getCollection());
             LOGGER.info("Found and removed [{}]", res.getDeletedCount());
         } catch (final Exception e) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug(e.getMessage(), e);
-            } else {
-                LOGGER.info("No trusted authentication records could be found");
-            }
+            LoggingUtils.error(LOGGER, e);
         }
     }
 
@@ -107,7 +99,6 @@ public class MongoDbMultifactorAuthenticationTrustStorage extends BaseMultifacto
             getTrustedDevicesMultifactorProperties().getMongo().getCollection());
     }
 
-    @SneakyThrows
     @Override
     protected MultifactorAuthenticationTrustRecord saveInternal(final MultifactorAuthenticationTrustRecord record) {
         this.mongoTemplate.save(record, getTrustedDevicesMultifactorProperties().getMongo().getCollection());

@@ -5,10 +5,12 @@ import org.apereo.cas.ticket.Ticket;
 import org.apereo.cas.util.LoggingUtils;
 
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
+import org.jooq.lambda.Unchecked;
+
+import java.util.Objects;
 
 /**
  * This is {@link DefaultTicketStringSerializationManager}.
@@ -24,10 +26,8 @@ public class DefaultTicketStringSerializationManager implements TicketSerializat
     @Override
     public String serializeTicket(final Ticket ticket) {
         try {
-            val serializer = ticketSerializationExecutionPlan.getTicketSerializer(ticket);
-            if (serializer == null) {
-                throw new IllegalArgumentException("Unable to find ticket serializer for " + ticket.getId());
-            }
+            val serializer = Objects.requireNonNull(ticketSerializationExecutionPlan.getTicketSerializer(ticket),
+                () -> "Unable to find ticket serializer for " + ticket.getId());
             return serializer.toString(ticket);
         } catch (final Exception e) {
             LoggingUtils.error(LOGGER, e);
@@ -36,7 +36,6 @@ public class DefaultTicketStringSerializationManager implements TicketSerializat
     }
 
     @Override
-    @SneakyThrows
     public Ticket deserializeTicket(final String ticketContent, final String type) {
         if (StringUtils.isBlank(type)) {
             throw new InvalidTicketException("Invalid ticket type [blank] specified");
@@ -45,16 +44,16 @@ public class DefaultTicketStringSerializationManager implements TicketSerializat
         if (serializer == null) {
             throw new IllegalArgumentException("Unable to find ticket deserializer for " + type);
         }
-        val clazz = Class.forName(type);
-        return deserializeTicket(ticketContent, (Class) clazz);
+        return Unchecked.supplier(() -> {
+            val clazz = Class.forName(type);
+            return deserializeTicket(ticketContent, (Class) clazz);
+        }).get();
     }
 
     @Override
     public <T extends Ticket> T deserializeTicket(final String ticketContent, final Class<T> clazz) {
-        val serializer = ticketSerializationExecutionPlan.getTicketSerializer(clazz);
-        if (serializer == null) {
-            throw new IllegalArgumentException("Unable to find ticket deserializer for " + clazz.getSimpleName());
-        }
+        val serializer = Objects.requireNonNull(ticketSerializationExecutionPlan.getTicketSerializer(clazz),
+            () -> "Unable to find ticket deserializer for " + clazz.getSimpleName());
         LOGGER.trace("Unmarshalling ticket content from [{}]", ticketContent);
         val ticket = serializer.from(ticketContent);
         if (ticket == null) {
@@ -62,8 +61,8 @@ public class DefaultTicketStringSerializationManager implements TicketSerializat
         }
         if (!clazz.isAssignableFrom(ticket.getClass())) {
             throw new ClassCastException("Ticket [" + ticket.getId()
-                + " is of type " + ticket.getClass()
-                + " when we were expecting " + clazz);
+                                         + " is of type " + ticket.getClass()
+                                         + " when we were expecting " + clazz);
         }
         return (T) ticket;
     }

@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.3.0
  */
-@Tag("WebflowActions")
+@Tag("WebflowAuthenticationActions")
 public class AcceptUserGraphicsForAuthenticationActionTests extends AbstractGraphicalAuthenticationTests {
     @Test
     public void verifyAction() throws Exception {
@@ -35,6 +35,6 @@ public class AcceptUserGraphicsForAuthenticationActionTests extends AbstractGrap
 
         val credential = WebUtils.getCredential(context, UsernamePasswordCredential.class);
         assertNotNull(credential);
-        assertNull(credential.getPassword());
+        assertEquals(0, credential.getPassword().length);
     }
 }

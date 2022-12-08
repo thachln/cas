@@ -2,7 +2,6 @@ package org.apereo.cas.ticket.query;
 
 import org.apereo.cas.mock.MockTicketGrantingTicket;
 import org.apereo.cas.support.saml.BaseSamlIdPConfigurationTests;
-import org.apereo.cas.ticket.expiration.NeverExpiresExpirationPolicy;
 
 import lombok.val;
 import org.junit.jupiter.api.Tag;
@@ -18,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.1.0
  */
-@Tag("SAML")
+@Tag("SAML2")
 public class DefaultSamlAttributeQueryTicketFactoryTests extends BaseSamlIdPConfigurationTests {
     @Autowired
     @Qualifier("samlAttributeQueryTicketFactory")
@@ -31,14 +30,11 @@ public class DefaultSamlAttributeQueryTicketFactoryTests extends BaseSamlIdPConf
         val ticketId = samlAttributeQueryTicketFactory.create("ATTR_QUERY",
             getAuthnRequestFor("helloworld"), "https://www.example.org", tgt);
         assertNotNull(ticketId);
+        assertNull(ticketId.getTicketGrantingTicket());
         assertNotNull(ticketId.getPrefix());
-        assertNotNull(ticketId.getTicketGrantingTicket());
+        assertNotNull(ticketId.getAuthentication());
         assertNotNull(ticketId.getObject());
         assertNotNull(ticketId.getRelyingParty());
         assertNotNull(ticketId.getExpirationPolicy());
-        assertTrue(ticketId.isFromNewLogin());
-        assertThrows(UnsupportedOperationException.class,
-            () -> ticketId.grantProxyGrantingTicket("id",
-                tgt.getAuthentication(), NeverExpiresExpirationPolicy.INSTANCE));
     }
 }

@@ -6,7 +6,9 @@ import org.apereo.cas.util.crypto.CipherExecutor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -25,6 +27,7 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public class EncryptionJwtSigningJwtCryptographyProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = -3015641631298039059L;
 
     /**
@@ -35,11 +38,13 @@ public class EncryptionJwtSigningJwtCryptographyProperties implements Serializab
     /**
      * Settings that deal with encryption of values.
      */
+    @NestedConfigurationProperty
     private EncryptionJwtCryptoProperties encryption = new EncryptionJwtCryptoProperties();
 
     /**
      * Settings that deal with signing of values.
      */
+    @NestedConfigurationProperty
     private SigningJwtCryptoProperties signing = new SigningJwtCryptoProperties();
 
     /**

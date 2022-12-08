@@ -2,10 +2,11 @@ package org.apereo.cas.u2f.redis;
 
 import org.apereo.cas.adaptors.u2f.storage.AbstractU2FDeviceRepositoryTests;
 import org.apereo.cas.adaptors.u2f.storage.U2FDeviceRepository;
+import org.apereo.cas.config.CasCoreHttpConfiguration;
 import org.apereo.cas.config.U2FConfiguration;
 import org.apereo.cas.config.U2FRedisConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import org.junit.jupiter.api.Tag;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
     U2FRedisConfiguration.class,
     U2FConfiguration.class,
     CasWebApplicationServiceFactoryConfiguration.class,
+    CasCoreHttpConfiguration.class,
     RefreshAutoConfiguration.class
 },
     properties = {
@@ -35,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
     })
 @Tag("Redis")
 @Getter
-@EnabledIfPortOpen(port = 6379)
+@EnabledIfListeningOnPort(port = 6379)
 public class U2FRedisDeviceRepositoryTests extends AbstractU2FDeviceRepositoryTests {
     @Autowired
     @Qualifier("u2fDeviceRepository")

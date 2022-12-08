@@ -2,7 +2,7 @@ package org.apereo.cas.adaptors.radius.authentication;
 
 import org.apereo.cas.adaptors.radius.RadiusServer;
 import org.apereo.cas.authentication.AbstractMultifactorAuthenticationProvider;
-import org.apereo.cas.configuration.model.support.mfa.RadiusMultifactorProperties;
+import org.apereo.cas.configuration.model.support.mfa.RadiusMultifactorAuthenticationProperties;
 import org.apereo.cas.services.RegisteredService;
 
 import lombok.AllArgsConstructor;
@@ -12,6 +12,7 @@ import lombok.val;
 import net.jradius.exception.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.Serial;
 import java.net.SocketTimeoutException;
 import java.util.List;
 
@@ -26,13 +27,14 @@ import java.util.List;
 @NoArgsConstructor
 public class RadiusMultifactorAuthenticationProvider extends AbstractMultifactorAuthenticationProvider {
 
+    @Serial
     private static final long serialVersionUID = 4789727148634156909L;
 
     private List<RadiusServer> servers;
 
     @Override
     public String getId() {
-        return StringUtils.defaultIfBlank(super.getId(), RadiusMultifactorProperties.DEFAULT_IDENTIFIER);
+        return StringUtils.defaultIfBlank(super.getId(), RadiusMultifactorAuthenticationProperties.DEFAULT_IDENTIFIER);
     }
 
     @Override

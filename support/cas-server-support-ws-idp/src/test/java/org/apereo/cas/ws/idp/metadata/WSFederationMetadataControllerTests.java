@@ -12,6 +12,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * This is {@link WSFederationMetadataControllerTests}.
@@ -30,6 +31,17 @@ public class WSFederationMetadataControllerTests extends BaseCoreWsSecurityIdent
         val request = new MockHttpServletRequest();
         val response = new MockHttpServletResponse();
         wsFederationMetadataController.doGet(request, response);
-        assertEquals(response.getStatus(), HttpStatus.SC_OK);
+        assertEquals(HttpStatus.SC_OK, response.getStatus());
+    }
+
+    @Test
+    public void verifyFailsOperation() throws Exception {
+        val request = new MockHttpServletRequest();
+        val response = mock(MockHttpServletResponse.class);
+        doThrow(new RuntimeException()).when(response).setContentType(anyString());
+        doCallRealMethod().when(response).sendError(anyInt());
+        doCallRealMethod().when(response).getStatus();
+        wsFederationMetadataController.doGet(request, response);
+        assertEquals(HttpStatus.SC_INTERNAL_SERVER_ERROR, response.getStatus());
     }
 }

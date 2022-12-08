@@ -10,13 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.binding.message.MessageBuilder;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.webflow.action.EventFactorySupport;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
-
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * This is {@link DefaultCasWebflowAuthenticationExceptionHandler}.
@@ -29,17 +26,17 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class DefaultCasWebflowAuthenticationExceptionHandler implements CasWebflowExceptionHandler<AuthenticationException> {
-    private int order = Integer.MAX_VALUE - 1;
-
     /**
      * Ordered list of error classes that this class knows how to handle.
      */
-    private final Set<Class<? extends Throwable>> errors;
+    private final CasWebflowExceptionCatalog errors;
 
     /**
      * String appended to exception class name to create a message bundle key for that particular error.
      */
     private final String messageBundlePrefix;
+
+    private int order = Integer.MAX_VALUE - 1;
 
     @Override
     public Event handle(final AuthenticationException exception, final RequestContext requestContext) {
@@ -71,8 +68,8 @@ public class DefaultCasWebflowAuthenticationExceptionHandler implements CasWebfl
                 return CasWebflowConstants.STATE_ID_SERVICE_UNAUTHZ_CHECK;
             }
         }
-        val values = e.getHandlerErrors().values().stream().map(Throwable::getClass).collect(Collectors.toList());
-        val handlerErrorName = this.errors
+        val values = e.getHandlerErrors().values().stream().map(Throwable::getClass).toList();
+        val handlerErrorName = errors.getRegisteredExceptions()
             .stream()
             .filter(values::contains)
             .map(Class::getSimpleName)
@@ -82,14 +79,8 @@ public class DefaultCasWebflowAuthenticationExceptionHandler implements CasWebfl
                 return UNKNOWN;
             });
 
-        val messageContext = requestContext.getMessageContext();
         val messageCode = this.messageBundlePrefix + handlerErrorName;
-        val message = new MessageBuilder()
-            .error()
-            .code(messageCode)
-            .args(e.getArgs())
-            .build();
-        messageContext.addMessage(message);
+        WebUtils.addErrorMessageToContext(requestContext, messageCode, StringUtils.EMPTY, e.getArgs().toArray());
         return handlerErrorName;
     }
 }

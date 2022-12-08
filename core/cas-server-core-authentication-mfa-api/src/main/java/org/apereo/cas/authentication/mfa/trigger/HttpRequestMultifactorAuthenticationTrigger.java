@@ -19,7 +19,9 @@ import lombok.val;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HttpRequestMultifactorAuthenticationTrigger implements MultifactorAuthenticationTrigger {
     private final CasConfigurationProperties casProperties;
+
     private final ApplicationContext applicationContext;
 
     private int order = Ordered.LOWEST_PRECEDENCE;
@@ -45,7 +48,9 @@ public class HttpRequestMultifactorAuthenticationTrigger implements MultifactorA
     @Override
     public Optional<MultifactorAuthenticationProvider> isActivated(final Authentication authentication,
                                                                    final RegisteredService registeredService,
-                                                                   final HttpServletRequest httpServletRequest, final Service service) {
+                                                                   final HttpServletRequest httpServletRequest,
+                                                                   final HttpServletResponse response,
+                                                                   final Service service) {
         if (authentication == null) {
             LOGGER.debug("No authentication is available to determine event for principal");
             return Optional.empty();
@@ -80,21 +85,21 @@ public class HttpRequestMultifactorAuthenticationTrigger implements MultifactorA
      */
     @SuppressWarnings("JdkObsolete")
     protected List<String> resolveEventFromHttpRequest(final HttpServletRequest request) {
-        val mfaRequestHeader = casProperties.getAuthn().getMfa().getRequestHeader();
+        val mfaRequestHeader = casProperties.getAuthn().getMfa().getTriggers().getHttp().getRequestHeader();
         val headers = request.getHeaders(mfaRequestHeader);
         if (headers != null && headers.hasMoreElements()) {
             LOGGER.debug("Received request header [{}] as [{}]", mfaRequestHeader, headers);
             return Collections.list(headers);
         }
 
-        val mfaRequestParameter = casProperties.getAuthn().getMfa().getRequestParameter();
+        val mfaRequestParameter = casProperties.getAuthn().getMfa().getTriggers().getHttp().getRequestParameter();
         val params = request.getParameterValues(mfaRequestParameter);
         if (params != null && params.length > 0) {
             LOGGER.debug("Received request parameter [{}] as [{}]", mfaRequestParameter, params);
             return Arrays.stream(params).collect(Collectors.toList());
         }
 
-        val attributeName = casProperties.getAuthn().getMfa().getSessionAttribute();
+        val attributeName = casProperties.getAuthn().getMfa().getTriggers().getHttp().getSessionAttribute();
         val session = request.getSession(false);
         var attributeValue = Optional.ofNullable(session).map(httpSession -> httpSession.getAttribute(attributeName)).orElse(null);
         if (attributeValue == null) {

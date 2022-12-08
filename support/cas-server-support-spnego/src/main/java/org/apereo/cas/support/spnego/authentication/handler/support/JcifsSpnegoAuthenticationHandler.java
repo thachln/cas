@@ -4,9 +4,9 @@ import org.apereo.cas.authentication.AuthenticationHandlerExecutionResult;
 import org.apereo.cas.authentication.Credential;
 import org.apereo.cas.authentication.DefaultAuthenticationHandlerExecutionResult;
 import org.apereo.cas.authentication.handler.support.AbstractPreAndPostProcessingAuthenticationHandler;
-import org.apereo.cas.authentication.metadata.BasicCredentialMetaData;
 import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.authentication.principal.PrincipalFactory;
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.support.spnego.authentication.principal.SpnegoCredential;
 
@@ -55,7 +55,7 @@ public class JcifsSpnegoAuthenticationHandler extends AbstractPreAndPostProcessi
 
     @Override
     @Synchronized
-    protected AuthenticationHandlerExecutionResult doAuthentication(final Credential credential) throws GeneralSecurityException {
+    protected AuthenticationHandlerExecutionResult doAuthentication(final Credential credential, final Service service) throws GeneralSecurityException {
         val spnegoCredential = (SpnegoCredential) credential;
         if (!this.ntlmAllowed && spnegoCredential.isNtlm()) {
             throw new FailedLoginException("NTLM not allowed");
@@ -99,7 +99,7 @@ public class JcifsSpnegoAuthenticationHandler extends AbstractPreAndPostProcessi
         if (!success) {
             throw new FailedLoginException("Principal is null, the processing of the SPNEGO Token failed");
         }
-        return new DefaultAuthenticationHandlerExecutionResult(this, new BasicCredentialMetaData(credential), spnegoCredential.getPrincipal());
+        return new DefaultAuthenticationHandlerExecutionResult(this, credential, spnegoCredential.getPrincipal());
     }
 
     @Override

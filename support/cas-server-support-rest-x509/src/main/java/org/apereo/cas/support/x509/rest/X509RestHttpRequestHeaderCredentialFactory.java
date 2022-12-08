@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.springframework.util.MultiValueMap;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +39,6 @@ public class X509RestHttpRequestHeaderCredentialFactory implements RestHttpReque
             credentials.add(new X509CertificateCredential(certFromHeader));
             return credentials;
         }
-        return new ArrayList<Credential>(0);
+        return new ArrayList<>(0);
     }
 }

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import java.util.Date;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,18 +17,18 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 6.3.0
  */
-@Tag("Simple")
+@Tag("Events")
 public class CasAuditActionContextRecordedEventTests {
 
     @Test
     public void verifyOperation() {
         assertDoesNotThrow(new Executable() {
             @Override
-            @SuppressWarnings("JdkObsolete")
+            @SuppressWarnings("JavaUtilDate")
             public void execute() throws Throwable {
                 val ctx = new AuditActionContext("casuser", "TEST", "TEST",
                     "CAS", new Date(), "1.2.3.4",
-                    "1.2.3.4");
+                    "1.2.3.4", UUID.randomUUID().toString());
                 new CasAuditActionContextRecordedEvent(this, ctx);
             }
         });

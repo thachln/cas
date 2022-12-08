@@ -4,15 +4,16 @@ import org.apereo.cas.authentication.Authentication;
 import org.apereo.cas.authentication.Credential;
 import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.services.RegisteredService;
-import org.apereo.cas.util.LoggingUtils;
 import org.apereo.cas.util.ResourceUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 import org.apereo.cas.util.io.FileWatcherService;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.apache.commons.io.IOUtils;
 import org.hjson.JsonValue;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.core.io.Resource;
@@ -32,23 +33,22 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class JsonResourceInterruptInquirer extends BaseInterruptInquirer implements DisposableBean {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(false).build().toObjectMapper();
+
+    private final Resource resource;
+
+    private final Map<String, InterruptResponse> interrupts = new ConcurrentHashMap<>();
 
     private FileWatcherService keystorePatchWatcherService;
 
-    private final Resource resource;
-    private final Map<String, InterruptResponse> interrupts = new ConcurrentHashMap<>();
-
     public JsonResourceInterruptInquirer(final Resource resource) {
         this.resource = resource;
-        try {
+        FunctionUtils.doUnchecked(__ -> {
             if (ResourceUtils.isFile(this.resource)) {
-                val resourceFile = this.resource.getFile();
-                keystorePatchWatcherService = new FileWatcherService(resourceFile, file -> readResourceForInterrupts());
+                keystorePatchWatcherService = new FileWatcherService(resource.getFile(), file -> readResourceForInterrupts());
             }
-        } catch (final Exception e) {
-            LoggingUtils.error(LOGGER, e);
-        }
+        });
     }
 
     @Override
@@ -59,29 +59,29 @@ public class JsonResourceInterruptInquirer extends BaseInterruptInquirer impleme
                                              final RequestContext requestContext) {
         readResourceForInterrupts();
         val user = authentication.getPrincipal().getId();
+        LOGGER.info("Locating interrupt for user [{}]", user);
         if (interrupts.containsKey(user)) {
             return interrupts.get(user);
         }
         return InterruptResponse.none();
     }
 
-    @SneakyThrows
-    private void readResourceForInterrupts() {
-        this.interrupts.clear();
-        if (ResourceUtils.doesResourceExist(resource)) {
-            try (val reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
-                final TypeReference<Map<String, InterruptResponse>> personList = new TypeReference<>() {
-                };
-                val data = (Map) MAPPER.readValue(JsonValue.readHjson(reader).toString(), personList);
-                this.interrupts.putAll(data);
-            }
-        }
-    }
-
     @Override
     public void destroy() {
-        if (this.keystorePatchWatcherService != null) {
-            this.keystorePatchWatcherService.close();
-        }
+        IOUtils.closeQuietly(this.keystorePatchWatcherService);
+    }
+
+    private void readResourceForInterrupts() {
+        FunctionUtils.doUnchecked(__ -> {
+            this.interrupts.clear();
+            if (ResourceUtils.doesResourceExist(resource)) {
+                try (val reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
+                    val personList = new TypeReference<Map<String, InterruptResponse>>() {
+                    };
+                    val data = (Map) MAPPER.readValue(JsonValue.readHjson(reader).toString(), personList);
+                    this.interrupts.putAll(data);
+                }
+            }
+        });
     }
 }

@@ -6,7 +6,6 @@ import org.apereo.cas.util.ResourceUtils;
 import org.apereo.cas.util.crypto.CipherExecutor;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -14,11 +13,11 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
+import org.jooq.lambda.Unchecked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -40,14 +39,10 @@ public abstract class AbstractSamlIdPMetadataLocator implements SamlIdPMetadataL
      */
     protected final CipherExecutor<String, String> metadataCipherExecutor;
 
-    private Cache<String, SamlIdPMetadataDocument> metadataCache;
+    private final Cache<String, SamlIdPMetadataDocument> metadataCache;
 
     private static Resource getResource(final String data) {
-        if (StringUtils.isBlank(data)) {
-            LOGGER.warn("Cannot determine resource based on blank/empty data");
-            return ResourceUtils.EMPTY_RESOURCE;
-        }
-        return new ByteArrayResource(data.getBytes(StandardCharsets.UTF_8));
+        return new ByteArrayResource(StringUtils.defaultString(data).getBytes(StandardCharsets.UTF_8));
     }
 
     private static String buildCacheKey(final Optional<SamlRegisteredService> registeredService) {
@@ -57,7 +52,7 @@ public abstract class AbstractSamlIdPMetadataLocator implements SamlIdPMetadataL
         }
         val samlRegisteredService = registeredService.get();
         val key = CACHE_KEY_METADATA + '_' + samlRegisteredService.getId() + '_' + samlRegisteredService.getName();
-        LOGGER.trace("Using {} as cache key for metadata for service definition", key);
+        LOGGER.trace("Using [{}] as cache key for metadata for service definition", key);
         return key;
     }
 
@@ -120,12 +115,10 @@ public abstract class AbstractSamlIdPMetadataLocator implements SamlIdPMetadataL
     }
 
     @Override
-    public final SamlIdPMetadataDocument fetch(final Optional<SamlRegisteredService> registeredService) {
-        initializeCache();
-
+    public SamlIdPMetadataDocument fetch(final Optional<SamlRegisteredService> registeredService) {
         val key = buildCacheKey(registeredService);
 
-        return metadataCache.get(key, k -> {
+        return getMetadataCache().get(key, Unchecked.function(k -> {
             val metadataDocument = fetchInternal(registeredService);
             if (metadataDocument != null && metadataDocument.isValid()) {
                 LOGGER.trace("Fetched and cached SAML IdP metadata document [{}] under key [{}]", metadataDocument, key);
@@ -134,24 +127,8 @@ public abstract class AbstractSamlIdPMetadataLocator implements SamlIdPMetadataL
 
             LOGGER.trace("SAML IdP metadata document [{}] is considered invalid", metadataDocument);
             return null;
-        });
+        }));
     }
 
-    /**
-     * Fetch saml idp metadata document.
-     *
-     * @param registeredService the registered service
-     * @return the saml idp metadata document
-     */
-    protected abstract SamlIdPMetadataDocument fetchInternal(Optional<SamlRegisteredService> registeredService);
-
-    private void initializeCache() {
-        if (metadataCache == null) {
-            metadataCache = Caffeine.newBuilder()
-                .initialCapacity(1)
-                .maximumSize(100)
-                .expireAfterAccess(Duration.ofHours(1))
-                .build();
-        }
-    }
+    protected abstract SamlIdPMetadataDocument fetchInternal(Optional<SamlRegisteredService> registeredService) throws Exception;
 }

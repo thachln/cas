@@ -24,14 +24,14 @@ import static org.junit.jupiter.api.Assertions.*;
     "management.endpoint.oauthTokens.enabled=true",
     "management.endpoints.web.exposure.include=*"
 })
-@Tag("OAuth")
+@Tag("OAuthWeb")
 public class OAuth20TokenManagementEndpointTests extends AbstractOAuth20Tests {
     @Autowired
     @Qualifier("oauth20TokenManagementEndpoint")
     private OAuth20TokenManagementEndpoint tokenManagementEndpoint;
 
     @Test
-    public void verifyOperationWithJwt() {
+    public void verifyOperationWithJwt() throws Exception {
         val registeredService = getRegisteredService("example1", "secret", new LinkedHashSet<>());
         registeredService.setJwtAccessToken(true);
         servicesManager.save(registeredService);
@@ -53,5 +53,10 @@ public class OAuth20TokenManagementEndpointTests extends AbstractOAuth20Tests {
         val at = mv.getModel().get(OAuth20Constants.ACCESS_TOKEN).toString();
         val token = tokenManagementEndpoint.getToken(at);
         assertNotNull(token);
+    }
+
+    @Test
+    public void verifyBadOperation() {
+        assertNull(tokenManagementEndpoint.getToken("unknown"));
     }
 }

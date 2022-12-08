@@ -6,14 +6,14 @@ import org.apereo.cas.gauth.credential.GoogleAuthenticatorTokenCredentialReposit
 import org.apereo.cas.gauth.credential.InMemoryGoogleAuthenticatorTokenCredentialRepositoryTests;
 import org.apereo.cas.gauth.credential.JsonGoogleAuthenticatorTokenCredentialRepositoryTests;
 import org.apereo.cas.gauth.credential.RestGoogleAuthenticatorTokenCredentialRepositoryTests;
+import org.apereo.cas.gauth.web.flow.GoogleAuthenticatorAuthenticationDeviceProviderActionTests;
 import org.apereo.cas.gauth.web.flow.GoogleAuthenticatorMultifactorWebflowConfigurerTests;
 import org.apereo.cas.gauth.web.flow.GoogleAuthenticatorPrepareLoginActionTests;
 import org.apereo.cas.gauth.web.flow.GoogleAuthenticatorSaveRegistrationActionTests;
 import org.apereo.cas.gauth.web.flow.GoogleAuthenticatorValidateSelectedRegistrationActionTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * This is {@link GoogleAuthenticatorTestsSuite}.
@@ -24,6 +24,7 @@ import org.junit.runner.RunWith;
 @SelectClasses({
     GoogleAuthenticatorValidateSelectedRegistrationActionTests.class,
     GoogleAuthenticatorConfigurationTests.class,
+    GoogleAuthenticatorAuthenticationDeviceProviderActionTests.class,
     GoogleAuthenticatorOneTimeTokenCredentialValidatorTests.class,
     GoogleAuthenticatorSaveRegistrationActionTests.class,
     GoogleAuthenticatorPrepareLoginActionTests.class,
@@ -33,6 +34,6 @@ import org.junit.runner.RunWith;
     InMemoryGoogleAuthenticatorTokenCredentialRepositoryTests.class,
     JsonGoogleAuthenticatorTokenCredentialRepositoryTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class GoogleAuthenticatorTestsSuite {
 }

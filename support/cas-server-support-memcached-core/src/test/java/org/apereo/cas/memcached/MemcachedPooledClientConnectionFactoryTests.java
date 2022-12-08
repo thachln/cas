@@ -1,12 +1,11 @@
 package org.apereo.cas.memcached;
 
 import org.apereo.cas.configuration.model.support.memcached.BaseMemcachedProperties;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 6.2.0
  */
 @Tag("Memcached")
-@EnabledIfPortOpen(port = 11211)
+@EnabledIfListeningOnPort(port = 11211)
 public class MemcachedPooledClientConnectionFactoryTests {
 
     @Test
@@ -29,13 +28,10 @@ public class MemcachedPooledClientConnectionFactoryTests {
         val factory = new MemcachedPooledClientConnectionFactory(memcached,
             MemcachedUtils.newTranscoder(memcached));
         val pool = factory.getObjectPool();
-        assertDoesNotThrow(new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                val client = pool.borrowObject();
-                val object = factory.wrap(client);
-                factory.destroyObject(object);
-            }
+        assertDoesNotThrow(() -> {
+            val client = pool.borrowObject();
+            val object = factory.wrap(client);
+            factory.destroyObject(object);
         });
     }
 }

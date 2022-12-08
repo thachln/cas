@@ -2,9 +2,9 @@ package org.apereo.cas.ticket.registry;
 
 import org.apereo.cas.ticket.Ticket;
 import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import net.spy.memcached.MemcachedClientIF;
@@ -37,7 +37,7 @@ public class MemcachedTicketRegistry extends AbstractTicketRegistry implements D
     private final ObjectPool<MemcachedClientIF> connectionPool;
 
     @Override
-    public Ticket updateTicket(final Ticket ticketToUpdate) {
+    public Ticket updateTicket(final Ticket ticketToUpdate) throws Exception {
         val ticket = encodeTicket(ticketToUpdate);
         LOGGER.debug("Updating ticket [{}]", ticket);
         val clientFromPool = getClientFromPool();
@@ -53,7 +53,7 @@ public class MemcachedTicketRegistry extends AbstractTicketRegistry implements D
     }
 
     @Override
-    public void addTicket(final Ticket ticketToAdd) {
+    public void addTicketInternal(final Ticket ticketToAdd) {
         val clientFromPool = getClientFromPool();
         try {
             val ticket = encodeTicket(ticketToAdd);
@@ -74,7 +74,7 @@ public class MemcachedTicketRegistry extends AbstractTicketRegistry implements D
     }
 
     @Override
-    public boolean deleteSingleTicket(final String ticketIdToDelete) {
+    public long deleteSingleTicket(final String ticketIdToDelete) {
         val clientFromPool = getClientFromPool();
         val ticketId = encodeTicketId(ticketIdToDelete);
         try {
@@ -85,7 +85,7 @@ public class MemcachedTicketRegistry extends AbstractTicketRegistry implements D
         } finally {
             returnClientToPool(clientFromPool);
         }
-        return true;
+        return 1;
     }
 
     @Override
@@ -116,9 +116,6 @@ public class MemcachedTicketRegistry extends AbstractTicketRegistry implements D
         return new ArrayList<>(0);
     }
 
-    /**
-     * Destroy the client and shut down.
-     */
     @Override
     public void destroy() {
         this.connectionPool.close();
@@ -143,9 +140,8 @@ public class MemcachedTicketRegistry extends AbstractTicketRegistry implements D
         return ttl.intValue();
     }
 
-    @SneakyThrows
     private MemcachedClientIF getClientFromPool() {
-        return this.connectionPool.borrowObject();
+        return FunctionUtils.doUnchecked(this.connectionPool::borrowObject);
     }
 
     private void returnClientToPool(final MemcachedClientIF clientFromPool) {

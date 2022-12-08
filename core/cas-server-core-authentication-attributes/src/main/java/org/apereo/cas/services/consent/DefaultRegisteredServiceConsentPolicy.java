@@ -11,6 +11,7 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.util.Set;
 
 /**
@@ -28,6 +29,7 @@ import java.util.Set;
 @Accessors(chain = true)
 public class DefaultRegisteredServiceConsentPolicy implements RegisteredServiceConsentPolicy {
 
+    @Serial
     private static final long serialVersionUID = -2771506941879419063L;
 
     private TriStateBoolean status = TriStateBoolean.UNDEFINED;
@@ -37,6 +39,8 @@ public class DefaultRegisteredServiceConsentPolicy implements RegisteredServiceC
     private Set<String> includeOnlyAttributes;
 
     private int order;
+
+    private Set<String> excludedServices;
 
     public DefaultRegisteredServiceConsentPolicy(final Set<String> excludedAttributes,
                                                  final Set<String> includeOnlyAttributes) {

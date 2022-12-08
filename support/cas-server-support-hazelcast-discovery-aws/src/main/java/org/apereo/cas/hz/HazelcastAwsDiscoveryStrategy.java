@@ -12,6 +12,7 @@ import lombok.val;
 import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
+import java.util.Optional;
 
 /**
  * This is {@link HazelcastAwsDiscoveryStrategy}.
@@ -22,7 +23,9 @@ import java.util.HashMap;
 public class HazelcastAwsDiscoveryStrategy implements HazelcastDiscoveryStrategy {
 
     @Override
-    public DiscoveryStrategyConfig get(final HazelcastClusterProperties cluster, final JoinConfig joinConfig, final Config configuration, final NetworkConfig networkConfig) {
+    public Optional<DiscoveryStrategyConfig> get(final HazelcastClusterProperties cluster,
+                                                 final JoinConfig joinConfig,
+                                                 final Config configuration, final NetworkConfig networkConfig) {
         val aws = cluster.getDiscovery().getAws();
         val properties = new HashMap<String, Comparable>();
         if (StringUtils.hasText(aws.getAccessKey())) {
@@ -38,7 +41,9 @@ public class HazelcastAwsDiscoveryStrategy implements HazelcastDiscoveryStrategy
             properties.put(HazelcastAwsDiscoveryProperties.AWS_DISCOVERY_HOST_HEADER, aws.getHostHeader());
         }
         if (aws.getPort() > 0) {
-            properties.put(HazelcastAwsDiscoveryProperties.AWS_DISCOVERY_PORT, aws.getPort());
+            properties.put(
+                HazelcastAwsDiscoveryProperties.AWS_DISCOVERY_PORT,
+                Integer.toString(aws.getPort()));
         }
         if (StringUtils.hasText(aws.getRegion())) {
             properties.put(HazelcastAwsDiscoveryProperties.AWS_DISCOVERY_REGION, aws.getRegion());
@@ -53,7 +58,7 @@ public class HazelcastAwsDiscoveryStrategy implements HazelcastDiscoveryStrategy
             properties.put(HazelcastAwsDiscoveryProperties.AWS_DISCOVERY_TAG_VALUE, aws.getTagValue());
         }
 
-        return new DiscoveryStrategyConfig(new AwsDiscoveryStrategyFactory(), properties);
+        return Optional.of(new DiscoveryStrategyConfig(new AwsDiscoveryStrategyFactory(), properties));
     }
 
 }

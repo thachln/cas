@@ -12,13 +12,15 @@ import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.annotation.Id;
 
-import javax.persistence.CollectionTable;
-import javax.persistence.Column;
-import javax.persistence.ElementCollection;
-import javax.persistence.JoinColumn;
-import javax.persistence.MapKeyColumn;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.Transient;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Transient;
+
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
@@ -81,6 +83,7 @@ public class CasEvent implements Serializable {
      */
     public static final String FIELD_GEO_TIMESTAMP = "geoTimestamp";
 
+    @Serial
     private static final long serialVersionUID = -4206712375316470417L;
 
     @Id

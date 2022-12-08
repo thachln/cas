@@ -1,9 +1,9 @@
 package org.apereo.cas.authentication.principal.cache;
 
-import org.apereo.cas.authentication.AttributeMergingStrategy;
 import org.apereo.cas.authentication.attribute.PrincipalAttributeRepositoryFetcher;
 import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.authentication.principal.RegisteredServicePrincipalAttributesRepository;
+import org.apereo.cas.configuration.model.core.authentication.PrincipalAttributesCoreProperties;
 import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.spring.ApplicationContextProvider;
@@ -21,7 +21,9 @@ import lombok.val;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apereo.services.persondir.IPersonAttributeDao;
 
-import javax.persistence.Transient;
+import jakarta.persistence.Transient;
+
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -46,6 +48,7 @@ import java.util.stream.Collectors;
 @EqualsAndHashCode(of = {"mergingStrategy", "attributeRepositoryIds"})
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public abstract class AbstractPrincipalAttributesRepository implements RegisteredServicePrincipalAttributesRepository, AutoCloseable {
+    @Serial
     private static final long serialVersionUID = 6350245643948535906L;
 
     @JsonIgnore
@@ -60,7 +63,8 @@ public abstract class AbstractPrincipalAttributesRepository implements Registere
      */
     @Getter
     @Setter
-    private AttributeMergingStrategy mergingStrategy = AttributeMergingStrategy.MULTIVALUED;
+    private PrincipalAttributesCoreProperties.MergingStrategyTypes mergingStrategy =
+        PrincipalAttributesCoreProperties.MergingStrategyTypes.MULTIVALUED;
 
     @Getter
     @Setter
@@ -69,13 +73,6 @@ public abstract class AbstractPrincipalAttributesRepository implements Registere
     @Getter
     @Setter
     private boolean ignoreResolvedAttributes;
-
-    @Override
-    public abstract Map<String, List<Object>> getAttributes(Principal principal, RegisteredService registeredService);
-
-    @Override
-    public void close() {
-    }
 
     /**
      * Gets attribute repository.
@@ -96,6 +93,7 @@ public abstract class AbstractPrincipalAttributesRepository implements Registere
     protected static Map<String, List<Object>> convertPrincipalAttributesToPersonAttributes(final Map<String, ?> attributes) {
         val convertedAttributes = new TreeMap<String, List<Object>>(String.CASE_INSENSITIVE_ORDER);
         val principalAttributes = new LinkedHashMap<>(attributes);
+        LOGGER.trace("Principal attributes to convert to person attributes are [{}]", principalAttributes);
         principalAttributes.forEach((key, values) -> {
             if (values instanceof Collection) {
                 val uniqueValues = new LinkedHashSet<Object>(Collection.class.cast(values));
@@ -105,6 +103,7 @@ public abstract class AbstractPrincipalAttributesRepository implements Registere
                 convertedAttributes.put(key, CollectionUtils.wrap(values));
             }
         });
+        LOGGER.trace("Converted principal attributes, now as person attributes are [{}]", convertedAttributes);
         return convertedAttributes;
     }
 
@@ -120,6 +119,10 @@ public abstract class AbstractPrincipalAttributesRepository implements Registere
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
+    @Override
+    public void close() {
+    }
+
     /**
      * Convert attributes to principal attributes and cache.
      *
@@ -132,27 +135,18 @@ public abstract class AbstractPrincipalAttributesRepository implements Registere
                                                                                        final Map<String, List<Object>> sourceAttributes,
                                                                                        final RegisteredService registeredService) {
         val finalAttributes = convertPersonAttributesToPrincipalAttributes(sourceAttributes);
-        addPrincipalAttributes(principal.getId(), finalAttributes, registeredService);
+        update(principal.getId(), finalAttributes, registeredService);
+        LOGGER.trace("Final principal attributes after caching, if any, are [{}]", finalAttributes);
         return finalAttributes;
     }
-
-    /**
-     * Add principal attributes into the underlying cache instance.
-     *
-     * @param id                identifier used by the cache as key.
-     * @param attributes        attributes to cache
-     * @param registeredService the registered service
-     * @since 4.2
-     */
-    protected abstract void addPrincipalAttributes(String id, Map<String, List<Object>> attributes, RegisteredService registeredService);
 
     /**
      * Calculate merging strategy attribute merging strategy.
      *
      * @return the attribute merging strategy
      */
-    protected AttributeMergingStrategy determineMergingStrategy() {
-        return ObjectUtils.defaultIfNull(getMergingStrategy(), AttributeMergingStrategy.MULTIVALUED);
+    protected PrincipalAttributesCoreProperties.MergingStrategyTypes determineMergingStrategy() {
+        return ObjectUtils.defaultIfNull(getMergingStrategy(), PrincipalAttributesCoreProperties.MergingStrategyTypes.MULTIVALUED);
     }
 
     /**

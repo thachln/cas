@@ -4,8 +4,9 @@ import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
 import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.config.CasConsentLdapConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
-import org.apereo.cas.services.AbstractRegisteredService;
+import org.apereo.cas.services.BaseRegisteredService;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unboundid.ldap.sdk.LDAPConnection;
@@ -43,7 +44,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 public abstract class BaseLdapConsentRepositoryTests extends BaseConsentRepositoryTests {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(false).build().toObjectMapper();
 
     private static final String ATTR_NAME = "description";
 
@@ -57,7 +59,7 @@ public abstract class BaseLdapConsentRepositoryTests extends BaseConsentReposito
 
     private static final Service SVC2 = RegisteredServiceTestUtils.getService2();
 
-    private static final AbstractRegisteredService REG_SVC2 = RegisteredServiceTestUtils.getRegisteredService(SVC2.getId());
+    private static final BaseRegisteredService REG_SVC2 = RegisteredServiceTestUtils.getRegisteredService(SVC2.getId());
 
     private static final String DEF_FILTER = "(objectClass=*)";
 
@@ -65,8 +67,13 @@ public abstract class BaseLdapConsentRepositoryTests extends BaseConsentReposito
     protected CasConfigurationProperties casProperties;
     
     @Autowired
-    @Qualifier("consentRepository")
+    @Qualifier(ConsentRepository.BEAN_NAME)
     protected ConsentRepository repository;
+
+    @Override
+    protected String getUser() {
+        return USER_CN;
+    }
 
     @AfterEach
     public void cleanDecisions() {

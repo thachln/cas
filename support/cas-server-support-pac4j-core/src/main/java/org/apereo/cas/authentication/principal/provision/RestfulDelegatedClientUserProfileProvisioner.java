@@ -1,5 +1,6 @@
 package org.apereo.cas.authentication.principal.provision;
 
+import org.apereo.cas.authentication.Credential;
 import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.configuration.model.RestEndpointProperties;
 import org.apereo.cas.util.HttpUtils;
@@ -10,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.http.HttpResponse;
 import org.pac4j.core.client.BaseClient;
-import org.pac4j.core.profile.CommonProfile;
+import org.pac4j.core.profile.UserProfile;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
@@ -28,26 +29,31 @@ public class RestfulDelegatedClientUserProfileProvisioner extends BaseDelegatedC
     private final RestEndpointProperties restProperties;
 
     @Override
-    public void execute(final Principal principal, final CommonProfile profile, final BaseClient client) {
+    public void execute(final Principal principal, final UserProfile profile,
+                        final BaseClient client, final Credential credential) {
         HttpResponse response = null;
         try {
-            val headers = new HashMap<String, Object>();
+            val headers = new HashMap<String, String>();
             headers.put("principalId", principal.getId());
-            headers.put("principalAttributes", principal.getAttributes());
+            headers.put("principalAttributes", principal.getAttributes().toString());
             headers.put("profileId", profile.getId());
             headers.put("profileTypedId", profile.getTypedId());
-            headers.put("profileAttributes", profile.getAttributes());
-            headers.put("authenticationAttributes", profile.getAuthenticationAttributes());
+            headers.put("profileAttributes", profile.getAttributes().toString());
             headers.put("clientName", client.getName());
-
-            response = HttpUtils.execute(restProperties.getUrl(), HttpMethod.GET.name(),
-                restProperties.getBasicAuthUsername(), restProperties.getBasicAuthPassword(), headers);
-
+            headers.putAll(restProperties.getHeaders());
+            
+            val exec = HttpUtils.HttpExecutionRequest.builder()
+                .basicAuthPassword(restProperties.getBasicAuthPassword())
+                .basicAuthUsername(restProperties.getBasicAuthUsername())
+                .method(HttpMethod.valueOf(restProperties.getMethod().toUpperCase().trim()))
+                .url(restProperties.getUrl())
+                .headers(headers)
+                .build();
+            
+            response = HttpUtils.execute(exec);
             if (response != null) {
                 val status = HttpStatus.valueOf(response.getStatusLine().getStatusCode());
-                if (status.is2xxSuccessful()) {
-                    LOGGER.debug("Provisioned principal [{}] successfully", principal);
-                }
+                LOGGER.debug("Provisioned principal [{}] with status result [{}]", principal.getId(), status);
             }
         } catch (final Exception e) {
             LoggingUtils.error(LOGGER, e);

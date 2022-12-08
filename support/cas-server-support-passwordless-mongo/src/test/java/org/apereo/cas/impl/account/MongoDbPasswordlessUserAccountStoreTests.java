@@ -5,7 +5,7 @@ import org.apereo.cas.api.PasswordlessUserAccountStore;
 import org.apereo.cas.config.MongoDbPasswordlessAuthenticationConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.impl.BasePasswordlessUserAccountStoreTests;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import lombok.val;
@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
@@ -40,19 +40,19 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 @Tag("MongoDb")
 @Getter
-@EnabledIfPortOpen(port = 27017)
+@EnabledIfListeningOnPort(port = 27017)
 @Import(MongoDbPasswordlessAuthenticationConfiguration.class)
 public class MongoDbPasswordlessUserAccountStoreTests extends BasePasswordlessUserAccountStoreTests {
     @Autowired
     private CasConfigurationProperties casProperties;
 
     @Autowired
-    @Qualifier("passwordlessUserAccountStore")
+    @Qualifier(PasswordlessUserAccountStore.BEAN_NAME)
     private PasswordlessUserAccountStore passwordlessUserAccountStore;
 
     @Autowired
     @Qualifier("mongoDbPasswordlessAuthenticationTemplate")
-    private MongoTemplate mongoDbTemplate;
+    private MongoOperations mongoDbTemplate;
 
     @Test
     public void verifyAction() {
@@ -64,7 +64,7 @@ public class MongoDbPasswordlessUserAccountStoreTests extends BasePasswordlessUs
             .attributes(Map.of("lastName", List.of("Smith")))
             .build();
         val mongo = casProperties.getAuthn().getPasswordless().getAccounts().getMongo();
-        this.mongoDbTemplate.save(account, mongo.getCollection());
+        mongoDbTemplate.save(account, mongo.getCollection());
 
         val user = passwordlessUserAccountStore.findUser("passwordlessuser");
         assertTrue(user.isPresent());

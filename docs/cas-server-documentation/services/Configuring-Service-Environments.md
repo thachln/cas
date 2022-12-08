@@ -4,6 +4,8 @@ title: CAS - Configuring Service Environments
 category: Services
 ---
 
+{% include variables.html %}
+
 # Configure Service Environments
 
 Each registered application in the registry may be assigned a set of environment names. The environment names act as a filter, allowing
@@ -13,7 +15,7 @@ For example, the below service definition is only recognized and loaded by CAS i
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "https://app.example.org/.+",
   "name" : "ExampleApp",
   "id" : 1,

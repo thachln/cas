@@ -4,12 +4,11 @@ import org.apereo.cas.api.AuthenticationRiskScore;
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
 import org.apereo.cas.impl.calcs.BaseAuthenticationRequestRiskCalculatorTests;
 import org.apereo.cas.util.CollectionUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
@@ -25,8 +24,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@EnabledIfPortOpen(port = 25000)
+@EnabledIfListeningOnPort(port = 25000)
 @TestPropertySource(properties = {
+    "cas.authn.adaptive.risk.ip.enabled=true",
+
     "spring.mail.host=localhost",
     "spring.mail.port=25000",
 
@@ -47,11 +48,16 @@ public class AuthenticationRiskEmailNotifierTests extends BaseAuthenticationRequ
         val authentication = CoreAuthenticationTestUtils.getAuthentication(principal);
         authenticationRiskEmailNotifier.setAuthentication(authentication);
         authenticationRiskEmailNotifier.setAuthenticationRiskScore(new AuthenticationRiskScore(BigDecimal.ONE));
-        assertDoesNotThrow(new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                authenticationRiskEmailNotifier.publish();
-            }
-        });
+        assertDoesNotThrow(() -> authenticationRiskEmailNotifier.publish());
+    }
+
+    @Test
+    public void verifyNoMailAttr() {
+        authenticationRiskEmailNotifier.setRegisteredService(CoreAuthenticationTestUtils.getRegisteredService());
+        val principal = CoreAuthenticationTestUtils.getPrincipal(CollectionUtils.wrap("nothing", List.of("cas@example.org")));
+        val authentication = CoreAuthenticationTestUtils.getAuthentication(principal);
+        authenticationRiskEmailNotifier.setAuthentication(authentication);
+        authenticationRiskEmailNotifier.setAuthenticationRiskScore(new AuthenticationRiskScore(BigDecimal.ONE));
+        assertDoesNotThrow(() -> authenticationRiskEmailNotifier.publish());
     }
 }

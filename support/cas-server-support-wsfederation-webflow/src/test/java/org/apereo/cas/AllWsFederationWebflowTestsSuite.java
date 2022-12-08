@@ -1,12 +1,12 @@
 package org.apereo.cas;
 
 import org.apereo.cas.web.flow.WsFederationActionTests;
+import org.apereo.cas.web.flow.WsFederationClientRedirectActionTests;
 import org.apereo.cas.web.flow.WsFederationResponseValidatorTests;
 import org.apereo.cas.web.flow.WsFederationWebflowConfigurerTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * This is {@link AllWsFederationWebflowTestsSuite}.
@@ -16,9 +16,10 @@ import org.junit.runner.RunWith;
  */
 @SelectClasses({
     WsFederationActionTests.class,
+    WsFederationClientRedirectActionTests.class,
     WsFederationResponseValidatorTests.class,
     WsFederationWebflowConfigurerTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class AllWsFederationWebflowTestsSuite {
 }

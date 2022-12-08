@@ -25,16 +25,9 @@ public class DefaultAuthenticationSystemSupport implements AuthenticationSystemS
 
     private final PrincipalElectionStrategy principalElectionStrategy;
 
-    @Override
-    public AuthenticationResultBuilder handleInitialAuthenticationTransaction(final Service service,
-                                                                              final Credential... credential) throws AuthenticationException {
-        val builder = new DefaultAuthenticationResultBuilder();
-        if (credential != null) {
-            Stream.of(credential).filter(Objects::nonNull).forEach(builder::collect);
-        }
+    private final AuthenticationResultBuilderFactory authenticationResultBuilderFactory;
 
-        return this.handleAuthenticationTransaction(service, builder, credential);
-    }
+    private final AuthenticationTransactionFactory authenticationTransactionFactory;
 
     @Override
     public AuthenticationResultBuilder establishAuthenticationContextFromInitial(final Authentication authentication,
@@ -44,16 +37,27 @@ public class DefaultAuthenticationSystemSupport implements AuthenticationSystemS
 
     @Override
     public AuthenticationResultBuilder establishAuthenticationContextFromInitial(final Authentication authentication) {
-        return new DefaultAuthenticationResultBuilder().collect(authentication);
+        return authenticationResultBuilderFactory.newBuilder().collect(authentication);
+    }
+
+    @Override
+    public AuthenticationResultBuilder handleInitialAuthenticationTransaction(final Service service,
+                                                                              final Credential... credential) throws AuthenticationException {
+        val builder = authenticationResultBuilderFactory.newBuilder();
+        if (credential != null) {
+            Stream.of(credential).filter(Objects::nonNull).forEach(builder::collect);
+        }
+        return this.handleAuthenticationTransaction(service, builder, credential);
     }
 
     @Override
     public AuthenticationResultBuilder handleAuthenticationTransaction(final Service service,
                                                                        final AuthenticationResultBuilder authenticationResultBuilder,
-                                                                       final Credential... credential) throws AuthenticationException {
+                                                                       final Credential... credentials) throws AuthenticationException {
 
-        val transaction = DefaultAuthenticationTransaction.of(service, credential);
-        this.authenticationTransactionManager.handle(transaction, authenticationResultBuilder);
+        val transaction = authenticationTransactionFactory.newTransaction(service, credentials);
+        transaction.collect(authenticationResultBuilder.getAuthentications());
+        authenticationTransactionManager.handle(transaction, authenticationResultBuilder);
         return authenticationResultBuilder;
     }
 
@@ -64,7 +68,7 @@ public class DefaultAuthenticationSystemSupport implements AuthenticationSystemS
     }
 
     @Override
-    public AuthenticationResult handleAndFinalizeSingleAuthenticationTransaction(final Service service, final Credential... credential)
+    public AuthenticationResult finalizeAuthenticationTransaction(final Service service, final Credential... credential)
         throws AuthenticationException {
 
         return finalizeAllAuthenticationTransactions(handleInitialAuthenticationTransaction(service, credential), service);

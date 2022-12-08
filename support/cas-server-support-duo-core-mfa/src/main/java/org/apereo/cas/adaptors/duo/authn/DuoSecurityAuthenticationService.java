@@ -2,10 +2,11 @@ package org.apereo.cas.adaptors.duo.authn;
 
 import org.apereo.cas.adaptors.duo.DuoSecurityUserAccount;
 import org.apereo.cas.authentication.Credential;
-
-import org.apache.commons.lang3.tuple.Pair;
+import org.apereo.cas.configuration.model.support.mfa.duo.DuoSecurityMultifactorAuthenticationProperties;
+import org.apereo.cas.util.spring.beans.BeanCondition;
 
 import java.io.Serializable;
+import java.util.Optional;
 
 /**
  * This is {@link DuoSecurityAuthenticationService}.
@@ -14,15 +15,61 @@ import java.io.Serializable;
  * @since 5.1.0
  */
 public interface DuoSecurityAuthenticationService extends Serializable {
+    /**
+     * Condition to activate Duo Security.
+     */
+    BeanCondition CONDITION = BeanCondition
+        .on("cas.authn.mfa.duo[0].duo-api-host")
+        .and("cas.authn.mfa.duo[0].duo-integration-key")
+        .and("cas.authn.mfa.duo[0].duo-secret-key");
+
+    /**
+     * Result key response in the duo validation payload.
+     */
+    String RESULT_KEY_RESPONSE = "response";
+
+    /**
+     * Result key stat in the duo validation payload.
+     */
+    String RESULT_KEY_STAT = "stat";
+
+    /**
+     * Result key result in the duo validation payload.
+     */
+    String RESULT_KEY_RESULT = "result";
+
+    /**
+     * Result key enroll_portal_url in the duo validation payload.
+     */
+    String RESULT_KEY_ENROLL_PORTAL_URL = "enroll_portal_url";
+
+    /**
+     * Result key status_msg in the duo validation payload.
+     */
+    String RESULT_KEY_STATUS_MESSAGE = "status_msg";
+
+    /**
+     * Result key code in the duo validation payload.
+     */
+    String RESULT_KEY_CODE = "code";
+
+    /**
+     * Result key message in the duo validation payload.
+     */
+    String RESULT_KEY_MESSAGE = "message";
+    /**
+     * Result key message_detail in the duo validation payload.
+     */
+    String RESULT_KEY_MESSAGE_DETAIL = "message_detail";
 
     /**
      * Verify the authentication response from Duo.
      *
      * @param credential signed request token
-     * @return authenticated user / verified response.
+     * @return authentication result
      * @throws Exception if response verification fails
      */
-    Pair<Boolean, String> authenticate(Credential credential) throws Exception;
+    DuoSecurityAuthenticationResult authenticate(Credential credential) throws Exception;
 
     /**
      * Ping provider.
@@ -32,11 +79,11 @@ public interface DuoSecurityAuthenticationService extends Serializable {
     boolean ping();
 
     /**
-     * Gets api host.
+     * Gets duo properties.
      *
-     * @return the api host
+     * @return the properties.
      */
-    String getApiHost();
+    DuoSecurityMultifactorAuthenticationProperties getProperties();
 
     /**
      * Sign request token.
@@ -44,7 +91,9 @@ public interface DuoSecurityAuthenticationService extends Serializable {
      * @param uid the uid
      * @return the signed token
      */
-    String signRequestToken(String uid);
+    default Optional<String> signRequestToken(final String uid) {
+        return Optional.empty();
+    }
 
     /**
      * Gets duo user account.
@@ -53,4 +102,15 @@ public interface DuoSecurityAuthenticationService extends Serializable {
      * @return the duo user account
      */
     DuoSecurityUserAccount getUserAccount(String username);
+
+    default Optional<Object> getDuoClient() {
+        return Optional.empty();
+    }
+
+    /**
+     * Gets admin api service.
+     *
+     * @return the admin api service
+     */
+    Optional<DuoSecurityAdminApiService> getAdminApiService();
 }

@@ -7,14 +7,13 @@ import org.apereo.cas.support.events.config.CasConfigurationModifiedEvent;
 import org.apereo.cas.util.function.ComposableFunction;
 import org.apereo.cas.util.io.FileWatcherService;
 import org.apereo.cas.util.io.PathWatcherService;
+import org.apereo.cas.util.spring.CasEventListener;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.context.ConfigurableApplicationContext;
 
 import java.io.Closeable;
 import java.io.File;
@@ -27,7 +26,7 @@ import java.io.File;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class CasConfigurationWatchService implements Closeable {
+public class CasConfigurationWatchService implements Closeable, CasEventListener, InitializingBean {
     private final ComposableFunction<File, AbstractCasEvent> createConfigurationCreatedEvent = file -> new CasConfigurationCreatedEvent(this, file.toPath());
 
     private final ComposableFunction<File, AbstractCasEvent> createConfigurationModifiedEvent = file -> new CasConfigurationModifiedEvent(this, file.toPath());
@@ -36,7 +35,7 @@ public class CasConfigurationWatchService implements Closeable {
 
     private final CasConfigurationPropertiesEnvironmentManager configurationPropertiesEnvironmentManager;
 
-    private final ApplicationEventPublisher eventPublisher;
+    private final ConfigurableApplicationContext applicationContext;
 
     private PathWatcherService configurationDirectoryWatch;
 
@@ -48,41 +47,44 @@ public class CasConfigurationWatchService implements Closeable {
     }
 
     /**
-     * Run path watch services.
-     *
-     * @param event the event
+     * Initialize.
      */
-    @EventListener
-    @Async
-    public void runPathWatchServices(final ApplicationReadyEvent event) {
+    public void initialize() {
         watchConfigurationDirectoryIfNeeded();
         watchConfigurationFileIfNeeded();
     }
 
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        initialize();
+    }
+
     private void watchConfigurationFileIfNeeded() {
-        val configFile = configurationPropertiesEnvironmentManager.getStandaloneProfileConfigurationFile();
+        val environment = applicationContext.getEnvironment();
+        val configFile = configurationPropertiesEnvironmentManager.getStandaloneProfileConfigurationFile(environment);
         if (configFile != null && configFile.exists()) {
             LOGGER.debug("Starting to watch configuration file [{}]", configFile);
-            this.configurationFileWatch = new FileWatcherService(configFile.getParentFile(),
-                createConfigurationCreatedEvent.andNext(eventPublisher::publishEvent),
-                createConfigurationModifiedEvent.andNext(eventPublisher::publishEvent),
-                createConfigurationDeletedEvent.andNext(eventPublisher::publishEvent));
+            this.configurationFileWatch = new FileWatcherService(configFile,
+                createConfigurationCreatedEvent.andNext(applicationContext::publishEvent),
+                createConfigurationModifiedEvent.andNext(applicationContext::publishEvent),
+                createConfigurationDeletedEvent.andNext(applicationContext::publishEvent));
             configurationFileWatch.start(configFile.getName());
         }
     }
 
     private void watchConfigurationDirectoryIfNeeded() {
-        val configDirectory = configurationPropertiesEnvironmentManager.getStandaloneProfileConfigurationDirectory();
+        val environment = applicationContext.getEnvironment();
+        val configDirectory = configurationPropertiesEnvironmentManager.getStandaloneProfileConfigurationDirectory(environment);
         if (configDirectory != null && configDirectory.exists()) {
             LOGGER.debug("Starting to watch configuration directory [{}]", configDirectory);
             this.configurationDirectoryWatch = new PathWatcherService(configDirectory.toPath(),
-                createConfigurationCreatedEvent.andNext(eventPublisher::publishEvent),
-                createConfigurationModifiedEvent.andNext(eventPublisher::publishEvent),
-                createConfigurationDeletedEvent.andNext(eventPublisher::publishEvent));
+                createConfigurationCreatedEvent.andNext(applicationContext::publishEvent),
+                createConfigurationModifiedEvent.andNext(applicationContext::publishEvent),
+                createConfigurationDeletedEvent.andNext(applicationContext::publishEvent));
             configurationDirectoryWatch.start(configDirectory.getName());
         }
     }
-    
+
     private void closeWatchServices() {
         if (configurationDirectoryWatch != null) {
             configurationDirectoryWatch.close();

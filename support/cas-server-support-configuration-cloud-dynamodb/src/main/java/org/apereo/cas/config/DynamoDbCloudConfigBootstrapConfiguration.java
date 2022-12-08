@@ -1,17 +1,18 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.aws.AmazonEnvironmentAwareClientBuilder;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.dynamodb.DynamoDbTableUtils;
 import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.cloud.bootstrap.config.PropertySourceLocator;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.PropertiesPropertySource;
 import org.springframework.core.env.PropertySource;
@@ -36,9 +37,10 @@ import java.util.Properties;
  * @author Misagh Moayyed
  * @since 5.1.0
  */
-@Configuration(value = "dynamoDbCloudConfigBootstrapConfiguration", proxyBeanMethods = false)
 @Slf4j
 @Getter
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.CasConfiguration, module = "dynamodb")
+@AutoConfiguration
 public class DynamoDbCloudConfigBootstrapConfiguration implements PropertySourceLocator {
 
     /**
@@ -53,8 +55,15 @@ public class DynamoDbCloudConfigBootstrapConfiguration implements PropertySource
 
     private static final long PROVISIONED_THROUGHPUT = 10;
 
-    @SneakyThrows
-    public static void createSettingsTable(final DynamoDbClient amazonDynamoDBClient, final boolean deleteTables) {
+    /**
+     * Create settings table.
+     *
+     * @param amazonDynamoDBClient the amazon dynamo db client
+     * @param deleteTables         the delete tables
+     * @throws Exception the exception
+     */
+    public static void createSettingsTable(final DynamoDbClient amazonDynamoDBClient,
+                                           final boolean deleteTables) throws Exception {
         val request = createCreateTableRequest();
         if (deleteTables) {
             val delete = DeleteTableRequest.builder().tableName(request.tableName()).build();

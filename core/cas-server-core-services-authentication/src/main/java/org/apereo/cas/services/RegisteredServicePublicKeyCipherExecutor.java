@@ -2,8 +2,8 @@ package org.apereo.cas.services;
 
 import org.apereo.cas.util.EncodingUtils;
 import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -22,6 +22,30 @@ import java.util.Optional;
 public class RegisteredServicePublicKeyCipherExecutor implements RegisteredServiceCipherExecutor {
     static {
         Security.addProvider(new BouncyCastleProvider());
+    }
+
+    /**
+     * Encode internally, meant to be called by extensions.
+     * Default behavior will encode the data based on the
+     * registered service public key's algorithm using {@link javax.crypto.Cipher}.
+     *
+     * @param data              the data
+     * @param registeredService the registered service
+     * @return a byte[] that contains the encrypted result
+     */
+    protected static byte[] encodeInternal(final String data, final RegisteredService registeredService) {
+        val publicKey = registeredService.getPublicKey();
+        if (publicKey == null) {
+            LOGGER.error("No public key is defined for service [{}]. No attributes will be released", registeredService);
+            return null;
+        }
+        LOGGER.debug("Using service [{}] public key [{}] to initialize the cipher", registeredService.getServiceId(), publicKey);
+        val cipher = publicKey.toCipher();
+        if (cipher != null) {
+            LOGGER.trace("Initialized cipher successfully. Proceeding to finalize...");
+            return FunctionUtils.doUnchecked(() -> cipher.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        }
+        return null;
     }
 
     /**
@@ -51,31 +75,6 @@ public class RegisteredServicePublicKeyCipherExecutor implements RegisteredServi
     @Override
     public String decode(final String data, final Optional<RegisteredService> service) {
         LOGGER.warn("Operation is not supported by this cipher");
-        return null;
-    }
-
-    /**
-     * Encode internally, meant to be called by extensions.
-     * Default behavior will encode the data based on the
-     * registered service public key's algorithm using {@link javax.crypto.Cipher}.
-     *
-     * @param data              the data
-     * @param registeredService the registered service
-     * @return a byte[] that contains the encrypted result
-     */
-    @SneakyThrows
-    protected static byte[] encodeInternal(final String data, final RegisteredService registeredService) {
-        val publicKey = registeredService.getPublicKey();
-        if (publicKey == null) {
-            LOGGER.error("No public key is defined for service [{}]. No attributes will be released", registeredService);
-            return null;
-        }
-        LOGGER.debug("Using service [{}] public key [{}] to initialize the cipher", registeredService.getServiceId(), publicKey);
-        val cipher = publicKey.toCipher();
-        if (cipher != null) {
-            LOGGER.trace("Initialized cipher successfully. Proceeding to finalize...");
-            return cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
-        }
         return null;
     }
 }

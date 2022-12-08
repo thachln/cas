@@ -2,10 +2,12 @@ package org.apereo.cas.configuration.model.support.hazelcast;
 
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +22,9 @@ import java.util.List;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("HazelcastWANReplicationProperties")
 public class HazelcastWANReplicationProperties implements Serializable {
+    @Serial
     private static final long serialVersionUID = 1726420607045775145L;
 
     /**

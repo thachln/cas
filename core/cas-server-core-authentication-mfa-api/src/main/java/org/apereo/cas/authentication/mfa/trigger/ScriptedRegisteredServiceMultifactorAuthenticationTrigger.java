@@ -27,9 +27,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 
-import javax.persistence.Transient;
-import javax.servlet.http.HttpServletRequest;
-import java.util.LinkedHashMap;
+import jakarta.persistence.Transient;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,12 +40,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @author Misagh Moayyed
  * @since 6.2.0
- * @deprecated Since 6.2
  */
 @Getter
 @Slf4j
 @RequiredArgsConstructor
-@Deprecated(since = "6.2.0")
 public class ScriptedRegisteredServiceMultifactorAuthenticationTrigger implements MultifactorAuthenticationTrigger {
     private final CasConfigurationProperties casProperties;
 
@@ -62,18 +61,14 @@ public class ScriptedRegisteredServiceMultifactorAuthenticationTrigger implement
     public Optional<MultifactorAuthenticationProvider> isActivated(final Authentication authentication,
                                                                    final RegisteredService registeredService,
                                                                    final HttpServletRequest httpServletRequest,
+                                                                   final HttpServletResponse response,
                                                                    final Service service) {
-
-        if (this.scriptCache == null) {
-            this.scriptCache = new LinkedHashMap<>(1);
-        }
-
         if (authentication == null || registeredService == null) {
             LOGGER.debug("No authentication or service is available to determine event for principal");
             return Optional.empty();
         }
 
-        val policy = registeredService.getMultifactorPolicy();
+        val policy = registeredService.getMultifactorAuthenticationPolicy();
         if (policy == null || StringUtils.isBlank(policy.getScript())) {
             LOGGER.trace("Multifactor authentication policy is absent or does not define a script to trigger multifactor authentication");
             return Optional.empty();
@@ -99,7 +94,7 @@ public class ScriptedRegisteredServiceMultifactorAuthenticationTrigger implement
             } else if (matcherFile.find()) {
                 try {
                     val scriptPath = SpringExpressionLanguageValueResolver.getInstance().resolve(matcherFile.group());
-                    val resource = ResourceUtils.getRawResourceFrom(scriptPath);
+                    val resource = ResourceUtils.getResourceFrom(scriptPath);
                     val script = new WatchableGroovyScriptResource(resource);
                     scriptCache.put(mfaScript, script);
                     LOGGER.trace("Caching multifactor authentication trigger script as script resource [{}]", resource);
@@ -109,21 +104,24 @@ public class ScriptedRegisteredServiceMultifactorAuthenticationTrigger implement
             }
         }
 
-        val executableScript = scriptCache.get(mfaScript);
-        LOGGER.debug("Executing multifactor authentication trigger script [{}]", executableScript);
-        val result = executableScript.execute(new Object[]{authentication, registeredService, httpServletRequest,
-            service, applicationContext, LOGGER}, String.class);
-        LOGGER.debug("Multifactor authentication provider delivered by trigger script is [{}]", result);
-        if (StringUtils.isBlank(result)) {
-            LOGGER.debug("No multifactor authentication is returned from trigger script");
-            return Optional.empty();
+        if (scriptCache.containsKey(mfaScript)) {
+            val executableScript = scriptCache.get(mfaScript);
+            LOGGER.debug("Executing multifactor authentication trigger script [{}]", executableScript);
+            val result = executableScript.execute(new Object[]{authentication, registeredService, httpServletRequest,
+                service, applicationContext, LOGGER}, String.class);
+            LOGGER.debug("Multifactor authentication provider delivered by trigger script is [{}]", result);
+            if (StringUtils.isBlank(result)) {
+                LOGGER.debug("No multifactor authentication is returned from trigger script");
+                return Optional.empty();
+            }
+            val providerResult = providerMap.values().stream().filter(provider -> provider.getId().equalsIgnoreCase(result)).findFirst();
+            if (providerResult.isEmpty()) {
+                LOGGER.error("Unable to locate multifactor authentication provider [{}] in the application context", result);
+                throw new AuthenticationException(new MultifactorAuthenticationProviderAbsentException());
+            }
+            return providerResult;
         }
-        val providerResult = providerMap.values().stream().filter(provider -> provider.getId().equalsIgnoreCase(result)).findFirst();
-        if (providerResult.isEmpty()) {
-            LOGGER.error("Unable to locate multifactor authentication provider [{}] in the application context", result);
-            throw new AuthenticationException(new MultifactorAuthenticationProviderAbsentException());
-        }
-        return providerResult;
+        return Optional.empty();
     }
 }
 

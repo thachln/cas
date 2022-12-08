@@ -1,5 +1,8 @@
 package org.apereo.cas.support.saml.metadata.resolver;
 
+import org.apereo.cas.audit.AuditActionResolvers;
+import org.apereo.cas.audit.AuditResourceResolvers;
+import org.apereo.cas.audit.AuditableActions;
 import org.apereo.cas.configuration.model.support.saml.idp.SamlIdPProperties;
 import org.apereo.cas.couchdb.saml.CouchDbSamlMetadataDocument;
 import org.apereo.cas.couchdb.saml.SamlMetadataDocumentCouchDbRepository;
@@ -11,8 +14,8 @@ import org.apereo.cas.util.LoggingUtils;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import net.shibboleth.utilities.java.support.resolver.CriteriaSet;
-import org.ektorp.DocumentNotFoundException;
+import net.shibboleth.shared.resolver.CriteriaSet;
+import org.apereo.inspektr.audit.annotation.Audit;
 import org.opensaml.saml.metadata.resolver.MetadataResolver;
 
 import java.util.Collection;
@@ -36,16 +39,12 @@ public class CouchDbSamlRegisteredServiceMetadataResolver extends BaseSamlRegist
         this.couchDb = couchDb;
     }
 
+    @Audit(action = AuditableActions.SAML2_METADATA_RESOLUTION,
+        actionResolverName = AuditActionResolvers.SAML2_METADATA_RESOLUTION_ACTION_RESOLVER,
+        resourceResolverName = AuditResourceResolvers.SAML2_METADATA_RESOLUTION_RESOURCE_RESOLVER)
     @Override
     public Collection<MetadataResolver> resolve(final SamlRegisteredService service, final CriteriaSet criteriaSet) {
-        try {
-            return couchDb.getAll().stream().map(doc -> buildMetadataResolverFrom(service, doc)).filter(Objects::nonNull).collect(Collectors.toList());
-        } catch (final DocumentNotFoundException e) {
-            LOGGER.debug(e.getMessage());
-        } catch (final Exception e) {
-            LoggingUtils.error(LOGGER, e);
-        }
-        return null;
+        return couchDb.getAll().stream().map(doc -> buildMetadataResolverFrom(service, doc)).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     @Override

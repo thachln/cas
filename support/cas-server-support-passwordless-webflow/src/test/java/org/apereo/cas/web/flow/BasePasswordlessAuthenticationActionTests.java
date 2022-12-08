@@ -1,5 +1,7 @@
 package org.apereo.cas.web.flow;
 
+import org.apereo.cas.api.PasswordlessAuthenticationPreProcessor;
+import org.apereo.cas.audit.spi.config.CasCoreAuditConfiguration;
 import org.apereo.cas.config.CasAuthenticationEventExecutionPlanTestConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationConfiguration;
 import org.apereo.cas.config.CasCoreAuthenticationHandlersConfiguration;
@@ -22,17 +24,17 @@ import org.apereo.cas.config.CasDefaultServiceTicketIdGeneratorsConfiguration;
 import org.apereo.cas.config.CasPersonDirectoryTestConfiguration;
 import org.apereo.cas.config.CasRegisteredServicesTestConfiguration;
 import org.apereo.cas.config.CoreSamlConfiguration;
+import org.apereo.cas.config.DelegatedAuthenticationWebflowConfiguration;
+import org.apereo.cas.config.Pac4jAuthenticationEventExecutionPlanConfiguration;
+import org.apereo.cas.config.Pac4jDelegatedAuthenticationConfiguration;
 import org.apereo.cas.config.PasswordlessAuthenticationConfiguration;
 import org.apereo.cas.config.PasswordlessAuthenticationWebflowConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
-import org.apereo.cas.support.pac4j.config.Pac4jDelegatedAuthenticationConfiguration;
-import org.apereo.cas.support.pac4j.config.support.authentication.Pac4jAuthenticationEventExecutionPlanConfiguration;
 import org.apereo.cas.web.config.CasCookieConfiguration;
 import org.apereo.cas.web.flow.config.CasCoreWebflowConfiguration;
 import org.apereo.cas.web.flow.config.CasMultifactorAuthenticationWebflowConfiguration;
 import org.apereo.cas.web.flow.config.CasWebflowContextConfiguration;
-import org.apereo.cas.web.flow.config.DelegatedAuthenticationWebflowConfiguration;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
@@ -40,8 +42,10 @@ import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguratio
 import org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Bean;
 
 /**
  * This is {@link BasePasswordlessAuthenticationActionTests}.
@@ -74,6 +78,7 @@ import org.springframework.context.ConfigurableApplicationContext;
     CasCoreServicesConfiguration.class,
     CasCoreTicketIdGeneratorsConfiguration.class,
     CasCoreTicketCatalogConfiguration.class,
+    CasCoreAuditConfiguration.class,
     CasCoreMultifactorAuthenticationConfiguration.class,
     CasMultifactorAuthenticationWebflowConfiguration.class,
     CasCoreAuthenticationServiceSelectionStrategyConfiguration.class,
@@ -92,4 +97,12 @@ import org.springframework.context.ConfigurableApplicationContext;
 public class BasePasswordlessAuthenticationActionTests {
     @Autowired
     protected ConfigurableApplicationContext applicationContext;
+
+    @TestConfiguration(value = "TestAuthenticationConfiguration", proxyBeanMethods = false)
+    public static class TestAuthenticationConfiguration {
+        @Bean
+        public PasswordlessAuthenticationPreProcessor testPasswordlessAuthenticationPreProcessor() {
+            return (builder, principal, service, credential, token) -> builder;
+        }
+    }
 }

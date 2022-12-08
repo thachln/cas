@@ -1,5 +1,8 @@
 package org.apereo.cas.support.oauth.web.response.accesstoken.ext;
 
+import org.apereo.cas.audit.AuditActionResolvers;
+import org.apereo.cas.audit.AuditResourceResolvers;
+import org.apereo.cas.audit.AuditableActions;
 import org.apereo.cas.audit.AuditableContext;
 import org.apereo.cas.audit.AuditableExecutionResult;
 import org.apereo.cas.audit.BaseAuditableExecution;
@@ -7,9 +10,10 @@ import org.apereo.cas.audit.BaseAuditableExecution;
 import lombok.RequiredArgsConstructor;
 import lombok.val;
 import org.apereo.inspektr.audit.annotation.Audit;
+import org.pac4j.jee.context.JEEContext;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Collection;
 
@@ -23,20 +27,25 @@ import java.util.Collection;
 public class AccessTokenGrantAuditableRequestExtractor extends BaseAuditableExecution {
     private final Collection<AccessTokenGrantRequestExtractor> accessTokenGrantRequestExtractors;
 
-    @Audit(action = "OAUTH2_ACCESS_TOKEN_REQUEST",
-        actionResolverName = "OAUTH2_ACCESS_TOKEN_REQUEST_ACTION_RESOLVER",
-        resourceResolverName = "OAUTH2_ACCESS_TOKEN_REQUEST_RESOURCE_RESOLVER")
+    @Audit(action = AuditableActions.OAUTH2_ACCESS_TOKEN_REQUEST,
+        actionResolverName = AuditActionResolvers.OAUTH2_ACCESS_TOKEN_REQUEST_ACTION_RESOLVER,
+        resourceResolverName = AuditResourceResolvers.OAUTH2_ACCESS_TOKEN_REQUEST_RESOURCE_RESOLVER)
     @Override
-    public AuditableExecutionResult execute(final AuditableContext context) {
-        val request = (HttpServletRequest) context.getRequest().orElseThrow();
-        val response = (HttpServletResponse) context.getResponse().orElseThrow();
+    public AuditableExecutionResult execute(final AuditableContext auditableContext) {
+        val request = (HttpServletRequest) auditableContext.getRequest().orElseThrow();
+        val response = (HttpServletResponse) auditableContext.getResponse().orElseThrow();
 
-        val result = this.accessTokenGrantRequestExtractors.stream()
-            .filter(ext -> ext.supports(request))
+        val context = new JEEContext(request, response);
+        val result = accessTokenGrantRequestExtractors.stream()
+            .filter(ext -> ext.supports(context))
             .findFirst()
             .orElseThrow(() -> new UnsupportedOperationException("Access token request is not supported"))
-            .extract(request, response);
+            .extract(context);
 
-        return AuditableExecutionResult.builder().executionResult(result).build();
+        return AuditableExecutionResult.builder()
+            .authentication(result.getAuthentication())
+            .service(result.getService())
+            .registeredService(result.getRegisteredService())
+            .executionResult(result).build();
     }
 }

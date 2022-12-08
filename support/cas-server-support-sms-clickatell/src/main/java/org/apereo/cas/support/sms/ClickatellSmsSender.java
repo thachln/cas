@@ -3,6 +3,7 @@ package org.apereo.cas.support.sms;
 import org.apereo.cas.notifications.sms.SmsSender;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.LoggingUtils;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,6 @@ import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * This is {@link ClickatellSmsSender}.
@@ -31,13 +31,14 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class ClickatellSmsSender implements SmsSender {
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(false).build().toObjectMapper();
 
     private final String token;
 
     private final String serverUrl;
 
-    private final transient RestTemplate restTemplate = new RestTemplate(CollectionUtils.wrapList(new MappingJackson2HttpMessageConverter()));
+    private final RestTemplate restTemplate = new RestTemplate(CollectionUtils.wrapList(new MappingJackson2HttpMessageConverter()));
 
     @Override
     public boolean send(final String from, final String to, final String message) {
@@ -55,7 +56,7 @@ public class ClickatellSmsSender implements SmsSender {
             val stringify = new StringWriter();
             MAPPER.writeValue(stringify, map);
 
-            val request = new HttpEntity<String>(stringify.toString(), headers);
+            val request = new HttpEntity<>(stringify.toString(), headers);
             val response = restTemplate.postForEntity(new URI(this.serverUrl), request, Map.class);
             if (response.hasBody()) {
                 val body = response.getBody();
@@ -75,8 +76,7 @@ public class ClickatellSmsSender implements SmsSender {
                 val messages = (List<Map>) body.get("messages");
                 val errors = messages.stream()
                     .filter(m -> m.containsKey("accepted") && !Boolean.parseBoolean(m.get("accepted").toString()) && m.containsKey("error"))
-                    .map(m -> (String) m.get("error"))
-                    .collect(Collectors.toList());
+                    .map(m -> (String) m.get("error")).toList();
                 if (errors.isEmpty()) {
                     return true;
                 }

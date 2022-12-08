@@ -1,8 +1,9 @@
 package org.apereo.cas.couchbase.core;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
+import com.couchbase.client.java.query.QueryOptions;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -20,11 +21,12 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 6.2.0
  */
 @Tag("Couchbase")
-@EnabledIfPortOpen(port = 8091)
+@EnabledIfListeningOnPort(port = 8091)
 @SpringBootTest(classes = RefreshAutoConfiguration.class,
     properties = {
         "cas.authn.couchbase.cluster-username=admin",
         "cas.authn.couchbase.cluster-password=password",
+        "cas.authn.couchbase.max-parallelism=1",
         "cas.authn.couchbase.bucket=testbucket"
     })
 @EnableConfigurationProperties(CasConfigurationProperties.class)
@@ -34,7 +36,7 @@ public class CouchbaseClientFactoryTests {
 
     @Test
     public void verifyInit() {
-        val factory = new CouchbaseClientFactory(casProperties.getAuthn().getCouchbase());
+        val factory = new DefaultCouchbaseClientFactory(casProperties.getAuthn().getCouchbase());
         assertNotNull(factory.getConnectionTimeout());
         assertNotNull(factory.getKvTimeout());
         assertNotNull(factory.getProperties());
@@ -42,5 +44,11 @@ public class CouchbaseClientFactoryTests {
         assertNotNull(factory.getSearchTimeout());
         assertNotNull(factory.getViewTimeout());
         assertNotNull(factory.getCluster());
+
+        assertNotNull(factory.select("1=1", QueryOptions.queryOptions()));
+        assertNotNull(factory.removeAll());
+
+        assertDoesNotThrow(factory::shutdown);
+
     }
 }

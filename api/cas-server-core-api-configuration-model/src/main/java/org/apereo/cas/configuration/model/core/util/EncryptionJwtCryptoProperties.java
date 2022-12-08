@@ -8,6 +8,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -22,10 +23,11 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public class EncryptionJwtCryptoProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 616825635591169628L;
 
     /**
-     * The encryption key is a JWT whose length is defined by the signing key size setting.
+     * The encryption key is a JWT whose length is defined by the encryption key size setting.
      */
     @RequiredProperty
     private String key = StringUtils.EMPTY;

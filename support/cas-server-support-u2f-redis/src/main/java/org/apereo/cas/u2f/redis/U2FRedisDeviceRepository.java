@@ -2,23 +2,20 @@ package org.apereo.cas.u2f.redis;
 
 import org.apereo.cas.adaptors.u2f.storage.BaseU2FDeviceRepository;
 import org.apereo.cas.adaptors.u2f.storage.U2FDeviceRegistration;
-import org.apereo.cas.util.DateTimeUtils;
+import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.redis.core.CasRedisTemplate;
 import org.apereo.cas.util.crypto.CipherExecutor;
 
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.data.redis.core.RedisTemplate;
 
 import java.io.Serializable;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * This is {@link U2FRedisDeviceRepository}.
@@ -33,43 +30,42 @@ public class U2FRedisDeviceRepository extends BaseU2FDeviceRepository {
      */
     public static final String CAS_U2F_PREFIX = U2FRedisDeviceRepository.class.getSimpleName() + ':';
 
-    private final transient RedisTemplate<String, U2FDeviceRegistration> redisTemplate;
-
-    private final long expirationTime;
-
-    private final TimeUnit expirationTimeUnit;
+    private final CasRedisTemplate<String, U2FDeviceRegistration> redisTemplate;
 
     public U2FRedisDeviceRepository(final LoadingCache<String, String> requestStorage,
-                                    final RedisTemplate<String, U2FDeviceRegistration> redisTemplate,
-                                    final long expirationTime,
-                                    final TimeUnit expirationTimeUnit,
-                                    final CipherExecutor<Serializable, String> cipherExecutor) {
-        super(requestStorage, cipherExecutor);
-        this.expirationTime = expirationTime;
-        this.expirationTimeUnit = expirationTimeUnit;
+                                    final CasRedisTemplate<String, U2FDeviceRegistration> redisTemplate,
+                                    final CipherExecutor<Serializable, String> cipherExecutor,
+                                    final CasConfigurationProperties casProperties) {
+        super(casProperties, requestStorage, cipherExecutor);
         this.redisTemplate = redisTemplate;
+    }
+
+    private static String getPatternRedisKey() {
+        return CAS_U2F_PREFIX + '*';
+    }
+
+    private static String buildRedisKeyForRecord(final U2FDeviceRegistration record) {
+        return CAS_U2F_PREFIX + record.getUsername() + ':' + record.getId();
+    }
+
+    private static String buildRedisKeyForUser(final String username) {
+        return CAS_U2F_PREFIX + username + ":*";
     }
 
     @Override
     public Collection<? extends U2FDeviceRegistration> getRegisteredDevices() {
-        val expirationDate = LocalDate.now(ZoneId.systemDefault())
-            .minus(this.expirationTime, DateTimeUtils.toChronoUnit(this.expirationTimeUnit));
-        val keys = (Set<String>) this.redisTemplate.keys(getPatternRedisKey());
-        if (keys != null) {
-            return queryDeviceRegistrations(expirationDate, keys);
-        }
-        return new ArrayList<>(0);
+        val expirationDate = getDeviceExpiration();
+        val keys = redisTemplate.scan(getPatternRedisKey(),
+            casProperties.getAuthn().getMfa().getU2f().getRedis().getScanCount());
+        return queryDeviceRegistrations(expirationDate, keys);
     }
 
     @Override
     public Collection<? extends U2FDeviceRegistration> getRegisteredDevices(final String username) {
-        val expirationDate = LocalDate.now(ZoneId.systemDefault())
-            .minus(this.expirationTime, DateTimeUtils.toChronoUnit(this.expirationTimeUnit));
-        val keys = (Set<String>) this.redisTemplate.keys(buildRedisKeyForUser(username));
-        if (keys != null) {
-            return queryDeviceRegistrations(expirationDate, keys);
-        }
-        return new ArrayList<>(0);
+        val expirationDate = getDeviceExpiration();
+        val keys = redisTemplate.scan(buildRedisKeyForUser(username),
+            casProperties.getAuthn().getMfa().getU2f().getRedis().getScanCount());
+        return queryDeviceRegistrations(expirationDate, keys);
     }
 
     @Override
@@ -86,10 +82,9 @@ public class U2FRedisDeviceRepository extends BaseU2FDeviceRepository {
 
     @Override
     public void clean() {
-        val expirationDate = LocalDate.now(ZoneId.systemDefault()).minus(this.expirationTime, DateTimeUtils.toChronoUnit(this.expirationTimeUnit));
+        val expirationDate = getDeviceExpiration();
         LOGGER.debug("Cleaning up expired U2F device registrations based on expiration date [{}]", expirationDate);
         val expiredKeys = getRedisKeys()
-            .stream()
             .map(redisKey -> this.redisTemplate.boundValueOps(redisKey).get())
             .filter(Objects::nonNull)
             .map(U2FDeviceRegistration.class::cast)
@@ -101,7 +96,7 @@ public class U2FRedisDeviceRepository extends BaseU2FDeviceRepository {
 
     @Override
     public void removeAll() {
-        this.redisTemplate.delete(getRedisKeys());
+        this.redisTemplate.delete(getRedisKeys().collect(Collectors.toSet()));
     }
 
     @Override
@@ -110,22 +105,9 @@ public class U2FRedisDeviceRepository extends BaseU2FDeviceRepository {
         this.redisTemplate.delete(redisKey);
     }
 
-    private static String getPatternRedisKey() {
-        return CAS_U2F_PREFIX + '*';
-    }
-
-    private static String buildRedisKeyForRecord(final U2FDeviceRegistration record) {
-        return CAS_U2F_PREFIX + record.getUsername() + ':' + record.getId();
-    }
-
-    private static String buildRedisKeyForUser(final String username) {
-        return CAS_U2F_PREFIX + username + ":*";
-    }
-
     private Collection<? extends U2FDeviceRegistration> queryDeviceRegistrations(final LocalDate expirationDate,
-                                                                                 final Set<String> keys) {
+                                                                                 final Stream<String> keys) {
         return keys
-            .stream()
             .map(redisKey -> this.redisTemplate.boundValueOps(redisKey).get())
             .filter(Objects::nonNull)
             .map(U2FDeviceRegistration.class::cast)
@@ -133,7 +115,8 @@ public class U2FRedisDeviceRepository extends BaseU2FDeviceRepository {
             .collect(Collectors.toList());
     }
 
-    private Set<String> getRedisKeys() {
-        return this.redisTemplate.keys(getPatternRedisKey());
+    private Stream<String> getRedisKeys() {
+        return redisTemplate.scan(getPatternRedisKey(),
+            casProperties.getAuthn().getMfa().getU2f().getRedis().getScanCount());
     }
 }

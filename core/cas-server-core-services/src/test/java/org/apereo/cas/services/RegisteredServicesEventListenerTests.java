@@ -3,13 +3,15 @@ package org.apereo.cas.services;
 import org.apereo.cas.config.CasCoreNotificationsConfiguration;
 import org.apereo.cas.config.CasCoreServicesConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
+import org.apereo.cas.config.CasCoreWebConfiguration;
+import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.notifications.CommunicationsManager;
+import org.apereo.cas.notifications.sms.MockSmsSender;
 import org.apereo.cas.notifications.sms.SmsSender;
-import org.apereo.cas.sms.MockSmsSender;
 import org.apereo.cas.support.events.service.CasRegisteredServiceExpiredEvent;
 import org.apereo.cas.support.events.service.CasRegisteredServicesRefreshEvent;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.val;
 import org.junit.jupiter.api.Tag;
@@ -26,7 +28,6 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.cloud.context.environment.EnvironmentChangeEvent;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Lazy;
 
 import java.util.Set;
 
@@ -44,27 +45,29 @@ import static org.junit.jupiter.api.Assertions.*;
     CasCoreServicesConfiguration.class,
     CasCoreNotificationsConfiguration.class,
     CasCoreUtilConfiguration.class,
+    CasCoreWebConfiguration.class,
+    CasWebApplicationServiceFactoryConfiguration.class,
     MailSenderAutoConfiguration.class,
     MailSenderValidatorAutoConfiguration.class
 }, properties = {
     "spring.mail.host=localhost",
     "spring.mail.port=25000",
-    "cas.service-registry.sms.text=Service %s has expired in CAS service registry",
+    "cas.service-registry.sms.text=Service ${service} has expired in CAS service registry",
     "cas.service-registry.sms.from=3477563421",
     "cas.service-registry.mail.from=admin@example.org",
     "cas.service-registry.mail.subject=Sample Subject",
-    "cas.service-registry.mail.text=Service %s has expired in CAS service registry"
+    "cas.service-registry.mail.text=Service ${service} has expired in CAS service registry"
 })
 @Tag("Mail")
-@EnabledIfPortOpen(port = 25000)
+@EnabledIfListeningOnPort(port = 25000)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 public class RegisteredServicesEventListenerTests {
     @Autowired
-    @Qualifier("servicesManager")
+    @Qualifier(ServicesManager.BEAN_NAME)
     private ServicesManager servicesManager;
 
     @Autowired
-    @Qualifier("communicationsManager")
+    @Qualifier(CommunicationsManager.BEAN_NAME)
     private CommunicationsManager communicationsManager;
 
     @Autowired
@@ -76,7 +79,7 @@ public class RegisteredServicesEventListenerTests {
         assertDoesNotThrow(new Executable() {
             @Override
             public void execute() throws Throwable {
-                val listener = new RegisteredServicesEventListener(servicesManager, casProperties, communicationsManager);
+                val listener = new DefaultRegisteredServicesEventListener(servicesManager, casProperties, communicationsManager);
                 val event = new CasRegisteredServiceExpiredEvent(this, registeredService, false);
                 listener.handleRegisteredServiceExpiredEvent(event);
             }
@@ -91,14 +94,9 @@ public class RegisteredServicesEventListenerTests {
         contact.setEmail("casuser@example.org");
         contact.setPhone("13477465421");
         registeredService.getContacts().add(contact);
-        val listener = new RegisteredServicesEventListener(this.servicesManager, casProperties, communicationsManager);
+        val listener = new DefaultRegisteredServicesEventListener(this.servicesManager, casProperties, communicationsManager);
         val event = new CasRegisteredServiceExpiredEvent(this, registeredService, false);
-        assertDoesNotThrow(new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                listener.handleRegisteredServiceExpiredEvent(event);
-            }
-        });
+        assertDoesNotThrow(() -> listener.handleRegisteredServiceExpiredEvent(event));
     }
 
     @Test
@@ -109,18 +107,17 @@ public class RegisteredServicesEventListenerTests {
         contact.setEmail("casuser@example.org");
         contact.setPhone("13477465421");
         registeredService.getContacts().add(contact);
-        val listener = new RegisteredServicesEventListener(this.servicesManager, casProperties, communicationsManager);
+        val listener = new DefaultRegisteredServicesEventListener(this.servicesManager, casProperties, communicationsManager);
         listener.handleRefreshEvent(new CasRegisteredServicesRefreshEvent(this));
         listener.handleEnvironmentChangeEvent(new EnvironmentChangeEvent(Set.of()));
         val event = new CasRegisteredServiceExpiredEvent(this, registeredService, true);
         listener.handleRegisteredServiceExpiredEvent(event);
     }
 
-    @TestConfiguration("RegisteredServicesEventListenerTestConfiguration")
-    @Lazy(false)
+    @TestConfiguration(value = "RegisteredServicesEventListenerTestConfiguration", proxyBeanMethods = false)
     public static class RegisteredServicesEventListenerTestConfiguration {
 
-        @ConditionalOnMissingBean(name = "smsSender")
+        @ConditionalOnMissingBean(name = SmsSender.BEAN_NAME)
         @Bean
         public SmsSender smsSender() {
             return new MockSmsSender();

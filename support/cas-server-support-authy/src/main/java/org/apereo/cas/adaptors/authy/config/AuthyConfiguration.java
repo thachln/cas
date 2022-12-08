@@ -1,45 +1,40 @@
 package org.apereo.cas.adaptors.authy.config;
 
-import org.apereo.cas.CentralAuthenticationService;
+import org.apereo.cas.adaptors.authy.AuthyClientInstance;
+import org.apereo.cas.adaptors.authy.web.flow.AuthyAuthenticationRegistrationWebflowAction;
 import org.apereo.cas.adaptors.authy.web.flow.AuthyAuthenticationWebflowAction;
 import org.apereo.cas.adaptors.authy.web.flow.AuthyAuthenticationWebflowEventResolver;
 import org.apereo.cas.adaptors.authy.web.flow.AuthyMultifactorTrustedDeviceWebflowConfigurer;
 import org.apereo.cas.adaptors.authy.web.flow.AuthyMultifactorWebflowConfigurer;
-import org.apereo.cas.audit.AuditableExecution;
-import org.apereo.cas.authentication.AuthenticationEventExecutionPlan;
-import org.apereo.cas.authentication.AuthenticationServiceSelectionPlan;
-import org.apereo.cas.authentication.AuthenticationSystemSupport;
-import org.apereo.cas.authentication.MultifactorAuthenticationContextValidator;
 import org.apereo.cas.configuration.CasConfigurationProperties;
-import org.apereo.cas.services.ServicesManager;
-import org.apereo.cas.ticket.registry.TicketRegistry;
-import org.apereo.cas.ticket.registry.TicketRegistrySupport;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.trusted.config.MultifactorAuthnTrustConfiguration;
-import org.apereo.cas.web.cookie.CasCookieBuilder;
+import org.apereo.cas.util.spring.beans.BeanCondition;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 import org.apereo.cas.web.flow.CasWebflowConfigurer;
 import org.apereo.cas.web.flow.CasWebflowConstants;
 import org.apereo.cas.web.flow.CasWebflowExecutionPlanConfigurer;
-import org.apereo.cas.web.flow.SingleSignOnParticipationStrategy;
-import org.apereo.cas.web.flow.resolver.CasDelegatingWebflowEventResolver;
+import org.apereo.cas.web.flow.actions.WebflowActionBeanSupplier;
 import org.apereo.cas.web.flow.resolver.CasWebflowEventResolver;
 import org.apereo.cas.web.flow.resolver.impl.CasWebflowEventResolutionConfigurationContext;
 import org.apereo.cas.web.flow.util.MultifactorAuthenticationWebflowUtils;
 
 import lombok.val;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.webflow.config.FlowDefinitionRegistryBuilder;
 import org.springframework.webflow.definition.registry.FlowDefinitionRegistry;
+import org.springframework.webflow.engine.builder.FlowBuilder;
 import org.springframework.webflow.engine.builder.support.FlowBuilderServices;
 import org.springframework.webflow.execution.Action;
 
@@ -49,153 +44,201 @@ import org.springframework.webflow.execution.Action;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration("authyConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.Authy)
+@AutoConfiguration
 public class AuthyConfiguration {
     private static final int WEBFLOW_CONFIGURER_ORDER = 100;
 
-    @Autowired
-    @Qualifier("singleSignOnParticipationStrategy")
-    private ObjectProvider<SingleSignOnParticipationStrategy> webflowSingleSignOnParticipationStrategy;
+    private static final BeanCondition CONDITION = BeanCondition.on("cas.authn.mfa.authy.api-key");
 
-    @Autowired
-    @Qualifier("authenticationEventExecutionPlan")
-    private ObjectProvider<AuthenticationEventExecutionPlan> authenticationEventExecutionPlan;
+    @Configuration(value = "AuthyWebflowRegistryConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class AuthyWebflowRegistryConfiguration {
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = "authyAuthenticatorFlowRegistry")
+        public FlowDefinitionRegistry authyAuthenticatorFlowRegistry(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_FLOW_BUILDER_SERVICES)
+            final FlowBuilderServices flowBuilderServices,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_FLOW_BUILDER)
+            final FlowBuilder flowBuilder) throws Exception {
+            return BeanSupplier.of(FlowDefinitionRegistry.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> {
+                    val builder = new FlowDefinitionRegistryBuilder(applicationContext, flowBuilderServices);
+                    builder.addFlowBuilder(flowBuilder, AuthyMultifactorWebflowConfigurer.MFA_AUTHY_EVENT_ID);
+                    return builder.build();
+                })
+                .otherwiseProxy()
+                .get();
+        }
 
-    @Autowired
-    @Qualifier("servicesManager")
-    private ObjectProvider<ServicesManager> servicesManager;
-
-    @Autowired
-    @Qualifier("registeredServiceAccessStrategyEnforcer")
-    private ObjectProvider<AuditableExecution> registeredServiceAccessStrategyEnforcer;
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("loginFlowRegistry")
-    private ObjectProvider<FlowDefinitionRegistry> loginFlowDefinitionRegistry;
-
-    @Autowired
-    private ObjectProvider<FlowBuilderServices> flowBuilderServices;
-
-    @Autowired
-    @Qualifier("centralAuthenticationService")
-    private ObjectProvider<CentralAuthenticationService> centralAuthenticationService;
-
-    @Autowired
-    @Qualifier("defaultAuthenticationSystemSupport")
-    private ObjectProvider<AuthenticationSystemSupport> authenticationSystemSupport;
-
-    @Autowired
-    @Qualifier("initialAuthenticationAttemptWebflowEventResolver")
-    private ObjectProvider<CasDelegatingWebflowEventResolver> initialAuthenticationAttemptWebflowEventResolver;
-    
-    @Autowired
-    @Qualifier("authenticationContextValidator")
-    private ObjectProvider<MultifactorAuthenticationContextValidator> authenticationContextValidator;
-    
-    @Autowired
-    @Qualifier("ticketRegistry")
-    private ObjectProvider<TicketRegistry> ticketRegistry;
-
-    @Autowired
-    @Qualifier("defaultTicketRegistrySupport")
-    private ObjectProvider<TicketRegistrySupport> ticketRegistrySupport;
-
-    @Autowired
-    @Qualifier("warnCookieGenerator")
-    private ObjectProvider<CasCookieBuilder> warnCookieGenerator;
-
-    @Autowired
-    private ConfigurableApplicationContext applicationContext;
-
-    @Autowired
-    @Qualifier("authenticationServiceSelectionPlan")
-    private ObjectProvider<AuthenticationServiceSelectionPlan> authenticationRequestServiceSelectionStrategies;
-
-    @Bean
-    public FlowDefinitionRegistry authyAuthenticatorFlowRegistry() {
-        val builder = new FlowDefinitionRegistryBuilder(this.applicationContext, flowBuilderServices.getObject());
-        builder.setBasePath(CasWebflowConstants.BASE_CLASSPATH_WEBFLOW);
-        builder.addFlowLocationPattern("/mfa-authy/*-webflow.xml");
-        return builder.build();
     }
 
-    @RefreshScope
-    @Bean
-    public CasWebflowEventResolver authyAuthenticationWebflowEventResolver() {
-        val context = CasWebflowEventResolutionConfigurationContext.builder()
-            .casDelegatingWebflowEventResolver(initialAuthenticationAttemptWebflowEventResolver.getObject())
-            .authenticationContextValidator(authenticationContextValidator.getObject())
-            .authenticationSystemSupport(authenticationSystemSupport.getObject())
-            .centralAuthenticationService(centralAuthenticationService.getObject())
-            .servicesManager(servicesManager.getObject())
-            .ticketRegistrySupport(ticketRegistrySupport.getObject())
-            .warnCookieGenerator(warnCookieGenerator.getObject())
-            .authenticationRequestServiceSelectionStrategies(authenticationRequestServiceSelectionStrategies.getObject())
-            .registeredServiceAccessStrategyEnforcer(registeredServiceAccessStrategyEnforcer.getObject())
-            .casProperties(casProperties)
-            .singleSignOnParticipationStrategy(webflowSingleSignOnParticipationStrategy.getObject())
-            .ticketRegistry(ticketRegistry.getObject())
-            .applicationContext(applicationContext)
-            .authenticationEventExecutionPlan(authenticationEventExecutionPlan.getObject())
-            .build();
-
-        return new AuthyAuthenticationWebflowEventResolver(context);
+    @Configuration(value = "AuthyWebflowCoreConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class AuthyWebflowCoreConfiguration {
+        @ConditionalOnMissingBean(name = "authyMultifactorWebflowConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public CasWebflowConfigurer authyMultifactorWebflowConfigurer(
+            @Qualifier("authyAuthenticatorFlowRegistry")
+            final FlowDefinitionRegistry authyAuthenticatorFlowRegistry,
+            final ConfigurableApplicationContext applicationContext,
+            final CasConfigurationProperties casProperties,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_LOGIN_FLOW_DEFINITION_REGISTRY)
+            final FlowDefinitionRegistry loginFlowDefinitionRegistry,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_FLOW_BUILDER_SERVICES)
+            final FlowBuilderServices flowBuilderServices) throws Exception {
+            return BeanSupplier.of(CasWebflowConfigurer.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> {
+                    val cfg = new AuthyMultifactorWebflowConfigurer(flowBuilderServices,
+                        loginFlowDefinitionRegistry, authyAuthenticatorFlowRegistry,
+                        applicationContext, casProperties,
+                        MultifactorAuthenticationWebflowUtils.getMultifactorAuthenticationWebflowCustomizers(applicationContext));
+                    cfg.setOrder(WEBFLOW_CONFIGURER_ORDER);
+                    return cfg;
+                })
+                .otherwiseProxy()
+                .get();
+        }
     }
 
-    @ConditionalOnMissingBean(name = "authyMultifactorWebflowConfigurer")
-    @Bean
-    @DependsOn("defaultWebflowConfigurer")
-    public CasWebflowConfigurer authyMultifactorWebflowConfigurer() {
-        val cfg = new AuthyMultifactorWebflowConfigurer(flowBuilderServices.getObject(),
-            loginFlowDefinitionRegistry.getObject(), authyAuthenticatorFlowRegistry(),
-            applicationContext, casProperties,
-            MultifactorAuthenticationWebflowUtils.getMultifactorAuthenticationWebflowCustomizers(applicationContext));
-        cfg.setOrder(WEBFLOW_CONFIGURER_ORDER);
-        return cfg;
+    @Configuration(value = "AuthyWebflowEventConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class AuthyWebflowEventConfiguration {
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @Bean
+        public CasWebflowEventResolver authyAuthenticationWebflowEventResolver(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("casWebflowConfigurationContext")
+            final CasWebflowEventResolutionConfigurationContext casWebflowConfigurationContext) throws Exception {
+            return BeanSupplier.of(CasWebflowEventResolver.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> new AuthyAuthenticationWebflowEventResolver(casWebflowConfigurationContext))
+                .otherwiseProxy()
+                .get();
+        }
+
     }
 
-    @RefreshScope
-    @Bean
-    public Action authyAuthenticationWebflowAction() {
-        return new AuthyAuthenticationWebflowAction(authyAuthenticationWebflowEventResolver());
+    @Configuration(value = "AuthyWebflowActionConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class AuthyWebflowActionConfiguration {
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = CasWebflowConstants.ACTION_ID_AUTHY_REGISTRATION)
+        @Bean
+        public Action authyAuthenticationRegistrationWebflowAction(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("authyClientInstance")
+            final AuthyClientInstance authyClientInstance) throws Exception {
+            return WebflowActionBeanSupplier.builder()
+                .withApplicationContext(applicationContext)
+                .withProperties(casProperties)
+                .withAction(() -> BeanSupplier.of(Action.class)
+                    .when(CONDITION.given(applicationContext.getEnvironment()))
+                    .supply(() -> new AuthyAuthenticationRegistrationWebflowAction(authyClientInstance))
+                    .otherwiseProxy()
+                    .get())
+                .withId(CasWebflowConstants.ACTION_ID_AUTHY_REGISTRATION)
+                .build()
+                .get();
+        }
+
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @Bean
+        @ConditionalOnMissingBean(name = CasWebflowConstants.ACTION_ID_AUTHY_AUTHENTICATION)
+        public Action authyAuthenticationWebflowAction(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("authyAuthenticationWebflowEventResolver")
+            final CasWebflowEventResolver authyAuthenticationWebflowEventResolver) throws Exception {
+            return WebflowActionBeanSupplier.builder()
+                .withApplicationContext(applicationContext)
+                .withProperties(casProperties)
+                .withAction(() -> BeanSupplier.of(Action.class)
+                    .when(CONDITION.given(applicationContext.getEnvironment()))
+                    .supply(() -> new AuthyAuthenticationWebflowAction(authyAuthenticationWebflowEventResolver))
+                    .otherwiseProxy()
+                    .get())
+                .withId(CasWebflowConstants.ACTION_ID_AUTHY_AUTHENTICATION)
+                .build()
+                .get();
+        }
     }
 
-    @Bean
-    @ConditionalOnMissingBean(name = "authyCasWebflowExecutionPlanConfigurer")
-    public CasWebflowExecutionPlanConfigurer authyCasWebflowExecutionPlanConfigurer() {
-        return plan -> plan.registerWebflowConfigurer(authyMultifactorWebflowConfigurer());
+    @Configuration(value = "AuthyWebflowExecutionPlanConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class AuthyWebflowExecutionPlanConfiguration {
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = "authyCasWebflowExecutionPlanConfigurer")
+        public CasWebflowExecutionPlanConfigurer authyCasWebflowExecutionPlanConfigurer(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("authyMultifactorWebflowConfigurer")
+            final CasWebflowConfigurer authyMultifactorWebflowConfigurer) throws Exception {
+            return BeanSupplier.of(CasWebflowExecutionPlanConfigurer.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> plan -> plan.registerWebflowConfigurer(authyMultifactorWebflowConfigurer))
+                .otherwiseProxy()
+                .get();
+        }
     }
 
-    /**
-     * The Authy multifactor trust configuration.
-     */
-    @ConditionalOnClass(value = MultifactorAuthnTrustConfiguration.class)
-    @ConditionalOnProperty(prefix = "cas.authn.mfa.authy", name = "trusted-device-enabled", havingValue = "true", matchIfMissing = true)
-    @Configuration("authyMultifactorTrustConfiguration")
-    public class AuthyMultifactorTrustConfiguration {
+    @ConditionalOnClass(MultifactorAuthnTrustConfiguration.class)
+    @Configuration(value = "AuthyMultifactorTrustConfiguration", proxyBeanMethods = false)
+    @DependsOn("authyMultifactorWebflowConfigurer")
+    @ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.MultifactorAuthenticationTrustedDevices, module = "authy")
+    public static class AuthyMultifactorTrustConfiguration {
+        private static final BeanCondition CONDITION = BeanCondition.on("cas.authn.mfa.authy.trusted-device-enabled")
+            .isTrue().evenIfMissing();
 
         @ConditionalOnMissingBean(name = "authyMultifactorTrustWebflowConfigurer")
         @Bean
-        @DependsOn("defaultWebflowConfigurer")
-        public CasWebflowConfigurer authyMultifactorTrustWebflowConfigurer() {
-            val cfg = new AuthyMultifactorTrustedDeviceWebflowConfigurer(flowBuilderServices.getObject(),
-                loginFlowDefinitionRegistry.getObject(),
-                authyAuthenticatorFlowRegistry(),
-                applicationContext,
-                casProperties,
-                MultifactorAuthenticationWebflowUtils.getMultifactorAuthenticationWebflowCustomizers(applicationContext));
-            cfg.setOrder(WEBFLOW_CONFIGURER_ORDER + 1);
-            return cfg;
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public CasWebflowConfigurer authyMultifactorTrustWebflowConfigurer(
+            @Qualifier("authyAuthenticatorFlowRegistry")
+            final FlowDefinitionRegistry authyAuthenticatorFlowRegistry,
+            final ConfigurableApplicationContext applicationContext,
+            final CasConfigurationProperties casProperties,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_LOGIN_FLOW_DEFINITION_REGISTRY)
+            final FlowDefinitionRegistry loginFlowDefinitionRegistry,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_FLOW_BUILDER_SERVICES)
+            final FlowBuilderServices flowBuilderServices) {
+            return BeanSupplier.of(CasWebflowConfigurer.class)
+                .when(AuthyConfiguration.CONDITION.given(applicationContext.getEnvironment()))
+                .and(AuthyMultifactorTrustConfiguration.CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> {
+                    val cfg = new AuthyMultifactorTrustedDeviceWebflowConfigurer(flowBuilderServices,
+                        loginFlowDefinitionRegistry,
+                        authyAuthenticatorFlowRegistry,
+                        applicationContext,
+                        casProperties,
+                        MultifactorAuthenticationWebflowUtils.getMultifactorAuthenticationWebflowCustomizers(applicationContext));
+                    cfg.setOrder(WEBFLOW_CONFIGURER_ORDER + 1);
+                    return cfg;
+                })
+                .otherwiseProxy()
+                .get();
         }
 
         @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
         @ConditionalOnMissingBean(name = "authyMultifactorTrustCasWebflowExecutionPlanConfigurer")
-        public CasWebflowExecutionPlanConfigurer authyMultifactorTrustCasWebflowExecutionPlanConfigurer() {
-            return plan -> plan.registerWebflowConfigurer(authyMultifactorTrustWebflowConfigurer());
+        public CasWebflowExecutionPlanConfigurer authyMultifactorTrustCasWebflowExecutionPlanConfigurer(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("authyMultifactorTrustWebflowConfigurer")
+            final CasWebflowConfigurer authyMultifactorTrustWebflowConfigurer) {
+            return BeanSupplier.of(CasWebflowExecutionPlanConfigurer.class)
+                .when(AuthyConfiguration.CONDITION.given(applicationContext.getEnvironment()))
+                .and(AuthyMultifactorTrustConfiguration.CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> plan -> plan.registerWebflowConfigurer(authyMultifactorTrustWebflowConfigurer))
+                .otherwiseProxy()
+                .get();
         }
     }
 }

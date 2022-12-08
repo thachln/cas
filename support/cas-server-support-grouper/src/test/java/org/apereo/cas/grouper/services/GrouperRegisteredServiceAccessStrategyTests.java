@@ -1,9 +1,11 @@
 package org.apereo.cas.grouper.services;
 
 import org.apereo.cas.services.JsonServiceRegistry;
+import org.apereo.cas.services.RegisteredServiceAccessStrategyRequest;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
 import org.apereo.cas.services.replication.NoOpRegisteredServiceReplicationStrategy;
 import org.apereo.cas.services.resource.DefaultRegisteredServiceResourceNamingStrategy;
+import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.io.WatcherService;
 
 import edu.internet2.middleware.grouperClient.ws.beans.WsGetGroupsResult;
@@ -16,13 +18,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.ClassPathResource;
 
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -54,6 +56,7 @@ public class GrouperRegisteredServiceAccessStrategyTests {
 
         val service = RegisteredServiceTestUtils.getRegisteredService("test");
         val grouper = new GrouperRegisteredServiceAccessStrategy();
+        grouper.setConfigProperties(CollectionUtils.wrap("hello", "world"));
         grouper.setRequiredAttributes(attributes);
         service.setAccessStrategy(grouper);
 
@@ -72,10 +75,11 @@ public class GrouperRegisteredServiceAccessStrategyTests {
     @Test
     public void checkGrouperAttributes() {
         val strategy = new GrouperRegisteredServiceAccessStrategy() {
+            @Serial
             private static final long serialVersionUID = 8533229193475808261L;
 
             @Override
-            protected Collection<WsGetGroupsResult> getWsGetGroupsResults(final String principal) {
+            protected Collection<WsGetGroupsResult> fetchWsGetGroupsResults(final String principal) {
                 val group = new WsGroup();
                 group.setExtension("GroupExtension");
                 group.setDescription("Group Desc");
@@ -89,20 +93,33 @@ public class GrouperRegisteredServiceAccessStrategyTests {
         val requiredAttributes = new HashMap<String, Set<String>>();
         requiredAttributes.put(GrouperRegisteredServiceAccessStrategy.GROUPER_GROUPS_ATTRIBUTE_NAME, Collections.singleton("SampleGroup"));
         strategy.setRequiredAttributes(requiredAttributes);
-        val attrs = (Map) RegisteredServiceTestUtils.getTestAttributes("banderson");
-        assertTrue(strategy.doPrincipalAttributesAllowServiceAccess("banderson", attrs));
+        assertTrue(executeStrategy(strategy));
     }
 
     @Test
     public void checkGrouperNoGroups() {
         val strategy = new GrouperRegisteredServiceAccessStrategy() {
+            @Serial
             private static final long serialVersionUID = 8533229193475808261L;
+
             @Override
-            protected Collection<WsGetGroupsResult> getWsGetGroupsResults(final String principal) {
+            protected Collection<WsGetGroupsResult> fetchWsGetGroupsResults(final String principal) {
                 return List.of();
             }
         };
-        val attrs = (Map) RegisteredServiceTestUtils.getTestAttributes("banderson");
-        assertFalse(strategy.doPrincipalAttributesAllowServiceAccess("banderson", attrs));
+        assertFalse(executeStrategy(strategy));
+    }
+
+    @Test
+    public void checkFailsConfig() {
+        val strategy = new GrouperRegisteredServiceAccessStrategy();
+        strategy.getConfigProperties().put("grouperClient.webService.url", "http://localhost:8012");
+        strategy.getConfigProperties().put("grouperClient.webService.login", "unknown");
+        strategy.getConfigProperties().put("grouperClient.webService.password", "unknown");
+        assertFalse(executeStrategy(strategy));
+    }
+
+    private static boolean executeStrategy(final GrouperRegisteredServiceAccessStrategy strategy) {
+        return strategy.doPrincipalAttributesAllowServiceAccess(RegisteredServiceAccessStrategyRequest.builder().principalId("banderson").build());
     }
 }

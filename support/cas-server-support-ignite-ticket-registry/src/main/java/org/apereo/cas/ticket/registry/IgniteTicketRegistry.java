@@ -58,7 +58,7 @@ public class IgniteTicketRegistry extends AbstractTicketRegistry implements Disp
     private Ignite ignite;
 
     @Override
-    public void addTicket(final Ticket ticket) {
+    public void addTicketInternal(final Ticket ticket) throws Exception {
         val encodedTicket = encodeTicket(ticket);
         val metadata = this.ticketCatalog.find(ticket);
         val cache = getIgniteCacheFromMetadata(metadata);
@@ -83,18 +83,14 @@ public class IgniteTicketRegistry extends AbstractTicketRegistry implements Disp
     }
 
     @Override
-    public boolean deleteSingleTicket(final String ticketId) {
-        val ticket = getTicket(ticketId);
-        if (ticket != null) {
-            val metadata = this.ticketCatalog.find(ticket);
-            if (metadata == null) {
-                LOGGER.warn("Ticket [{}] is not registered in the catalog and is unrecognized", ticketId);
-                return false;
-            }
+    public long deleteSingleTicket(final String ticketId) {
+        val encTicketId = encodeTicketId(ticketId);
+        val metadata = this.ticketCatalog.find(ticketId);
+        if (metadata != null) {
             val cache = getIgniteCacheFromMetadata(metadata);
-            return cache.remove(encodeTicketId(ticket.getId()));
+            return cache.remove(encTicketId) ? 1 : 0;
         }
-        return true;
+        return 1;
     }
 
     @Override
@@ -118,11 +114,7 @@ public class IgniteTicketRegistry extends AbstractTicketRegistry implements Disp
             return null;
         }
         val result = decodeTicket(ticket);
-        if (predicate.test(result)) {
-            return result;
-        }
-        LOGGER.debug("Unable to decode ticket [{}]", ticket);
-        return null;
+        return predicate.test(result) ? result : null;
     }
 
     @Override
@@ -135,7 +127,7 @@ public class IgniteTicketRegistry extends AbstractTicketRegistry implements Disp
     }
 
     @Override
-    public Ticket updateTicket(final Ticket ticket) {
+    public Ticket updateTicket(final Ticket ticket) throws Exception {
         addTicket(ticket);
         return ticket;
     }
@@ -166,26 +158,8 @@ public class IgniteTicketRegistry extends AbstractTicketRegistry implements Disp
         }
     }
 
-    private IgniteCache<String, Ticket> getIgniteCacheFromMetadata(final TicketDefinition metadata) {
-        val mapName = metadata.getProperties().getStorageName();
-        LOGGER.trace("Locating cache name [{}] for ticket definition [{}]", mapName, metadata);
-        return getIgniteCacheInstanceByName(mapName);
-    }
-
-    private IgniteCache<String, Ticket> getIgniteCacheInstanceByName(final String name) {
-        LOGGER.trace("Attempting to get/create cache [{}]", name);
-        return this.ignite.getOrCreateCache(name);
-    }
-
-    @ToString
-    private static class IgniteInternalTicketExpiryPolicy implements ExpiryPolicy {
-
-        private final ExpirationPolicy expirationPolicy;
-
-        IgniteInternalTicketExpiryPolicy(final ExpirationPolicy ticket) {
-            this.expirationPolicy = ticket;
-        }
-
+    @SuppressWarnings("UnusedVariable")
+    private record IgniteInternalTicketExpiryPolicy(ExpirationPolicy expirationPolicy) implements ExpiryPolicy {
         @Override
         public Duration getExpiryForCreation() {
             return new Duration(TimeUnit.SECONDS, expirationPolicy.getTimeToLive());
@@ -202,5 +176,16 @@ public class IgniteTicketRegistry extends AbstractTicketRegistry implements Disp
         public Duration getExpiryForUpdate() {
             return new Duration(TimeUnit.SECONDS, expirationPolicy.getTimeToLive());
         }
+    }
+
+    private IgniteCache<String, Ticket> getIgniteCacheFromMetadata(final TicketDefinition metadata) {
+        val mapName = metadata.getProperties().getStorageName();
+        LOGGER.trace("Locating cache name [{}] for ticket definition [{}]", mapName, metadata);
+        return getIgniteCacheInstanceByName(mapName);
+    }
+
+    private IgniteCache<String, Ticket> getIgniteCacheInstanceByName(final String name) {
+        LOGGER.trace("Attempting to get/create cache [{}]", name);
+        return this.ignite.getOrCreateCache(name);
     }
 }

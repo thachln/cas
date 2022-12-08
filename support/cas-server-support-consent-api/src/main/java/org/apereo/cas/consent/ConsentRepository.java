@@ -14,6 +14,10 @@ import java.util.Collection;
  * @since 5.1.0
  */
 public interface ConsentRepository extends Serializable {
+    /**
+     * Bean name.
+     */
+    String BEAN_NAME = "consentRepository";
 
     /**
      * Gets consent decision.
@@ -47,8 +51,9 @@ public interface ConsentRepository extends Serializable {
      *
      * @param decision the decision
      * @return consent decision updated/added
+     * @throws Exception the exception
      */
-    ConsentDecision storeConsentDecision(ConsentDecision decision);
+    ConsentDecision storeConsentDecision(ConsentDecision decision) throws Exception;
 
     /**
      * Delete consent decision.
@@ -58,4 +63,17 @@ public interface ConsentRepository extends Serializable {
      * @return true / false
      */
     boolean deleteConsentDecision(long id, String principal);
+
+    /**
+     * Delete consent decisions.
+     *
+     * @param principal the principal
+     * @return true/false
+     */
+    boolean deleteConsentDecisions(String principal);
+
+    /**
+     * Delete all.
+     */
+    void deleteAll();
 }

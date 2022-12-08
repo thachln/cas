@@ -7,12 +7,12 @@ import org.apereo.cas.support.saml.mdui.MetadataUIUtils;
 import org.apereo.cas.support.saml.services.SamlRegisteredService;
 import org.apereo.cas.support.saml.services.idp.metadata.SamlRegisteredServiceServiceProviderMetadataFacade;
 import org.apereo.cas.support.saml.services.idp.metadata.cache.SamlRegisteredServiceCachingMetadataResolver;
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.support.WebUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
 
@@ -24,7 +24,7 @@ import org.springframework.webflow.execution.RequestContext;
  */
 @RequiredArgsConstructor
 @Slf4j
-public class SamlIdPMetadataUIAction extends AbstractAction {
+public class SamlIdPMetadataUIAction extends BaseCasWebflowAction {
     private final ServicesManager servicesManager;
 
     private final SamlRegisteredServiceCachingMetadataResolver resolver;
@@ -45,7 +45,7 @@ public class SamlIdPMetadataUIAction extends AbstractAction {
                     return success();
                 }
 
-                val mdui = MetadataUIUtils.locateMetadataUserInterfaceForEntityId(adaptor.get().getEntityDescriptor(),
+                val mdui = MetadataUIUtils.locateMetadataUserInterfaceForEntityId(adaptor.get().entityDescriptor(),
                     service.getId(), samlService, WebUtils.getHttpServletRequestFromExternalWebflowContext(requestContext));
                 WebUtils.putServiceUserInterfaceMetadata(requestContext, mdui);
             }

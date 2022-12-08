@@ -20,7 +20,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
@@ -39,8 +38,9 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@SpringBootTest(classes = BaseGrouperConfigurationTests.SharedTestConfiguration.class, properties = "cas.authn.mfa.grouper-group-field=name")
-@Tag("WebflowEvents")
+@SpringBootTest(classes = BaseGrouperConfigurationTests.SharedTestConfiguration.class,
+    properties = "cas.authn.mfa.triggers.grouper.grouper-group-field=NAME")
+@Tag("Grouper")
 public class GrouperMultifactorAuthenticationPolicyEventResolverTests {
     @Autowired
     @Qualifier("grouperMultifactorAuthenticationWebflowEventResolver")
@@ -67,8 +67,7 @@ public class GrouperMultifactorAuthenticationPolicyEventResolverTests {
         assertEquals(TestMultifactorAuthenticationProvider.ID, event.iterator().next().getId());
     }
 
-    @TestConfiguration("GrouperTestConfiguration")
-    @Lazy(false)
+    @TestConfiguration(value = "GrouperTestConfiguration", proxyBeanMethods = false)
     public static class GrouperTestConfiguration {
         @Bean
         public GrouperFacade grouperFacade() {

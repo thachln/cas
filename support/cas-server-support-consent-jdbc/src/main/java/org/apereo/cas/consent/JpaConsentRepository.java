@@ -12,9 +12,9 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import java.util.ArrayList;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.io.Serial;
 import java.util.Collection;
 
 /**
@@ -23,17 +23,20 @@ import java.util.Collection;
  * @author Misagh Moayyed
  * @since 5.1.0
  */
-@EnableTransactionManagement(proxyTargetClass = true)
+@EnableTransactionManagement(proxyTargetClass = false)
 @Transactional(transactionManager = "transactionManagerConsent")
 @Slf4j
 @ToString
 public class JpaConsentRepository implements ConsentRepository {
 
+    @Serial
     private static final long serialVersionUID = 6599902742493270206L;
 
-    private static final String SELECT_QUERY = "SELECT r from JpaConsentDecision r ";
+    private static final String ENTITY_NAME = "JpaConsentDecision";
 
-    @PersistenceContext(unitName = "consentEntityManagerFactory")
+    private static final String SELECT_QUERY = "SELECT r from " + ENTITY_NAME + " r ";
+
+    @PersistenceContext(unitName = "jpaConsentContext")
     private transient EntityManager entityManager;
 
     @Override
@@ -53,63 +56,69 @@ public class JpaConsentRepository implements ConsentRepository {
 
     @Override
     public Collection<? extends ConsentDecision> findConsentDecisions(final String principal) {
-        try {
-            return this.entityManager.createQuery(SELECT_QUERY.concat("where r.principal = :principal"),
-                JpaConsentDecision.class).setParameter("principal", principal).getResultList();
-        } catch (final Exception e) {
-            LoggingUtils.error(LOGGER, e);
-        }
-        return new ArrayList<>(0);
+        return this.entityManager.createQuery(SELECT_QUERY.concat("WHERE r.principal = :principal"),
+            JpaConsentDecision.class).setParameter("principal", principal).getResultList();
     }
 
     @Override
     public Collection<? extends ConsentDecision> findConsentDecisions() {
-        try {
-            return this.entityManager.createQuery(SELECT_QUERY, JpaConsentDecision.class).getResultList();
-        } catch (final Exception e) {
-            LoggingUtils.error(LOGGER, e);
-        }
-        return new ArrayList<>(0);
+        return this.entityManager.createQuery(SELECT_QUERY, JpaConsentDecision.class).getResultList();
     }
 
     @Override
     public ConsentDecision storeConsentDecision(final ConsentDecision decision) {
-        try {
-            val account = (JpaConsentDecision) ObjectUtils.defaultIfNull(
-                this.entityManager.find(JpaConsentDecision.class, decision.getId()), new JpaConsentDecision());
-            account.setAttributes(decision.getAttributes());
-            account.setCreatedDate(decision.getCreatedDate());
-            account.setOptions(decision.getOptions());
-            account.setPrincipal(decision.getPrincipal());
-            account.setReminder(decision.getReminder());
-            account.setReminderTimeUnit(decision.getReminderTimeUnit());
-            account.setService(decision.getService());
+        val account = (JpaConsentDecision) ObjectUtils.defaultIfNull(
+            this.entityManager.find(JpaConsentDecision.class, decision.getId()), new JpaConsentDecision());
+        account.setAttributes(decision.getAttributes());
+        account.setCreatedDate(decision.getCreatedDate());
+        account.setOptions(decision.getOptions());
+        account.setPrincipal(decision.getPrincipal());
+        account.setReminder(decision.getReminder());
+        account.setReminderTimeUnit(decision.getReminderTimeUnit());
+        account.setService(decision.getService());
 
-            val isNew = account.getId() < 0;
-            val mergedDecision = this.entityManager.merge(account);
-            if (!isNew) {
-                this.entityManager.persist(mergedDecision);
-            }
-            return mergedDecision;
-        } catch (final Exception e) {
-            LoggingUtils.error(LOGGER, e);
+        val isNew = account.getId() < 0;
+        val mergedDecision = this.entityManager.merge(account);
+        if (!isNew) {
+            this.entityManager.persist(mergedDecision);
         }
-        return null;
+        return mergedDecision;
     }
 
     @Override
     public boolean deleteConsentDecision(final long decisionId, final String principal) {
         try {
             val query = SELECT_QUERY.concat("WHERE r.principal = :principal AND r.id = :id");
-            val decision = this.entityManager.createQuery(query, JpaConsentDecision.class)
+            val decision = entityManager.createQuery(query, JpaConsentDecision.class)
                 .setParameter("id", decisionId)
                 .setParameter("principal", principal)
                 .getSingleResult();
-            this.entityManager.remove(decision);
+            entityManager.remove(decision);
             return true;
         } catch (final Exception e) {
             LoggingUtils.error(LOGGER, e);
         }
         return false;
+    }
+
+    @Override
+    public boolean deleteConsentDecisions(final String principal) {
+        try {
+            val query = SELECT_QUERY.concat("WHERE r.principal = :principal");
+            val decision = entityManager.createQuery(query, JpaConsentDecision.class)
+                .setParameter("principal", principal)
+                .getSingleResult();
+            entityManager.remove(decision);
+            return true;
+        } catch (final Exception e) {
+            LoggingUtils.error(LOGGER, e);
+        }
+        return false;
+    }
+
+    @Override
+    public void deleteAll() {
+        val query = "DELETE FROM " + ENTITY_NAME;
+        entityManager.createQuery(query).executeUpdate();
     }
 }

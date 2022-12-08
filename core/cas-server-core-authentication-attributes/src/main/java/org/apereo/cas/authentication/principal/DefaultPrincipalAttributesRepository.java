@@ -1,5 +1,6 @@
 package org.apereo.cas.authentication.principal;
 
+import org.apereo.cas.authentication.CoreAuthenticationUtils;
 import org.apereo.cas.authentication.principal.cache.AbstractPrincipalAttributesRepository;
 import org.apereo.cas.services.RegisteredService;
 
@@ -9,6 +10,7 @@ import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
+import java.io.Serial;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +27,7 @@ import java.util.Map;
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class DefaultPrincipalAttributesRepository extends AbstractPrincipalAttributesRepository {
 
+    @Serial
     private static final long serialVersionUID = -4535358847021241725L;
 
     @Override
@@ -32,19 +35,16 @@ public class DefaultPrincipalAttributesRepository extends AbstractPrincipalAttri
         val mergeStrategy = determineMergingStrategy();
         val principalAttributes = getPrincipalAttributes(principal);
 
+        LOGGER.trace("Operating principal attributes for processing are [{}]", principalAttributes);
         if (areAttributeRepositoryIdsDefined()) {
             val personDirectoryAttributes = retrievePersonAttributesFromAttributeRepository(principal);
             LOGGER.debug("Merging current principal attributes with that of the repository via strategy [{}]", mergeStrategy);
-            val mergedAttributes = mergeStrategy.getAttributeMerger().mergeAttributes(principalAttributes, personDirectoryAttributes);
+            val mergedAttributes = CoreAuthenticationUtils.getAttributeMerger(mergeStrategy)
+                .mergeAttributes(principalAttributes, personDirectoryAttributes);
             LOGGER.debug("Merged current principal attributes are [{}]", mergedAttributes);
             return convertAttributesToPrincipalAttributesAndCache(principal, mergedAttributes, registeredService);
         }
         return convertAttributesToPrincipalAttributesAndCache(principal, principalAttributes, registeredService);
     }
 
-    @Override
-    protected void addPrincipalAttributes(final String id, final Map<String, List<Object>> attributes,
-                                          final RegisteredService registeredService) {
-        LOGGER.debug("Using [{}], no caching takes place for [{}] to add attributes.", id, this.getClass().getSimpleName());
-    }
 }

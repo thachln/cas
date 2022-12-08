@@ -18,14 +18,14 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@Tag("SAML")
+@Tag("SAML2")
 public class SamlRequestAuditResourceResolverTests {
     @Test
     public void verifyActionUnknown() {
         val r = new SamlRequestAuditResourceResolver();
         val result = r.resolveFrom(mock(JoinPoint.class), new Object());
         assertNotNull(result);
-        assertTrue(result.length == 0);
+        assertEquals(0, result.length);
     }
 
 

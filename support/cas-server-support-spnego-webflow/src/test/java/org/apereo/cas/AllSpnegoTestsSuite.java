@@ -6,9 +6,8 @@ import org.apereo.cas.web.flow.SpnegoNegotiateCredentialsActionTests;
 import org.apereo.cas.web.flow.client.LdapSpnegoKnownClientSystemsFilterActionTests;
 import org.apereo.cas.web.flow.client.SpnegoKnownClientSystemsFilterActionTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * This is {@link AllSpnegoTestsSuite}.
@@ -23,6 +22,6 @@ import org.junit.runner.RunWith;
     SpengoWebflowConfigurerTests.class,
     SpnegoCredentialsActionTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class AllSpnegoTestsSuite {
 }

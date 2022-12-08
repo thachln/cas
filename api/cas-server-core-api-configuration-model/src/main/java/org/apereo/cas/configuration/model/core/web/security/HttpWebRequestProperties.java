@@ -2,10 +2,12 @@ package org.apereo.cas.configuration.model.core.web.security;
 
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 
@@ -19,8 +21,10 @@ import java.nio.charset.StandardCharsets;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("HttpWebRequestProperties")
 public class HttpWebRequestProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = -4711604991237695091L;
 
     /**

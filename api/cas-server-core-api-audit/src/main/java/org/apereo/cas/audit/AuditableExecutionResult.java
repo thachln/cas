@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import lombok.val;
 
 import java.util.Map;
@@ -26,7 +27,7 @@ import java.util.TreeMap;
  */
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
+@SuperBuilder
 public class AuditableExecutionResult {
 
     /**
@@ -104,10 +105,7 @@ public class AuditableExecutionResult {
      */
     public void throwExceptionIfNeeded() {
         if (isExecutionFailure()) {
-            getException().ifPresent(ex -> {
-                throw ex;
-            });
-            throw new RuntimeException("Auditable task has failed to execute");
+            throw getException().get();
         }
     }
 

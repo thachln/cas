@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -20,6 +21,7 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public class AuditSlf4jLogProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 4227475246873515918L;
 
     /**
@@ -34,12 +36,6 @@ public class AuditSlf4jLogProperties implements Serializable {
      * Character to separate audit fields if single-line audits are used.
      */
     private String singlelineSeparator = "|";
-
-    /**
-     * The audit format to use in the logs.
-     * Accepted value are: DEFAULT, JSON.
-     */
-    private String auditFormat = "DEFAULT";
 
     /**
      * Decide whether Slf4j audits should be enabled.

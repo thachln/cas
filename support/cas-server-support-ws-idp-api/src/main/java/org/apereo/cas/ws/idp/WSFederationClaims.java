@@ -122,11 +122,6 @@ public enum WSFederationClaims {
      */
     private final String uri;
 
-    /**
-     * Instantiates a new Claim type constants.
-     *
-     * @param str the str
-     */
     WSFederationClaims(final String str) {
         this.uri = str;
     }
@@ -151,6 +146,11 @@ public enum WSFederationClaims {
         return Arrays.stream(WSFederationClaims.values()).anyMatch(c -> c.getUri().equalsIgnoreCase(claimUri));
     }
 
+    /**
+     * Gets claim.
+     *
+     * @return the claim
+     */
     public String getClaim() {
         val idx = StringUtils.lastIndexOf(this.uri, '/');
         return this.uri.substring(idx + 1);

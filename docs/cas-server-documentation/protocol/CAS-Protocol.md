@@ -3,7 +3,7 @@ layout: default
 title: CAS - CAS Protocol
 category: Protocols
 ---
-
+{% include variables.html %}
 
 # CAS Protocol
 
@@ -11,14 +11,13 @@ The CAS protocol is a simple and powerful ticket-based protocol. The complete pr
 
 It involves one or many clients and one server. Clients are embedded in *CASified* applications (called "CAS services") whereas the CAS server is a standalone component:
 
-- The [CAS server](../installation/Configuring-Authentication-Components.html) is responsible for authenticating users and granting accesses to applications
+- The [CAS server](../authentication/Configuring-Authentication-Components.html) is responsible for authenticating users and granting accesses to applications
 - The [CAS clients](../integration/CAS-Clients.html) protect the CAS applications and retrieve the identity of the granted users from the CAS server.
 
 The key concepts are:
 
 - The `TGT` (Ticket Granting Ticket), stored in the `TGC` cookie, represents a SSO session for a user.
 - The `ST` (Service Ticket), transmitted as a `GET` parameter in urls, stands for the access granted by the CAS server to the *CASified* application for a specific user.
-
 
 ## Specification Versions
 
@@ -31,6 +30,19 @@ The current CAS protocol specification is `3.0.3`. The actual protocol specifica
 ### 2.0
 
 The version `2.0` protocol specification is available at [CAS-Protocol-Specification](CAS-Protocol-V2-Specification.html). 
+
+### Troubleshooting
+
+To enable additional logging, configure the log4j configuration file to add the following levels:
+
+```xml
+...
+<Logger name="PROTOCOL_MESSAGE" level="debug" additivity="false">
+    <AppenderRef ref="console"/>
+    <AppenderRef ref="file"/>
+</Logger>
+...
+```
 
 ## Web flow diagram
 
@@ -47,7 +59,6 @@ One of the most powerful feature of the CAS protocol is the ability for a CAS se
 
 Even if the primary goal of the CAS server is to implement the CAS protocol, other protocols are also supported as extensions:
 
-- [OpenID](../protocol/OpenID-Protocol.html)
 - [OAuth2](../protocol/OAuth-Protocol.html)
 - [SAML](../protocol/SAML-Protocol.html)
 - [OpenID Connect](../protocol/OIDC-Protocol.html)

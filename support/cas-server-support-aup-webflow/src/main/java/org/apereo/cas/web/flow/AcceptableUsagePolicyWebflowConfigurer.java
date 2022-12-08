@@ -63,7 +63,7 @@ public class AcceptableUsagePolicyWebflowConfigurer extends AbstractCasWebflowCo
      * @param flow the flow
      */
     protected void createSubmitActionState(final Flow flow) {
-        val aupAcceptedAction = createActionState(flow, CasWebflowConstants.STATE_ID_AUP_ACCEPTED, "acceptableUsagePolicySubmitAction");
+        val aupAcceptedAction = createActionState(flow, CasWebflowConstants.STATE_ID_AUP_ACCEPTED, CasWebflowConstants.ACTION_ID_AUP_SUBMIT);
         val target = getRealSubmissionState(flow).getTransition(CasWebflowConstants.TRANSITION_ID_SUCCESS).getTargetStateId();
         val transitionSet = aupAcceptedAction.getTransitionSet();
         transitionSet.add(createTransition(CasWebflowConstants.TRANSITION_ID_AUP_ACCEPTED, target));
@@ -77,7 +77,7 @@ public class AcceptableUsagePolicyWebflowConfigurer extends AbstractCasWebflowCo
      * @param flow the flow
      */
     protected void createAcceptableUsagePolicyView(final Flow flow) {
-        val viewState = createViewState(flow, CasWebflowConstants.STATE_ID_ACCEPTABLE_USAGE_POLICY_VIEW, "casAcceptableUsagePolicyView");
+        val viewState = createViewState(flow, CasWebflowConstants.STATE_ID_ACCEPTABLE_USAGE_POLICY_VIEW, "aup/casAcceptableUsagePolicyView");
         createTransitionForState(viewState, CasWebflowConstants.TRANSITION_ID_SUBMIT,
             CasWebflowConstants.STATE_ID_AUP_ACCEPTED);
         viewState.getRenderActionList().add(createEvaluateAction(CasWebflowConstants.ACTION_ID_AUP_RENDER));
@@ -93,7 +93,9 @@ public class AcceptableUsagePolicyWebflowConfigurer extends AbstractCasWebflowCo
 
         val transitionSet = actionState.getTransitionSet();
         val target = getRealSubmissionState(flow).getTransition(CasWebflowConstants.TRANSITION_ID_SUCCESS).getTargetStateId();
+        
         transitionSet.add(createTransition(CasWebflowConstants.TRANSITION_ID_AUP_ACCEPTED, target));
+        transitionSet.add(createTransition(CasWebflowConstants.TRANSITION_ID_SKIP, target));
         transitionSet.add(createTransition(CasWebflowConstants.TRANSITION_ID_AUP_MUST_ACCEPT,
             CasWebflowConstants.STATE_ID_ACCEPTABLE_USAGE_POLICY_VIEW));
 

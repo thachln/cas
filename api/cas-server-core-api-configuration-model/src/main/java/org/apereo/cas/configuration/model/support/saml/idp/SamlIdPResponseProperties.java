@@ -1,13 +1,16 @@
 package org.apereo.cas.configuration.model.support.saml.idp;
 
+import org.apereo.cas.configuration.support.DurationCapable;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import com.google.common.base.Splitter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import lombok.val;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,32 +28,41 @@ import java.util.Map;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("SamlIdPResponseProperties")
 public class SamlIdPResponseProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 7200477683583467619L;
+
     /**
      * Indicate the encoding type of the credential used when rendering the saml response.
      */
     private SignatureCredentialTypes credentialType = SignatureCredentialTypes.X509;
+
     /**
      * Time unit in seconds used to skew authentication dates such
      * as valid-from and valid-until elements.
      */
-    private int skewAllowance = 15;
+    @DurationCapable
+    private String skewAllowance = "PT30S";
+
     /**
      * Whether error responses should be signed.
      */
     private boolean signError;
+
     /**
      * The default authentication context class to include in the response
      * if none is specified via the service.
      */
     private String defaultAuthenticationContextClass = "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport";
+
     /**
      * Indicates the default name-format for all attributes
      * in case the individual attribute is not individually mapped.
      */
     private String defaultAttributeNameFormat = "uri";
+
     /**
      * Each individual attribute can be mapped to a particular name-format.
      * Example: {@code attributeName->basic|uri|unspecified|custom-format-etc,...}.

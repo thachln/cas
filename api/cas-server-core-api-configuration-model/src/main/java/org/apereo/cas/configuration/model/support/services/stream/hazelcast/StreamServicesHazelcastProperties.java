@@ -2,12 +2,15 @@ package org.apereo.cas.configuration.model.support.services.stream.hazelcast;
 
 import org.apereo.cas.configuration.model.support.hazelcast.BaseHazelcastProperties;
 import org.apereo.cas.configuration.model.support.services.stream.BaseStreamServicesProperties;
+import org.apereo.cas.configuration.support.DurationCapable;
 import org.apereo.cas.configuration.support.RequiresModule;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
+
+import java.io.Serial;
 
 /**
  * This is {@link StreamServicesHazelcastProperties}.
@@ -21,6 +24,7 @@ import org.springframework.boot.context.properties.NestedConfigurationProperty;
 @Accessors(chain = true)
 public class StreamServicesHazelcastProperties extends BaseStreamServicesProperties {
 
+    @Serial
     private static final long serialVersionUID = -1583614089051161614L;
 
     /**
@@ -35,6 +39,7 @@ public class StreamServicesHazelcastProperties extends BaseStreamServicesPropert
      * adjusted if the latency between the CAS nodes in the cluster is too large. Having too
      * short a value will cause the record to expire before it reaches other members of the cluster.
      */
+    @DurationCapable
     private String duration = "PT1M";
 
     /**
@@ -44,7 +49,7 @@ public class StreamServicesHazelcastProperties extends BaseStreamServicesPropert
     private BaseHazelcastProperties config = new BaseHazelcastProperties();
 
     public StreamServicesHazelcastProperties() {
-        config.getCluster().setPort(PORT);
-        config.getCluster().setInstanceName("localhost-services-replication");
+        config.getCluster().getNetwork().setPort(PORT);
+        config.getCluster().getCore().setInstanceName("localhost-services-replication");
     }
 }

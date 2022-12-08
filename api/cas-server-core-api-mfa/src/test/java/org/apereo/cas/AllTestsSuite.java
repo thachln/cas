@@ -3,12 +3,10 @@ package org.apereo.cas;
 import org.apereo.cas.authentication.MultifactorAuthenticationCredentialTests;
 import org.apereo.cas.authentication.MultifactorAuthenticationFailureModeEvaluatorTests;
 import org.apereo.cas.authentication.MultifactorAuthenticationTriggerTests;
-import org.apereo.cas.authentication.bypass.ChainingMultifactorAuthenticationProviderBypassEvaluatorTests;
 import org.apereo.cas.authentication.bypass.MultifactorAuthenticationProviderBypassEvaluatorTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * The {@link AllTestsSuite} is responsible for
@@ -20,10 +18,9 @@ import org.junit.runner.RunWith;
 @SelectClasses({
     MultifactorAuthenticationCredentialTests.class,
     MultifactorAuthenticationProviderBypassEvaluatorTests.class,
-    ChainingMultifactorAuthenticationProviderBypassEvaluatorTests.class,
     MultifactorAuthenticationFailureModeEvaluatorTests.class,
     MultifactorAuthenticationTriggerTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class AllTestsSuite {
 }

@@ -1,25 +1,25 @@
 package org.apereo.cas.support.oauth.web.response.callback;
 
-import org.apereo.cas.configuration.CasConfigurationProperties;
-import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.audit.AuditActionResolvers;
+import org.apereo.cas.audit.AuditResourceResolvers;
+import org.apereo.cas.audit.AuditableActions;
 import org.apereo.cas.support.oauth.OAuth20Constants;
 import org.apereo.cas.support.oauth.OAuth20ResponseTypes;
-import org.apereo.cas.support.oauth.web.response.accesstoken.OAuth20TokenGenerator;
-import org.apereo.cas.support.oauth.web.response.accesstoken.ext.AccessTokenRequestDataHolder;
+import org.apereo.cas.support.oauth.util.OAuth20Utils;
+import org.apereo.cas.support.oauth.web.endpoints.OAuth20ConfigurationContext;
+import org.apereo.cas.support.oauth.web.response.OAuth20AuthorizationRequest;
+import org.apereo.cas.support.oauth.web.response.accesstoken.ext.AccessTokenRequestContext;
 import org.apereo.cas.support.oauth.web.response.accesstoken.response.OAuth20JwtAccessTokenEncoder;
 import org.apereo.cas.ticket.accesstoken.OAuth20AccessToken;
 import org.apereo.cas.ticket.refreshtoken.OAuth20RefreshToken;
-import org.apereo.cas.token.JwtBuilder;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URIBuilder;
-import org.pac4j.core.context.JEEContext;
+import org.apereo.inspektr.audit.annotation.Audit;
 import org.springframework.web.servlet.ModelAndView;
 
 import java.util.ArrayList;
@@ -33,65 +33,52 @@ import java.util.List;
  * @since 5.2.0
  */
 @Slf4j
-@RequiredArgsConstructor
 @Getter
-public class OAuth20TokenAuthorizationResponseBuilder implements OAuth20AuthorizationResponseBuilder {
-    private final OAuth20TokenGenerator accessTokenGenerator;
-    private final ServicesManager servicesManager;
-    private final JwtBuilder accessTokenJwtBuilder;
-    private final CasConfigurationProperties casProperties;
+public class OAuth20TokenAuthorizationResponseBuilder<T extends OAuth20ConfigurationContext> extends BaseOAuth20AuthorizationResponseBuilder<T> {
+    public OAuth20TokenAuthorizationResponseBuilder(
+        final T configurationContext,
+        final OAuth20AuthorizationModelAndViewBuilder authorizationModelAndViewBuilder) {
+        super(configurationContext, authorizationModelAndViewBuilder);
+    }
 
     @Override
-    @SneakyThrows
-    public ModelAndView build(final JEEContext context,
-                              final String clientId,
-                              final AccessTokenRequestDataHolder holder) {
-
-        val redirectUri = context.getRequestParameter(OAuth20Constants.REDIRECT_URI)
-            .map(String::valueOf)
-            .orElse(StringUtils.EMPTY);
-        LOGGER.debug("Authorize request verification successful for client [{}] with redirect uri [{}]", clientId, redirectUri);
-        val result = accessTokenGenerator.generate(holder);
+    @Audit(action = AuditableActions.OAUTH2_AUTHORIZATION_RESPONSE,
+        actionResolverName = AuditActionResolvers.OAUTH2_AUTHORIZATION_RESPONSE_ACTION_RESOLVER,
+        resourceResolverName = AuditResourceResolvers.OAUTH2_AUTHORIZATION_RESPONSE_RESOURCE_RESOLVER)
+    public ModelAndView build(final AccessTokenRequestContext holder) throws Exception {
+        LOGGER.debug("Authorize request verification successful for client [{}] with redirect uri [{}]", holder.getClientId(), holder.getRedirectUri());
+        val result = configurationContext.getAccessTokenGenerator().generate(holder);
         val accessToken = result.getAccessToken().orElse(null);
         val refreshToken = result.getRefreshToken().orElse(null);
         LOGGER.debug("Generated OAuth access token: [{}]", accessToken);
-        return buildCallbackUrlResponseType(holder, redirectUri, accessToken, new ArrayList<>(0), refreshToken, context);
+        return buildCallbackUrlResponseType(holder, accessToken, new ArrayList<>(0), refreshToken);
     }
 
+    @Override
+    public boolean supports(final OAuth20AuthorizationRequest context) {
+        return StringUtils.equalsIgnoreCase(context.getResponseType(), OAuth20ResponseTypes.TOKEN.getType());
+    }
 
-    /**
-     * Build callback url response type string.
-     *
-     * @param holder       the holder
-     * @param redirectUri  the redirect uri
-     * @param accessToken  the access token
-     * @param params       the params
-     * @param refreshToken the refresh token
-     * @param context      the context
-     * @return the string
-     * @throws Exception the exception
-     */
-    protected ModelAndView buildCallbackUrlResponseType(final AccessTokenRequestDataHolder holder,
-                                                        final String redirectUri,
-                                                        final OAuth20AccessToken accessToken,
-                                                        final List<NameValuePair> params,
-                                                        final OAuth20RefreshToken refreshToken,
-                                                        final JEEContext context) throws Exception {
+    protected ModelAndView buildCallbackUrlResponseType(
+        final AccessTokenRequestContext holder,
+        final OAuth20AccessToken accessToken,
+        final List<NameValuePair> params,
+        final OAuth20RefreshToken refreshToken) throws Exception {
         val attributes = holder.getAuthentication().getAttributes();
         val state = attributes.get(OAuth20Constants.STATE).get(0).toString();
         val nonce = attributes.get(OAuth20Constants.NONCE).get(0).toString();
 
-        val builder = new URIBuilder(redirectUri);
+        val builder = new URIBuilder(holder.getRedirectUri());
         val stringBuilder = new StringBuilder();
 
         val encodedAccessToken = OAuth20JwtAccessTokenEncoder.builder()
             .accessToken(accessToken)
             .registeredService(holder.getRegisteredService())
             .service(holder.getService())
-            .accessTokenJwtBuilder(accessTokenJwtBuilder)
-            .casProperties(casProperties)
+            .accessTokenJwtBuilder(configurationContext.getAccessTokenJwtBuilder())
+            .casProperties(configurationContext.getCasProperties())
             .build()
-            .encode();
+            .encode(accessToken.getId());
 
         val expiresIn = accessToken.getExpiresIn();
         stringBuilder.append(OAuth20Constants.ACCESS_TOKEN)
@@ -134,22 +121,8 @@ public class OAuth20TokenAuthorizationResponseBuilder implements OAuth20Authoriz
         val url = builder.toString();
 
         LOGGER.debug("Redirecting to URL [{}]", url);
-        val parameters = new LinkedHashMap<String, String>();
-        parameters.put(OAuth20Constants.ACCESS_TOKEN, encodedAccessToken);
-        if (refreshToken != null) {
-            parameters.put(OAuth20Constants.REFRESH_TOKEN, refreshToken.getId());
-        }
-        parameters.put(OAuth20Constants.EXPIRES_IN, String.valueOf(expiresIn));
-        parameters.put(OAuth20Constants.STATE, state);
-        parameters.put(OAuth20Constants.NONCE, nonce);
-        parameters.put(OAuth20Constants.CLIENT_ID, accessToken.getClientId());
-        return buildResponseModelAndView(context, servicesManager, accessToken.getClientId(), url, parameters);
-    }
-
-    @Override
-    public boolean supports(final JEEContext context) {
-        val responseType = context.getRequestParameter(OAuth20Constants.RESPONSE_TYPE)
-            .map(String::valueOf).orElse(StringUtils.EMPTY);
-        return StringUtils.equalsIgnoreCase(responseType, OAuth20ResponseTypes.TOKEN.getType());
+        val registeredService = OAuth20Utils.getRegisteredOAuthServiceByClientId(
+            configurationContext.getServicesManager(), accessToken.getClientId());
+        return build(registeredService, holder.getResponseMode(), url, new LinkedHashMap<>());
     }
 }

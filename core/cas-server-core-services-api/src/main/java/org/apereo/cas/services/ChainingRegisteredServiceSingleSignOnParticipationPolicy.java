@@ -1,6 +1,6 @@
 package org.apereo.cas.services;
 
-import org.apereo.cas.ticket.TicketState;
+import org.apereo.cas.ticket.AuthenticationAwareTicket;
 import org.apereo.cas.util.model.TriStateBoolean;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -12,12 +12,12 @@ import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.core.annotation.AnnotationAwareOrderComparator;
+import lombok.val;
 
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * This is {@link ChainingRegisteredServiceSingleSignOnParticipationPolicy}.
@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @JsonIgnoreProperties("order")
 public class ChainingRegisteredServiceSingleSignOnParticipationPolicy implements RegisteredServiceSingleSignOnParticipationPolicy {
+    @Serial
     private static final long serialVersionUID = -2923946898337761319L;
 
     private List<RegisteredServiceSingleSignOnParticipationPolicy> policies = new ArrayList<>(0);
@@ -61,18 +62,22 @@ public class ChainingRegisteredServiceSingleSignOnParticipationPolicy implements
      * @param policy the policy
      */
     public void addPolicies(final @NonNull RegisteredServiceSingleSignOnParticipationPolicy... policy) {
-        policies.addAll(Arrays.stream(policy).collect(Collectors.toList()));
+        policies.addAll(Arrays.stream(policy).toList());
+    }
+
+    @Override
+    public boolean shouldParticipateInSso(final RegisteredService registeredService, final AuthenticationAwareTicket ticketState) {
+        return policies.stream()
+            .allMatch(p -> p.shouldParticipateInSso(registeredService, ticketState));
     }
 
     @JsonIgnore
     @Override
-    public TriStateBoolean isCreateCookieOnRenewedAuthentication() {
-        return TriStateBoolean.UNDEFINED;
-    }
-
-    @Override
-    public boolean shouldParticipateInSso(final TicketState ticketState) {
-        AnnotationAwareOrderComparator.sortIfNecessary(this.policies);
-        return policies.stream().allMatch(p -> p.shouldParticipateInSso(ticketState));
+    public TriStateBoolean getCreateCookieOnRenewedAuthentication() {
+        val result = policies
+            .stream()
+            .filter(p -> p.getCreateCookieOnRenewedAuthentication() != null)
+            .allMatch(p -> p.getCreateCookieOnRenewedAuthentication().isTrue() || p.getCreateCookieOnRenewedAuthentication().isUndefined());
+        return TriStateBoolean.fromBoolean(result);
     }
 }

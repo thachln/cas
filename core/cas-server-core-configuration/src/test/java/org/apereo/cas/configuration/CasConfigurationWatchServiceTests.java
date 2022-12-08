@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -34,9 +33,9 @@ public class CasConfigurationWatchServiceTests {
     @Test
     public void verifyOperationByDirectory() {
         val manager = mock(CasConfigurationPropertiesEnvironmentManager.class);
-        when(manager.getStandaloneProfileConfigurationDirectory()).thenReturn(FileUtils.getTempDirectory());
+        when(manager.getStandaloneProfileConfigurationDirectory(any())).thenReturn(FileUtils.getTempDirectory());
         val service = new CasConfigurationWatchService(manager, applicationContext);
-        service.runPathWatchServices(mock(ApplicationReadyEvent.class));
+        service.initialize();
         service.close();
     }
 
@@ -45,9 +44,15 @@ public class CasConfigurationWatchServiceTests {
         val manager = mock(CasConfigurationPropertiesEnvironmentManager.class);
         val cas = File.createTempFile("cas", ".properties");
         FileUtils.writeStringToFile(cas, "server.port=0", StandardCharsets.UTF_8);
-        when(manager.getStandaloneProfileConfigurationFile()).thenReturn(cas);
+        when(manager.getStandaloneProfileConfigurationFile(any())).thenReturn(cas);
         val service = new CasConfigurationWatchService(manager, applicationContext);
-        service.runPathWatchServices(mock(ApplicationReadyEvent.class));
+        service.initialize();
+
+        val newFile = new File(cas.getParentFile(), "something");
+        FileUtils.writeStringToFile(newFile, "helloworld", StandardCharsets.UTF_8);
+        FileUtils.writeStringToFile(newFile, "helloworld-update", StandardCharsets.UTF_8, true);
+        FileUtils.deleteQuietly(newFile);
+
         service.close();
     }
 }

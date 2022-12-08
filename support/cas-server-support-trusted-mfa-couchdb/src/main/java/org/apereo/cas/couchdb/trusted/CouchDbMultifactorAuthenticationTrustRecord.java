@@ -4,11 +4,13 @@ import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustR
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import org.ektorp.support.TypeDiscriminator;
 
+import java.io.Serial;
 import java.time.ZonedDateTime;
 import java.util.Date;
 
@@ -22,6 +24,9 @@ import java.util.Date;
 @Setter
 @TypeDiscriminator("doc.principal && doc.deviceFingerprint && doc.recordDate")
 public class CouchDbMultifactorAuthenticationTrustRecord extends MultifactorAuthenticationTrustRecord {
+
+    @Serial
+    private static final long serialVersionUID = 3362756698370049408L;
 
     @JsonProperty("_id")
     private String cid;
@@ -61,6 +66,7 @@ public class CouchDbMultifactorAuthenticationTrustRecord extends MultifactorAuth
      * @param other record to be merged into this one
      * @return this
      */
+    @CanIgnoreReturnValue
     public CouchDbMultifactorAuthenticationTrustRecord merge(final MultifactorAuthenticationTrustRecord other) {
         setId(other.getId());
         setPrincipal(other.getPrincipal());

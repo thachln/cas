@@ -1,6 +1,6 @@
 package org.apereo.cas.authentication;
 
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import org.junit.jupiter.api.Tag;
 import org.springframework.test.context.TestPropertySource;
@@ -12,7 +12,7 @@ import org.springframework.test.context.TestPropertySource;
  * @since 6.3.0
  */
 @TestPropertySource(properties = "cas.authn.ldap[0].disable-pooling=true")
-@EnabledIfPortOpen(port = 10389)
-@Tag("Ldap")
+@EnabledIfListeningOnPort(port = 10389)
+@Tag("LdapAuthentication")
 public class DisabledPoolingLdapAuthenticationHandlerTests extends AuthenticatedLdapAuthenticationHandlerTests {
 }

@@ -1,18 +1,19 @@
 package org.apereo.cas.trusted.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustRecordKeyGenerator;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustStorage;
 import org.apereo.cas.trusted.authentication.storage.RestMultifactorAuthenticationTrustStorage;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -21,26 +22,21 @@ import org.springframework.web.client.RestTemplate;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration(value = "restMultifactorAuthenticationTrustConfiguration", proxyBeanMethods = false)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.MultifactorAuthenticationTrustedDevices, module = "rest")
+@AutoConfiguration
 public class RestMultifactorAuthenticationTrustConfiguration {
 
-    @Autowired
-    @Qualifier("mfaTrustRecordKeyGenerator")
-    private ObjectProvider<MultifactorAuthenticationTrustRecordKeyGenerator> keyGenerationStrategy;
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("mfaTrustCipherExecutor")
-    private ObjectProvider<CipherExecutor> mfaTrustCipherExecutor;
-
-    @RefreshScope
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @Bean
-    public MultifactorAuthenticationTrustStorage mfaTrustEngine() {
-        return new RestMultifactorAuthenticationTrustStorage(casProperties.getAuthn().getMfa().getTrusted(),
-            mfaTrustCipherExecutor.getObject(), keyGenerationStrategy.getObject(),
-            new RestTemplate());
+    public MultifactorAuthenticationTrustStorage mfaTrustEngine(
+        final CasConfigurationProperties casProperties,
+        @Qualifier("mfaTrustRecordKeyGenerator")
+        final MultifactorAuthenticationTrustRecordKeyGenerator keyGenerationStrategy,
+        @Qualifier("mfaTrustCipherExecutor")
+        final CipherExecutor mfaTrustCipherExecutor) {
+        return new RestMultifactorAuthenticationTrustStorage(casProperties.getAuthn()
+            .getMfa()
+            .getTrusted(), mfaTrustCipherExecutor, keyGenerationStrategy, new RestTemplate());
     }
 }

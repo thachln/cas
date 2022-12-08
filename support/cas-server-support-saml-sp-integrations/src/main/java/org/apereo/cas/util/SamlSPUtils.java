@@ -9,13 +9,14 @@ import org.apereo.cas.services.ReturnMappedAttributeReleasePolicy;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.support.saml.services.SamlRegisteredService;
 import org.apereo.cas.support.saml.services.idp.metadata.cache.SamlRegisteredServiceCachingMetadataResolver;
+import org.apereo.cas.util.model.TriStateBoolean;
 
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import net.shibboleth.utilities.java.support.resolver.CriteriaSet;
+import net.shibboleth.shared.resolver.CriteriaSet;
 import org.apache.commons.lang3.StringUtils;
+import org.opensaml.core.criterion.SatisfyAnyCriterion;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.criterion.EntityRoleCriterion;
 import org.opensaml.saml.metadata.resolver.ChainingMetadataResolver;
@@ -48,7 +49,6 @@ public class SamlSPUtils {
      * @param resolver the resolver
      * @return the saml registered service
      */
-    @SneakyThrows
     public static SamlRegisteredService newSamlServiceProviderService(final AbstractSamlSPProperties sp,
                                                                       final SamlRegisteredServiceCachingMetadataResolver resolver) {
         if (StringUtils.isBlank(sp.getMetadata())) {
@@ -61,7 +61,7 @@ public class SamlSPUtils {
         service.setDescription(sp.getDescription());
         service.setEvaluationOrder(Ordered.LOWEST_PRECEDENCE);
         service.setMetadataLocation(sp.getMetadata());
-        val attributesToRelease = new ArrayList<String>(sp.getAttributes());
+        val attributesToRelease = new ArrayList<>(sp.getAttributes());
         if (StringUtils.isNotBlank(sp.getNameIdAttribute())) {
             attributesToRelease.add(sp.getNameIdAttribute());
             service.setUsernameAttributeProvider(new PrincipalAttributeRegisteredServiceUsernameProvider(sp.getNameIdAttribute()));
@@ -72,7 +72,7 @@ public class SamlSPUtils {
 
         val attributes = CoreAuthenticationUtils.transformPrincipalAttributesListIntoMultiMap(attributesToRelease);
         val policy = new ChainingAttributeReleasePolicy();
-        policy.addPolicy(new ReturnMappedAttributeReleasePolicy(CollectionUtils.wrap(attributes)));
+        policy.addPolicies(new ReturnMappedAttributeReleasePolicy().setAllowedAttributes(CollectionUtils.wrap(attributes)));
         service.setAttributeReleasePolicy(policy);
 
         service.setMetadataCriteriaRoles(SPSSODescriptor.DEFAULT_ELEMENT_NAME.getLocalPart());
@@ -96,8 +96,8 @@ public class SamlSPUtils {
         LOGGER.debug("Registering saml service [{}] by entity id [{}]", sp.getName(), entityIds);
         service.setServiceId(entityIds);
 
-        service.setSignAssertions(sp.isSignAssertions());
-        service.setSignResponses(sp.isSignResponses());
+        service.setSignAssertions(sp.getSignAssertions());
+        service.setSignResponses(TriStateBoolean.fromBoolean(sp.isSignResponses()));
 
         return service;
     }
@@ -110,7 +110,8 @@ public class SamlSPUtils {
 
             val criteriaSet = new CriteriaSet();
             criteriaSet.add(new EntityRoleCriterion(SPSSODescriptor.DEFAULT_ELEMENT_NAME));
-            val metadataResolver = resolver.resolve(service, criteriaSet);
+            criteriaSet.add(new SatisfyAnyCriterion());
+            val metadataResolver = resolver.resolve(service, criteriaSet).getMetadataResolver();
 
             val resolvers = new ArrayList<MetadataResolver>();
             if (metadataResolver instanceof ChainingMetadataResolver) {

@@ -4,12 +4,13 @@ import org.apereo.cas.CasProtocolConstants;
 import org.apereo.cas.authentication.credential.HttpBasedServiceCredential;
 import org.apereo.cas.authentication.credential.UsernamePasswordCredential;
 import org.apereo.cas.authentication.handler.support.SimpleTestUsernamePasswordAuthenticationHandler;
-import org.apereo.cas.authentication.metadata.BasicCredentialMetaData;
+import org.apereo.cas.authentication.metadata.BasicCredentialMetadata;
+import org.apereo.cas.authentication.principal.DefaultPrincipalElectionStrategy;
 import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.authentication.principal.PrincipalFactoryUtils;
 import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.authentication.principal.WebApplicationService;
-import org.apereo.cas.services.RegisteredService;
+import org.apereo.cas.services.CasModelRegisteredService;
 import org.apereo.cas.services.RegisteredServiceAccessStrategy;
 import org.apereo.cas.services.RegisteredServiceAuthenticationPolicy;
 import org.apereo.cas.util.CollectionUtils;
@@ -21,12 +22,11 @@ import org.apereo.services.persondir.support.StubPersonAttributeDao;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.mockito.Mockito.*;
 
@@ -60,8 +60,7 @@ public class CoreAuthenticationTestUtils {
     public static UsernamePasswordCredential getCredentialsWithDifferentUsernameAndPassword(final String username, final String password) {
         val usernamePasswordCredentials = new UsernamePasswordCredential();
         usernamePasswordCredentials.setUsername(username);
-        usernamePasswordCredentials.setPassword(password);
-
+        usernamePasswordCredentials.assignPassword(password);
         return usernamePasswordCredentials;
     }
 
@@ -80,6 +79,7 @@ public class CoreAuthenticationTestUtils {
     public static Service getService(final String id) {
         val svc = mock(Service.class);
         lenient().when(svc.getId()).thenReturn(id);
+        lenient().when(svc.getAttributes()).thenReturn(new HashMap<>());
         return svc;
     }
 
@@ -160,21 +160,22 @@ public class CoreAuthenticationTestUtils {
 
     public static Authentication getAuthentication(final Principal principal, final Map<String, List<Object>> attributes, final ZonedDateTime authnDate) {
         val handler = new SimpleTestUsernamePasswordAuthenticationHandler();
-        val meta = new BasicCredentialMetaData(new UsernamePasswordCredential());
+        val credential = new UsernamePasswordCredential("casuser", UUID.randomUUID().toString());
+        credential.setCredentialMetadata(new BasicCredentialMetadata(credential));
         return new DefaultAuthenticationBuilder(principal)
-            .addCredential(meta)
+            .addCredential(credential)
             .setAuthenticationDate(authnDate)
-            .addSuccess(handler.getName(), new DefaultAuthenticationHandlerExecutionResult(handler, meta))
+            .addSuccess(handler.getName(), new DefaultAuthenticationHandlerExecutionResult(handler, credential))
             .setAttributes(attributes)
             .build();
     }
 
-    public static RegisteredService getRegisteredService() {
+    public static CasModelRegisteredService getRegisteredService() {
         return getRegisteredService(CONST_TEST_URL);
     }
 
-    public static RegisteredService getRegisteredService(final String url) {
-        val service = mock(RegisteredService.class);
+    public static CasModelRegisteredService getRegisteredService(final String url) {
+        val service = mock(CasModelRegisteredService.class);
         when(service.getServiceId()).thenReturn(url);
         when(service.getName()).thenReturn("service name");
         when(service.getId()).thenReturn(Long.MAX_VALUE);
@@ -196,22 +197,22 @@ public class CoreAuthenticationTestUtils {
     }
 
     public static AuthenticationResult getAuthenticationResult(final AuthenticationSystemSupport support) throws AuthenticationException {
-        return getAuthenticationResult(support, getService(), getCredentialsWithSameUsernameAndPassword());
+        return getAuthenticationResult(support, getWebApplicationService(), getCredentialsWithSameUsernameAndPassword());
     }
 
     public static AuthenticationResult getAuthenticationResult(final AuthenticationSystemSupport support, final Credential... credentials)
         throws AuthenticationException {
-        return getAuthenticationResult(support, getService(), credentials);
+        return getAuthenticationResult(support, getWebApplicationService(), credentials);
     }
 
     public static AuthenticationResult getAuthenticationResult(final AuthenticationSystemSupport support, final Service service,
                                                                final Credential... credentials) throws AuthenticationException {
 
-        return support.handleAndFinalizeSingleAuthenticationTransaction(service, credentials);
+        return support.finalizeAuthenticationTransaction(service, credentials);
     }
 
     public static AuthenticationResult getAuthenticationResult() throws AuthenticationException {
-        return getAuthenticationResult(getService(), getAuthentication());
+        return getAuthenticationResult(getWebApplicationService(), getAuthentication());
     }
 
     public static AuthenticationResult getAuthenticationResult(final Service service) {
@@ -219,7 +220,7 @@ public class CoreAuthenticationTestUtils {
     }
 
     public static AuthenticationResult getAuthenticationResult(final Authentication authentication) throws AuthenticationException {
-        return getAuthenticationResult(getService(), authentication);
+        return getAuthenticationResult(getWebApplicationService(), authentication);
     }
 
     public static AuthenticationResult getAuthenticationResult(final Service service, final Authentication authentication) throws AuthenticationException {
@@ -229,21 +230,16 @@ public class CoreAuthenticationTestUtils {
         return result;
     }
 
-    public static Principal mockPrincipal(final String attrName, final String... attrValues) {
-        val attributes = (Map) Collections.singletonMap(attrName, CollectionUtils.toCollection(attrValues, ArrayList.class));
-        return PrincipalFactoryUtils.newPrincipalFactory().createPrincipal("user", attributes);
-    }
-
     public static AuthenticationBuilder getAuthenticationBuilder() {
         return getAuthenticationBuilder(getPrincipal());
     }
 
     public static AuthenticationBuilder getAuthenticationBuilder(final Principal principal) {
-        val meta = new BasicCredentialMetaData(new UsernamePasswordCredential());
+        val credential = new UsernamePasswordCredential();
         val handler = new SimpleTestUsernamePasswordAuthenticationHandler();
         return new DefaultAuthenticationBuilder(principal)
-            .addCredential(meta)
-            .addSuccess(handler.getName(), new DefaultAuthenticationHandlerExecutionResult(handler, meta));
+            .addCredential(credential)
+            .addSuccess(handler.getName(), new DefaultAuthenticationHandlerExecutionResult(handler, credential));
     }
 
     public static AuthenticationBuilder getAuthenticationBuilder(final Principal principal,
@@ -251,9 +247,15 @@ public class CoreAuthenticationTestUtils {
                                                                  final Map<String, List<Object>> attributes) {
         val builder = new DefaultAuthenticationBuilder(principal).setAttributes(attributes);
         handlers.forEach((credential, handler) -> {
-            builder.addSuccess(handler.getName(), new DefaultAuthenticationHandlerExecutionResult(handler, new BasicCredentialMetaData(credential)));
-            builder.addCredential(new BasicCredentialMetaData(credential));
+            builder.addSuccess(handler.getName(), new DefaultAuthenticationHandlerExecutionResult(handler, credential));
+            builder.addCredential(credential);
         });
         return builder;
+    }
+
+    public static AuthenticationSystemSupport getAuthenticationSystemSupport() {
+        val authSupport = mock(AuthenticationSystemSupport.class);
+        when(authSupport.getPrincipalElectionStrategy()).thenReturn(new DefaultPrincipalElectionStrategy());
+        return authSupport;
     }
 }

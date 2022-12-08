@@ -17,17 +17,18 @@ import java.nio.file.Files;
 public class InMemoryResourceMetadataResolver extends DOMMetadataResolver {
 
     public InMemoryResourceMetadataResolver(final Resource metadataResource, final OpenSamlConfigBean configBean) throws IOException {
-        super(SamlUtils.getRootElementFrom(metadataResource.getInputStream(), configBean));
-        setParserPool(configBean.getParserPool());
+        this(metadataResource.getInputStream(), configBean);
     }
 
     public InMemoryResourceMetadataResolver(final InputStream metadataResource, final OpenSamlConfigBean configBean) {
         super(SamlUtils.getRootElementFrom(metadataResource, configBean));
         setParserPool(configBean.getParserPool());
+        setResolveViaPredicatesOnly(true);
     }
 
     public InMemoryResourceMetadataResolver(final File metadataResource, final OpenSamlConfigBean configBean) throws IOException {
-        super(SamlUtils.getRootElementFrom(Files.newInputStream(metadataResource.toPath()), configBean));
+        this(Files.newInputStream(metadataResource.toPath()), configBean);
         setParserPool(configBean.getParserPool());
+        setResolveViaPredicatesOnly(true);
     }
 }

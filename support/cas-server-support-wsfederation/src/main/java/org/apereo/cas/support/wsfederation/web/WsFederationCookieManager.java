@@ -12,8 +12,8 @@ import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.webflow.execution.RequestContext;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,7 +55,7 @@ public class WsFederationCookieManager {
         }
 
         val configuration = configurations.stream()
-            .filter(c -> c.getId().equalsIgnoreCase(contextId))
+            .filter(cookie -> cookie.getId().equalsIgnoreCase(contextId))
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("Could not locate WsFederation configuration for " + contextId));
         
@@ -88,7 +88,8 @@ public class WsFederationCookieManager {
      * @param configuration the configuration
      */
     public void store(final HttpServletRequest request, final HttpServletResponse response,
-                      final String wctx, final Service service, final WsFederationConfiguration configuration) {
+                      final String wctx, final Service service,
+                      final WsFederationConfiguration configuration) {
         val session = new HashMap<String, Object>();
         session.put(CasProtocolConstants.PARAMETER_SERVICE + '-' + wctx, service);
         val methods = request.getParameter(CasProtocolConstants.PARAMETER_METHOD);
@@ -106,6 +107,7 @@ public class WsFederationCookieManager {
 
         val cookieValue = serializeSessionValues(session);
         val cookieGen = configuration.getCookieGenerator();
+        LOGGER.debug("Adding WsFederation cookie [{}] with value [{}]", cookieGen.getCookieName(), cookieValue);
         cookieGen.addCookie(request, response, cookieValue);
     }
 

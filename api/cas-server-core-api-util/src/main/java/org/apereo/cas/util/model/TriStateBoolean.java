@@ -1,7 +1,13 @@
 package org.apereo.cas.util.model;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
 import lombok.RequiredArgsConstructor;
+import lombok.val;
+import org.apache.commons.lang3.StringUtils;
 
+import java.io.IOException;
 import java.io.Serializable;
 
 /**
@@ -29,23 +35,65 @@ public enum TriStateBoolean implements Serializable {
 
     private final Boolean state;
 
+    /**
+     * From boolean.
+     *
+     * @param value the value
+     * @return the tri state boolean
+     */
     public static TriStateBoolean fromBoolean(final boolean value) {
         return value ? TriStateBoolean.TRUE : TriStateBoolean.FALSE;
     }
 
+    /**
+     * Is true.
+     *
+     * @return true/false
+     */
     public boolean isTrue() {
         return Boolean.TRUE.equals(this.state);
     }
 
+    /**
+     * Is false.
+     *
+     * @return true/false
+     */
     public boolean isFalse() {
         return Boolean.FALSE.equals(this.state);
     }
 
+    /**
+     * Is undefined.
+     *
+     * @return true/false
+     */
     public boolean isUndefined() {
         return this.state == null;
     }
 
+    /**
+     * To boolean.
+     *
+     * @return true/false
+     */
     public Boolean toBoolean() {
         return state;
+    }
+
+    public static class Deserializer extends JsonDeserializer<TriStateBoolean> {
+
+        @Override
+        public TriStateBoolean deserialize(final JsonParser jsonParser,
+                                           final DeserializationContext deserializationContext) throws IOException {
+            val value = jsonParser.getText();
+            if (StringUtils.equalsIgnoreCase(value, Boolean.TRUE.toString())) {
+                return TriStateBoolean.TRUE;
+            }
+            if (StringUtils.equalsIgnoreCase(value, Boolean.FALSE.toString())) {
+                return TriStateBoolean.FALSE;
+            }
+            return TriStateBoolean.valueOf(value);
+        }
     }
 }

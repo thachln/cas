@@ -1,6 +1,6 @@
 package org.apereo.cas.audit;
 
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import org.junit.jupiter.api.Tag;
 import org.springframework.test.context.TestPropertySource;
@@ -16,9 +16,9 @@ import org.springframework.test.context.TestPropertySource;
     "cas.audit.jdbc.password=password",
     "cas.audit.jdbc.driver-class=org.postgresql.Driver",
     "cas.audit.jdbc.url=jdbc:postgresql://localhost:5432/audit",
-    "cas.audit.jdbc.dialect=org.hibernate.dialect.PostgreSQL95Dialect"
+    "cas.audit.jdbc.dialect=org.hibernate.dialect.PostgreSQLDialect"
 })
-@EnabledIfPortOpen(port = 5432)
+@EnabledIfListeningOnPort(port = 5432)
 @Tag("Postgres")
 public class CasSupportPostgresJdbcAuditConfigurationTests extends CasSupportJdbcAuditConfigurationTests {
 }

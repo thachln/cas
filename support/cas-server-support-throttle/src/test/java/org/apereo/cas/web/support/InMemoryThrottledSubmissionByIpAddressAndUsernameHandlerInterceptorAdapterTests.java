@@ -16,16 +16,16 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @SpringBootTest(classes = BaseThrottledSubmissionHandlerInterceptorAdapterTests.SharedTestConfiguration.class,
     properties = {
-        "cas.authn.throttle.usernameParameter=username",
+        "cas.authn.throttle.core.username-parameter=username",
         "cas.authn.throttle.failure.range-seconds=5"
     }
 )
 @Getter
-@Tag("Simple")
+@Tag("AuthenticationThrottling")
 public class InMemoryThrottledSubmissionByIpAddressAndUsernameHandlerInterceptorAdapterTests
     extends BaseThrottledSubmissionHandlerInterceptorAdapterTests {
 
     @Autowired
-    @Qualifier("authenticationThrottle")
+    @Qualifier(ThrottledSubmissionHandlerInterceptor.BEAN_NAME)
     private ThrottledSubmissionHandlerInterceptor throttle;
 }

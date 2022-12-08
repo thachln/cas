@@ -31,12 +31,11 @@ public class DefaultMultifactorAuthenticationTrustedDeviceBypassEvaluator implem
             .service(service)
             .authentication(authentication)
             .registeredService(registeredService)
-            .retrievePrincipalAttributesFromReleasePolicy(Boolean.FALSE)
             .build();
         val accessResult = this.registeredServiceAccessStrategyEnforcer.execute(audit);
         accessResult.throwExceptionIfNeeded();
 
-        val mfaPolicy = registeredService != null ? registeredService.getMultifactorPolicy() : null;
+        val mfaPolicy = registeredService != null ? registeredService.getMultifactorAuthenticationPolicy() : null;
         return mfaPolicy != null && mfaPolicy.isBypassTrustedDeviceEnabled();
     }
 }

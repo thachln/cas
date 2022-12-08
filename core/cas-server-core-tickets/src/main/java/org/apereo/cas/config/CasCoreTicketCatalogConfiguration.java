@@ -1,6 +1,7 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.ticket.BaseTicketCatalogConfigurer;
 import org.apereo.cas.ticket.ProxyGrantingTicketImpl;
 import org.apereo.cas.ticket.ProxyTicketImpl;
@@ -14,10 +15,11 @@ import org.apereo.cas.ticket.TransientSessionTicket;
 import org.apereo.cas.ticket.TransientSessionTicketImpl;
 import org.apereo.cas.ticket.proxy.ProxyGrantingTicket;
 import org.apereo.cas.ticket.proxy.ProxyTicket;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 
 /**
@@ -26,33 +28,35 @@ import org.springframework.core.Ordered;
  * @author Misagh Moayyed
  * @since 5.1.0
  */
-@Configuration(value = "casCoreTicketCatalogConfiguration", proxyBeanMethods = false)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 @Slf4j
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.TicketRegistry)
+@AutoConfiguration
 public class CasCoreTicketCatalogConfiguration extends BaseTicketCatalogConfigurer {
     @Override
-    public final void configureTicketCatalog(final TicketCatalog plan) {
+    public final void configureTicketCatalog(final TicketCatalog plan,
+                                             final CasConfigurationProperties casProperties) {
         LOGGER.trace("Registering core CAS protocol ticket definitions...");
 
         buildAndRegisterProxyTicketDefinition(plan,
             buildTicketDefinition(plan, ProxyTicket.PROXY_TICKET_PREFIX,
-                ProxyTicketImpl.class, Ordered.HIGHEST_PRECEDENCE));
+                ProxyTicket.class, ProxyTicketImpl.class, Ordered.HIGHEST_PRECEDENCE));
 
         buildAndRegisterServiceTicketDefinition(plan,
             buildTicketDefinition(plan, ServiceTicket.PREFIX,
-                ServiceTicketImpl.class, Ordered.HIGHEST_PRECEDENCE));
+                ServiceTicket.class, ServiceTicketImpl.class, Ordered.HIGHEST_PRECEDENCE));
 
         buildAndRegisterProxyGrantingTicketDefinition(plan,
             buildTicketDefinition(plan, ProxyGrantingTicket.PROXY_GRANTING_TICKET_PREFIX,
-                ProxyGrantingTicketImpl.class, Ordered.LOWEST_PRECEDENCE));
+                ProxyGrantingTicket.class, ProxyGrantingTicketImpl.class, Ordered.LOWEST_PRECEDENCE));
 
         buildAndRegisterTicketGrantingTicketDefinition(plan,
             buildTicketDefinition(plan, TicketGrantingTicket.PREFIX,
-                TicketGrantingTicketImpl.class, Ordered.LOWEST_PRECEDENCE));
+                TicketGrantingTicket.class, TicketGrantingTicketImpl.class, Ordered.LOWEST_PRECEDENCE));
 
         buildAndRegisterTransientSessionTicketDefinition(plan,
             buildTicketDefinition(plan, TransientSessionTicket.PREFIX,
-                TransientSessionTicketImpl.class, Ordered.LOWEST_PRECEDENCE));
+                TransientSessionTicket.class, TransientSessionTicketImpl.class, Ordered.LOWEST_PRECEDENCE));
     }
 
     protected void buildAndRegisterProxyGrantingTicketDefinition(final TicketCatalog plan, final TicketDefinition metadata) {

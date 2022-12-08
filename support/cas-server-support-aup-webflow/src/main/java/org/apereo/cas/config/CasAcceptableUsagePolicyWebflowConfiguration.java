@@ -1,5 +1,7 @@
 package org.apereo.cas.config;
 
+import org.apereo.cas.audit.AuditActionResolvers;
+import org.apereo.cas.audit.AuditResourceResolvers;
 import org.apereo.cas.audit.AuditTrailConstants;
 import org.apereo.cas.audit.AuditTrailRecordResolutionPlanConfigurer;
 import org.apereo.cas.audit.AuditableExecution;
@@ -7,31 +9,34 @@ import org.apereo.cas.aup.AcceptableUsagePolicyRepository;
 import org.apereo.cas.aup.DefaultAcceptableUsagePolicyRepository;
 import org.apereo.cas.aup.GroovyAcceptableUsagePolicyRepository;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.ticket.registry.TicketRegistrySupport;
 import org.apereo.cas.util.scripting.WatchableGroovyScriptResource;
-import org.apereo.cas.web.flow.AcceptableUsagePolicyRenderAction;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 import org.apereo.cas.web.flow.AcceptableUsagePolicySubmitAction;
 import org.apereo.cas.web.flow.AcceptableUsagePolicyVerifyAction;
 import org.apereo.cas.web.flow.AcceptableUsagePolicyVerifyServiceAction;
 import org.apereo.cas.web.flow.AcceptableUsagePolicyWebflowConfigurer;
 import org.apereo.cas.web.flow.CasWebflowConfigurer;
+import org.apereo.cas.web.flow.CasWebflowConstants;
 import org.apereo.cas.web.flow.CasWebflowExecutionPlanConfigurer;
+import org.apereo.cas.web.flow.actions.ConsumerExecutionAction;
+import org.apereo.cas.web.flow.actions.WebflowActionBeanSupplier;
+import org.apereo.cas.web.support.WebUtils;
 
 import lombok.val;
-import org.apache.commons.lang3.StringUtils;
 import org.apereo.inspektr.audit.spi.AuditResourceResolver;
 import org.apereo.inspektr.audit.spi.support.DefaultAuditActionResolver;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.webflow.definition.registry.FlowDefinitionRegistry;
 import org.springframework.webflow.engine.builder.support.FlowBuilderServices;
 import org.springframework.webflow.execution.Action;
@@ -42,109 +47,190 @@ import org.springframework.webflow.execution.Action;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration("casAcceptableUsagePolicyWebflowConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@ConditionalOnProperty(prefix = "cas.acceptable-usage-policy", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.AcceptableUsagePolicy)
+@AutoConfiguration
 public class CasAcceptableUsagePolicyWebflowConfiguration {
 
-    @Autowired
-    @Qualifier("loginFlowRegistry")
-    private ObjectProvider<FlowDefinitionRegistry> loginFlowDefinitionRegistry;
+    @Configuration(value = "CasAcceptableUsagePolicyWebflowCoreConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasAcceptableUsagePolicyWebflowCoreConfiguration {
 
-    @Autowired
-    private ObjectProvider<FlowBuilderServices> flowBuilderServices;
-
-    @Autowired
-    @Qualifier("defaultTicketRegistrySupport")
-    private ObjectProvider<TicketRegistrySupport> ticketRegistrySupport;
-
-    @Autowired
-    private ConfigurableApplicationContext applicationContext;
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("nullableReturnValueResourceResolver")
-    private ObjectProvider<AuditResourceResolver> nullableReturnValueResourceResolver;
-
-    @Autowired
-    @Qualifier("registeredServiceAccessStrategyEnforcer")
-    private ObjectProvider<AuditableExecution> registeredServiceAccessStrategyEnforcer;
-
-    @Bean
-    @RefreshScope
-    @ConditionalOnMissingBean(name = "acceptableUsagePolicySubmitAction")
-    public Action acceptableUsagePolicySubmitAction() {
-        return new AcceptableUsagePolicySubmitAction(acceptableUsagePolicyRepository());
+        @ConditionalOnMissingBean(name = "acceptableUsagePolicyWebflowConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public CasWebflowConfigurer acceptableUsagePolicyWebflowConfigurer(
+            final CasConfigurationProperties casProperties, final ConfigurableApplicationContext applicationContext,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_LOGIN_FLOW_DEFINITION_REGISTRY)
+            final FlowDefinitionRegistry loginFlowDefinitionRegistry,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_FLOW_BUILDER_SERVICES)
+            final FlowBuilderServices flowBuilderServices) {
+            return BeanSupplier.of(CasWebflowConfigurer.class)
+                .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+                .supply(() -> new AcceptableUsagePolicyWebflowConfigurer(flowBuilderServices,
+                    loginFlowDefinitionRegistry, applicationContext, casProperties))
+                .otherwiseProxy()
+                .get();
+        }
     }
 
-    @Bean
-    @RefreshScope
-    @ConditionalOnMissingBean(name = "acceptableUsagePolicyVerifyAction")
-    public Action acceptableUsagePolicyVerifyAction() {
-        return new AcceptableUsagePolicyVerifyAction(acceptableUsagePolicyRepository(),
-            registeredServiceAccessStrategyEnforcer.getObject());
+    @Configuration(value = "CasAcceptableUsagePolicyWebflowRepositoryConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasAcceptableUsagePolicyWebflowRepositoryConfiguration {
+        @ConditionalOnMissingBean(name = AcceptableUsagePolicyRepository.BEAN_NAME)
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public AcceptableUsagePolicyRepository acceptableUsagePolicyRepository(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(TicketRegistrySupport.BEAN_NAME)
+            final TicketRegistrySupport ticketRegistrySupport) throws Exception {
+            return BeanSupplier.of(AcceptableUsagePolicyRepository.class)
+                .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+                .supply(() -> {
+                    val groovy = casProperties.getAcceptableUsagePolicy().getGroovy();
+                    if (groovy.getLocation() != null) {
+                        return new GroovyAcceptableUsagePolicyRepository(ticketRegistrySupport, casProperties.getAcceptableUsagePolicy(),
+                            new WatchableGroovyScriptResource(groovy.getLocation()), applicationContext);
+                    }
+                    return new DefaultAcceptableUsagePolicyRepository(ticketRegistrySupport, casProperties.getAcceptableUsagePolicy());
+                })
+                .otherwise(AcceptableUsagePolicyRepository::noOp)
+                .get();
+        }
     }
 
-    @Bean
-    @RefreshScope
-    @ConditionalOnMissingBean(name = "acceptableUsagePolicyRenderAction")
-    public Action acceptableUsagePolicyRenderAction() {
-        return new AcceptableUsagePolicyRenderAction(acceptableUsagePolicyRepository());
+    @Configuration(value = "CasAcceptableUsagePolicyWebflowPlanConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasAcceptableUsagePolicyWebflowPlanConfiguration {
+        @ConditionalOnMissingBean(name = "casAcceptableUsagePolicyWebflowExecutionPlanConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public CasWebflowExecutionPlanConfigurer casAcceptableUsagePolicyWebflowExecutionPlanConfigurer(
+            @Qualifier("acceptableUsagePolicyWebflowConfigurer")
+            final CasWebflowConfigurer acceptableUsagePolicyWebflowConfigurer) {
+            return plan -> plan.registerWebflowConfigurer(acceptableUsagePolicyWebflowConfigurer);
+        }
     }
 
-    @Bean
-    @RefreshScope
-    @ConditionalOnMissingBean(name = "acceptableUsagePolicyVerifyServiceAction")
-    public Action acceptableUsagePolicyVerifyServiceAction() {
-        return new AcceptableUsagePolicyVerifyServiceAction(acceptableUsagePolicyRepository(),
-            registeredServiceAccessStrategyEnforcer.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "acceptableUsagePolicyWebflowConfigurer")
-    @Bean
-    @DependsOn("defaultWebflowConfigurer")
-    public CasWebflowConfigurer acceptableUsagePolicyWebflowConfigurer() {
-        return new AcceptableUsagePolicyWebflowConfigurer(flowBuilderServices.getObject(),
-            loginFlowDefinitionRegistry.getObject(), applicationContext, casProperties);
-    }
-
-    @ConditionalOnMissingBean(name = "acceptableUsagePolicyRepository")
-    @Bean
-    @RefreshScope
-    public AcceptableUsagePolicyRepository acceptableUsagePolicyRepository() {
-        val groovy = casProperties.getAcceptableUsagePolicy().getGroovy();
-        if (groovy.getLocation() != null) {
-            return new GroovyAcceptableUsagePolicyRepository(ticketRegistrySupport.getObject(),
-                casProperties.getAcceptableUsagePolicy(),
-                new WatchableGroovyScriptResource(groovy.getLocation()), applicationContext);
+    @Configuration(value = "CasAcceptableUsagePolicyWebflowActionConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasAcceptableUsagePolicyWebflowActionConfiguration {
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = CasWebflowConstants.ACTION_ID_AUP_SUBMIT)
+        public Action acceptableUsagePolicySubmitAction(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(AcceptableUsagePolicyRepository.BEAN_NAME)
+            final AcceptableUsagePolicyRepository acceptableUsagePolicyRepository) throws Exception {
+            return WebflowActionBeanSupplier.builder()
+                .withApplicationContext(applicationContext)
+                .withProperties(casProperties)
+                .withAction(() -> BeanSupplier.of(Action.class)
+                    .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+                    .supply(() -> new AcceptableUsagePolicySubmitAction(acceptableUsagePolicyRepository))
+                    .otherwise(() -> ConsumerExecutionAction.NONE)
+                    .get())
+                .withId(CasWebflowConstants.ACTION_ID_AUP_SUBMIT)
+                .build()
+                .get();
         }
 
-        return new DefaultAcceptableUsagePolicyRepository(
-            ticketRegistrySupport.getObject(),
-            casProperties.getAcceptableUsagePolicy());
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = CasWebflowConstants.ACTION_ID_AUP_VERIFY)
+        public Action acceptableUsagePolicyVerifyAction(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(AcceptableUsagePolicyRepository.BEAN_NAME)
+            final AcceptableUsagePolicyRepository acceptableUsagePolicyRepository,
+            @Qualifier(AuditableExecution.AUDITABLE_EXECUTION_REGISTERED_SERVICE_ACCESS)
+            final AuditableExecution registeredServiceAccessStrategyEnforcer) throws Exception {
+            return WebflowActionBeanSupplier.builder()
+                .withApplicationContext(applicationContext)
+                .withProperties(casProperties)
+                .withAction(() -> BeanSupplier.of(Action.class)
+                    .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+                    .supply(() -> new AcceptableUsagePolicyVerifyAction(acceptableUsagePolicyRepository, registeredServiceAccessStrategyEnforcer))
+                    .otherwise(() -> ConsumerExecutionAction.NONE)
+                    .get())
+                .withId(CasWebflowConstants.ACTION_ID_AUP_VERIFY)
+                .build()
+                .get();
+        }
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = CasWebflowConstants.ACTION_ID_AUP_RENDER)
+        public Action acceptableUsagePolicyRenderAction(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(AcceptableUsagePolicyRepository.BEAN_NAME)
+            final AcceptableUsagePolicyRepository acceptableUsagePolicyRepository) throws Exception {
+            return WebflowActionBeanSupplier.builder()
+                .withApplicationContext(applicationContext)
+                .withProperties(casProperties)
+                .withAction(() -> BeanSupplier.of(Action.class)
+                    .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+                    .supply(() -> new ConsumerExecutionAction(requestContext -> acceptableUsagePolicyRepository.fetchPolicy(requestContext)
+                        .ifPresent(policy -> WebUtils.putAcceptableUsagePolicyTermsIntoFlowScope(requestContext, policy))))
+                    .otherwise(() -> ConsumerExecutionAction.NONE)
+                    .get())
+                .withId(CasWebflowConstants.ACTION_ID_AUP_RENDER)
+                .build()
+                .get();
+        }
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = CasWebflowConstants.ACTION_ID_AUP_VERIFY_SERVICE)
+        public Action acceptableUsagePolicyVerifyServiceAction(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(AcceptableUsagePolicyRepository.BEAN_NAME)
+            final AcceptableUsagePolicyRepository acceptableUsagePolicyRepository,
+            @Qualifier(AuditableExecution.AUDITABLE_EXECUTION_REGISTERED_SERVICE_ACCESS)
+            final AuditableExecution registeredServiceAccessStrategyEnforcer) throws Exception {
+            return WebflowActionBeanSupplier.builder()
+                .withApplicationContext(applicationContext)
+                .withProperties(casProperties)
+                .withAction(() -> BeanSupplier.of(Action.class)
+                    .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+                    .supply(() -> new AcceptableUsagePolicyVerifyServiceAction(acceptableUsagePolicyRepository, registeredServiceAccessStrategyEnforcer))
+                    .otherwise(() -> ConsumerExecutionAction.NONE)
+                    .get())
+                .withId(CasWebflowConstants.ACTION_ID_AUP_VERIFY_SERVICE)
+                .build()
+                .get();
+        }
     }
 
-    @ConditionalOnMissingBean(name = "casAcceptableUsagePolicyAuditTrailRecordResolutionPlanConfigurer")
-    @Bean
-    public AuditTrailRecordResolutionPlanConfigurer casAcceptableUsagePolicyAuditTrailRecordResolutionPlanConfigurer() {
-        return plan -> {
-            plan.registerAuditResourceResolver("AUP_VERIFY_RESOURCE_RESOLVER",
-                nullableReturnValueResourceResolver.getObject());
-            plan.registerAuditActionResolver("AUP_VERIFY_ACTION_RESOLVER",
-                new DefaultAuditActionResolver(AuditTrailConstants.AUDIT_ACTION_POSTFIX_TRIGGERED, StringUtils.EMPTY));
+    @Configuration(value = "CasAcceptableUsagePolicyWebflowAuditConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasAcceptableUsagePolicyWebflowAuditConfiguration {
+        @ConditionalOnMissingBean(name = "casAcceptableUsagePolicyAuditTrailRecordResolutionPlanConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public AuditTrailRecordResolutionPlanConfigurer casAcceptableUsagePolicyAuditTrailRecordResolutionPlanConfigurer(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("nullableReturnValueResourceResolver")
+            final AuditResourceResolver resourceResolver) throws Exception {
 
-            plan.registerAuditResourceResolver("AUP_SUBMIT_RESOURCE_RESOLVER",
-                nullableReturnValueResourceResolver.getObject());
-            plan.registerAuditActionResolver("AUP_SUBMIT_ACTION_RESOLVER",
-                new DefaultAuditActionResolver(AuditTrailConstants.AUDIT_ACTION_POSTFIX_TRIGGERED, StringUtils.EMPTY));
-        };
-    }
-
-    @ConditionalOnMissingBean(name = "casAcceptableUsagePolicyWebflowExecutionPlanConfigurer")
-    @Bean
-    public CasWebflowExecutionPlanConfigurer casAcceptableUsagePolicyWebflowExecutionPlanConfigurer() {
-        return plan -> plan.registerWebflowConfigurer(acceptableUsagePolicyWebflowConfigurer());
+            return BeanSupplier.of(AuditTrailRecordResolutionPlanConfigurer.class)
+                .when(AcceptableUsagePolicyRepository.CONDITION_AUP_ENABLED.given(applicationContext.getEnvironment()))
+                .supply(() ->
+                    plan -> {
+                        plan.registerAuditResourceResolver(resourceResolver,
+                            AuditResourceResolvers.AUP_SUBMIT_RESOURCE_RESOLVER,
+                            AuditResourceResolvers.AUP_VERIFY_RESOURCE_RESOLVER);
+                        val resolver = new DefaultAuditActionResolver(AuditTrailConstants.AUDIT_ACTION_POSTFIX_TRIGGERED);
+                        plan.registerAuditActionResolvers(resolver,
+                            AuditActionResolvers.AUP_VERIFY_ACTION_RESOLVER,
+                            AuditActionResolvers.AUP_SUBMIT_ACTION_RESOLVER);
+                    })
+                .otherwiseProxy()
+                .get();
+        }
     }
 }

@@ -4,10 +4,17 @@ title: CAS - OAuth User-Managed Access Protocol
 category: Protocols
 ---
 
+{% include variables.html %}
+
 # User-Managed Access Protocol
 
-User-Managed Access (UMA) is a lightweight access control protocol that defines a centralized workflow to allow an entity (user or corporation) 
+User-Managed Access (UMA) is a lightweight access control protocol that defines 
+a centralized workflow to allow an entity (user or corporation) 
 to manage access to their resources.
+
+<div class="alert alert-info"><strong>Scopes</strong><p>Remember that UMA-related operations that typically
+may carry special scopes such as <code>uma_protection</code> or <code>uma_authorization</code> must not only be
+requested in the initial authorization request, but should also be explicitly authorized in the registered service definition.</p></div>
 
 To learn more about UMA, please [read the specification](https://docs.kantarainitiative.org/uma/rec-uma-core.html).
 
@@ -15,15 +22,32 @@ To learn more about UMA, please [read the specification](https://docs.kantaraini
 
 Support is enabled by including the following dependency in the WAR overlay:
 
-```xml
-<dependency>
-  <groupId>org.apereo.cas</groupId>
-  <artifactId>cas-server-support-oauth-uma</artifactId>
-  <version>${cas.version}</version>
-</dependency>
-```
+{% include_cached casmodule.html group="org.apereo.cas" module="cas-server-support-oauth-uma" %}
 
-To see the relevant list of CAS properties for this feature, please [review this guide](../configuration/Configuration-Properties.html#oauth2-uma).
+{% include_cached casproperties.html properties="cas.authn.oauth.uma.core" %}
+
+## Permission Tickets
+
+A permission represents a resource identifier and its corresponding scopes. At a single instance, the 
+resource server can only request permissions for access to the resources belonging to a 
+single resource owner, protected by a single authorization server. As the response, 
+the resource server receives a permission ticket which represents the 
+same permissions that the resource server requested.
+
+{% include_cached casproperties.html properties="cas.authn.oauth.uma.permission-ticket" %}
+
+## Requesting Party Tokens
+
+The client can then obtain a Requesting Party Token (`RPT`) from the authorization 
+server by presenting the received permission ticket and any other required claims. `RPT` 
+will be issued with successful evaluation of policy conditions, 
+scopes, claims, and any other relevant information.
+
+A `RPT` is an OAuth access token associated with the UMA grant. An `RPT` is 
+unique to a requesting party, client, authorization server, resource server, 
+and resource owner. This token represents some number of granted permissions.
+
+{% include_cached casproperties.html properties="cas.authn.oauth.uma.requesting-party-token" %}
 
 ## Resources Storage
 
@@ -34,13 +58,9 @@ of choice to track and manage such definitions. The repository choice is activat
 
 Support is enabled by including the following dependency in the WAR overlay:
 
-```xml
-<dependency>
-  <groupId>org.apereo.cas</groupId>
-  <artifactId>cas-server-support-oauth-uma-jpa</artifactId>
-  <version>${cas.version}</version>
-</dependency>
-```
+{% include_cached casmodule.html group="org.apereo.cas" module="cas-server-support-oauth-uma-jpa" %}
+
+{% include_cached casproperties.html properties="cas.authn.oauth.uma.resource-set.jpa" %}
 
 ## Endpoints
 

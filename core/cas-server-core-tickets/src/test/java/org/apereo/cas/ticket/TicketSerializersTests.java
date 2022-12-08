@@ -10,6 +10,7 @@ import org.apereo.cas.config.CasCoreTicketIdGeneratorsConfiguration;
 import org.apereo.cas.config.CasCoreTicketsConfiguration;
 import org.apereo.cas.config.CasCoreTicketsSerializationConfiguration;
 import org.apereo.cas.config.CasCoreUtilConfiguration;
+import org.apereo.cas.config.CasCoreWebConfiguration;
 import org.apereo.cas.config.CasDefaultServiceTicketIdGeneratorsConfiguration;
 import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguration;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.*;
     RefreshAutoConfiguration.class,
     CasCoreUtilConfiguration.class,
     CasCoreTicketsConfiguration.class,
+    CasCoreWebConfiguration.class,
     CasCoreTicketIdGeneratorsConfiguration.class,
     CasDefaultServiceTicketIdGeneratorsConfiguration.class,
     CasCoreHttpConfiguration.class,
@@ -55,11 +57,11 @@ import static org.junit.jupiter.api.Assertions.*;
 public class TicketSerializersTests {
 
     @Autowired
-    @Qualifier("defaultTicketFactory")
+    @Qualifier(TicketFactory.BEAN_NAME)
     private TicketFactory defaultTicketFactory;
 
     @Autowired
-    @Qualifier("ticketSerializationManager")
+    @Qualifier(TicketSerializationManager.BEAN_NAME)
     private TicketSerializationManager ticketSerializationManager;
 
     @Test

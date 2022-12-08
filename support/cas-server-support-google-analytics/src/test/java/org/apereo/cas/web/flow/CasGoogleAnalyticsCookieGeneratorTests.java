@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "cas.tgc.cookie.same-site-policy=lax"
     })
 @EnableConfigurationProperties(CasConfigurationProperties.class)
-@Tag("Simple")
+@Tag("Cookie")
 public class CasGoogleAnalyticsCookieGeneratorTests {
 
     @Autowired
@@ -44,7 +44,7 @@ public class CasGoogleAnalyticsCookieGeneratorTests {
     private CasCookieBuilder casGoogleAnalyticsCookieGenerator;
 
     @Autowired
-    @Qualifier("ticketGrantingTicketCookieGenerator")
+    @Qualifier(CasCookieBuilder.BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER)
     private CasCookieBuilder ticketGrantingTicketCookieGenerator;
 
     @BeforeAll

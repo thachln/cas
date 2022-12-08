@@ -3,24 +3,38 @@ package org.apereo.cas.web.flow.config;
 import org.apereo.cas.adaptors.x509.authentication.X509CertificateExtractor;
 import org.apereo.cas.authentication.adaptive.AdaptiveAuthenticationPolicy;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 import org.apereo.cas.web.flow.CasWebflowConfigurer;
+import org.apereo.cas.web.flow.CasWebflowConstants;
 import org.apereo.cas.web.flow.CasWebflowExecutionPlanConfigurer;
+import org.apereo.cas.web.flow.X509CasMultifactorWebflowCustomizer;
 import org.apereo.cas.web.flow.X509CertificateCredentialsNonInteractiveAction;
 import org.apereo.cas.web.flow.X509CertificateCredentialsRequestHeaderAction;
 import org.apereo.cas.web.flow.X509WebflowConfigurer;
+import org.apereo.cas.web.flow.actions.WebflowActionBeanSupplier;
+import org.apereo.cas.web.flow.configurer.CasMultifactorWebflowCustomizer;
 import org.apereo.cas.web.flow.resolver.CasDelegatingWebflowEventResolver;
 import org.apereo.cas.web.flow.resolver.CasWebflowEventResolver;
+import org.apereo.cas.web.tomcat.X509TomcatServletWebServiceFactoryCustomizer;
+import org.apereo.cas.web.tomcat.X509TomcatServletWebServiceFactoryWebflowConfigurer;
 
 import lombok.val;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.apache.catalina.startup.Tomcat;
+import org.apache.coyote.http2.Http2Protocol;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.webflow.definition.registry.FlowDefinitionRegistry;
 import org.springframework.webflow.engine.builder.support.FlowBuilderServices;
 import org.springframework.webflow.execution.Action;
@@ -31,65 +45,111 @@ import org.springframework.webflow.execution.Action;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@Configuration("x509AuthenticationWebflowConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.X509)
+@AutoConfiguration
 public class X509AuthenticationWebflowConfiguration {
-
-    @Autowired
-    @Qualifier("adaptiveAuthenticationPolicy")
-    private ObjectProvider<AdaptiveAuthenticationPolicy> adaptiveAuthenticationPolicy;
-
-    @Autowired
-    @Qualifier("serviceTicketRequestWebflowEventResolver")
-    private ObjectProvider<CasWebflowEventResolver> serviceTicketRequestWebflowEventResolver;
-
-    @Autowired
-    @Qualifier("initialAuthenticationAttemptWebflowEventResolver")
-    private ObjectProvider<CasDelegatingWebflowEventResolver> initialAuthenticationAttemptWebflowEventResolver;
-
-    @Autowired
-    @Qualifier("loginFlowRegistry")
-    private ObjectProvider<FlowDefinitionRegistry> loginFlowDefinitionRegistry;
-
-    @Autowired
-    private ObjectProvider<FlowBuilderServices> flowBuilderServices;
-
-    @Autowired
-    private ConfigurableApplicationContext applicationContext;
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("x509CertificateExtractor")
-    private ObjectProvider<X509CertificateExtractor> x509CertificateExtractor;
 
     @ConditionalOnMissingBean(name = "x509WebflowConfigurer")
     @Bean
-    @DependsOn("defaultWebflowConfigurer")
-    public CasWebflowConfigurer x509WebflowConfigurer() {
-        return new X509WebflowConfigurer(flowBuilderServices.getObject(),
-            loginFlowDefinitionRegistry.getObject(),
-            applicationContext, casProperties);
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public CasWebflowConfigurer x509WebflowConfigurer(
+        @Qualifier(CasWebflowConstants.BEAN_NAME_LOGIN_FLOW_DEFINITION_REGISTRY)
+        final FlowDefinitionRegistry loginFlowRegistry,
+        @Qualifier(CasWebflowConstants.BEAN_NAME_FLOW_BUILDER_SERVICES)
+        final FlowBuilderServices flowBuilderServices,
+        final CasConfigurationProperties casProperties,
+        final ConfigurableApplicationContext applicationContext) {
+        return new X509WebflowConfigurer(flowBuilderServices,
+            loginFlowRegistry, applicationContext, casProperties);
     }
 
     @Bean
-    public Action x509Check() {
-        val extractCertFromRequestHeader = casProperties.getAuthn().getX509().isExtractCert();
-        if (extractCertFromRequestHeader) {
-            return new X509CertificateCredentialsRequestHeaderAction(initialAuthenticationAttemptWebflowEventResolver.getObject(),
-                serviceTicketRequestWebflowEventResolver.getObject(),
-                adaptiveAuthenticationPolicy.getObject(),
-                x509CertificateExtractor.getObject());
-        }
-        return new X509CertificateCredentialsNonInteractiveAction(initialAuthenticationAttemptWebflowEventResolver.getObject(),
-            serviceTicketRequestWebflowEventResolver.getObject(),
-            adaptiveAuthenticationPolicy.getObject());
+    @ConditionalOnMissingBean(name = "x509CasMultifactorWebflowCustomizer")
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public CasMultifactorWebflowCustomizer x509CasMultifactorWebflowCustomizer() {
+        return new X509CasMultifactorWebflowCustomizer();
+    }
+
+    @ConditionalOnMissingBean(name = CasWebflowConstants.ACTION_ID_X509_CHECK)
+    @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public Action x509Check(
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier("initialAuthenticationAttemptWebflowEventResolver")
+        final CasDelegatingWebflowEventResolver initialAuthenticationAttemptWebflowEventResolver,
+        @Qualifier("x509CertificateExtractor")
+        final X509CertificateExtractor x509CertificateExtractor,
+        @Qualifier("serviceTicketRequestWebflowEventResolver")
+        final CasWebflowEventResolver serviceTicketRequestWebflowEventResolver,
+        @Qualifier("adaptiveAuthenticationPolicy")
+        final AdaptiveAuthenticationPolicy adaptiveAuthenticationPolicy,
+        final CasConfigurationProperties casProperties) {
+        return WebflowActionBeanSupplier.builder()
+            .withApplicationContext(applicationContext)
+            .withProperties(casProperties)
+            .withAction(() -> {
+                val extractCertFromRequestHeader = casProperties.getAuthn().getX509().isExtractCert();
+                if (extractCertFromRequestHeader) {
+                    return new X509CertificateCredentialsRequestHeaderAction(
+                        initialAuthenticationAttemptWebflowEventResolver,
+                        serviceTicketRequestWebflowEventResolver,
+                        adaptiveAuthenticationPolicy,
+                        x509CertificateExtractor, casProperties);
+                }
+                return new X509CertificateCredentialsNonInteractiveAction(
+                    initialAuthenticationAttemptWebflowEventResolver,
+                    serviceTicketRequestWebflowEventResolver,
+                    adaptiveAuthenticationPolicy, casProperties);
+            })
+            .withId(CasWebflowConstants.ACTION_ID_X509_CHECK)
+            .build()
+            .get();
     }
 
     @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     @ConditionalOnMissingBean(name = "x509CasWebflowExecutionPlanConfigurer")
-    public CasWebflowExecutionPlanConfigurer x509CasWebflowExecutionPlanConfigurer() {
-        return plan -> plan.registerWebflowConfigurer(x509WebflowConfigurer());
+    public CasWebflowExecutionPlanConfigurer x509CasWebflowExecutionPlanConfigurer(
+        @Qualifier("x509WebflowConfigurer")
+        final CasWebflowConfigurer x509WebflowConfigurer) {
+        return plan -> plan.registerWebflowConfigurer(x509WebflowConfigurer);
+    }
+
+    @SuppressWarnings("ConditionalOnProperty")
+    @Configuration(value = "X509TomcatServletWebServiceFactoryConfiguration", proxyBeanMethods = false)
+    @ConditionalOnClass({Tomcat.class, Http2Protocol.class})
+    @ConditionalOnProperty("cas.authn.x509.webflow.port")
+    public static class X509TomcatServletWebServiceFactoryConfiguration {
+        @ConditionalOnMissingBean(name = "x509TomcatServletWebServiceFactoryCustomizer")
+        @Bean
+        public WebServerFactoryCustomizer x509TomcatServletWebServiceFactoryCustomizer(
+            final ServerProperties serverProperties,
+            final CasConfigurationProperties casProperties) {
+            return new X509TomcatServletWebServiceFactoryCustomizer(serverProperties, casProperties);
+        }
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = "x509TomcatWebflowExecutionPlanConfigurer")
+        public CasWebflowExecutionPlanConfigurer x509TomcatWebflowExecutionPlanConfigurer(
+            @Qualifier("x509TomcatServletWebServiceFactoryWebflowConfigurer")
+            final CasWebflowConfigurer x509TomcatServletWebServiceFactoryWebflowConfigurer) {
+            return plan -> plan.registerWebflowConfigurer(x509TomcatServletWebServiceFactoryWebflowConfigurer);
+        }
+
+        @ConditionalOnMissingBean(name = "x509TomcatServletWebServiceFactoryWebflowConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public CasWebflowConfigurer x509TomcatServletWebServiceFactoryWebflowConfigurer(
+            @Qualifier(CasWebflowConstants.BEAN_NAME_LOGIN_FLOW_DEFINITION_REGISTRY)
+            final FlowDefinitionRegistry loginFlowRegistry,
+            @Qualifier(CasWebflowConstants.BEAN_NAME_FLOW_BUILDER_SERVICES)
+            final FlowBuilderServices flowBuilderServices,
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext) {
+            return new X509TomcatServletWebServiceFactoryWebflowConfigurer(
+                flowBuilderServices, loginFlowRegistry, applicationContext, casProperties);
+        }
     }
 }

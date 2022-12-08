@@ -7,12 +7,13 @@ import org.apereo.cas.authentication.PreventedException;
 import org.apereo.cas.authentication.credential.UsernamePasswordCredential;
 import org.apereo.cas.authentication.handler.PrincipalNameTransformer;
 import org.apereo.cas.authentication.principal.PrincipalFactory;
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.authentication.support.password.PasswordPolicyContext;
 import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.util.function.FunctionUtils;
 
 import lombok.Getter;
 import lombok.Setter;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.beanutils.BeanUtils;
@@ -23,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import javax.security.auth.login.AccountNotFoundException;
 import javax.security.auth.login.FailedLoginException;
+
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 
@@ -45,28 +47,45 @@ public abstract class AbstractUsernamePasswordAuthenticationHandler extends Abst
 
     private PasswordEncoder passwordEncoder = NoOpPasswordEncoder.getInstance();
 
-    private PrincipalNameTransformer principalNameTransformer = formUserId -> formUserId;
+    private PrincipalNameTransformer principalNameTransformer = String::trim;
 
     private PasswordPolicyContext passwordPolicyConfiguration;
 
     protected AbstractUsernamePasswordAuthenticationHandler(final String name, final ServicesManager servicesManager,
-                                                         final PrincipalFactory principalFactory, final Integer order) {
+                                                            final PrincipalFactory principalFactory, final Integer order) {
         super(name, servicesManager, principalFactory, order);
     }
 
-    @SneakyThrows
     @Override
-    protected AuthenticationHandlerExecutionResult doAuthentication(final Credential credential) {
+    public boolean supports(final Credential credential) {
+        if (!UsernamePasswordCredential.class.isInstance(credential)) {
+            LOGGER.debug("Credential is not one of username/password and is not accepted by handler [{}]", getName());
+            return false;
+        }
+        if (getCredentialSelectionPredicate() == null) {
+            LOGGER.debug("No credential selection criteria is defined for handler [{}]. Credential is accepted for further processing", getName());
+            return true;
+        }
+        LOGGER.debug("Examining credential [{}] eligibility for authentication handler [{}]", credential, getName());
+        val result = getCredentialSelectionPredicate().test(credential);
+        LOGGER.debug("Credential [{}] eligibility is [{}] for authentication handler [{}]", credential, getName(), BooleanUtils.toStringTrueFalse(result));
+        return result;
+    }
+
+    @Override
+    public boolean supports(final Class<? extends Credential> clazz) {
+        return UsernamePasswordCredential.class.isAssignableFrom(clazz);
+    }
+
+    @Override
+    protected AuthenticationHandlerExecutionResult doAuthentication(final Credential credential, final Service service) throws GeneralSecurityException {
         val originalUserPass = (UsernamePasswordCredential) credential;
-        val userPass = (UsernamePasswordCredential) credential.getClass().getDeclaredConstructor().newInstance();
-
-        BeanUtils.copyProperties(userPass, originalUserPass);
-
+        val userPass = new UsernamePasswordCredential();
+        FunctionUtils.doUnchecked(__ -> BeanUtils.copyProperties(userPass, originalUserPass));
         transformUsername(userPass);
         transformPassword(userPass);
-
         LOGGER.debug("Attempting authentication internally for transformed credential [{}]", userPass);
-        return authenticateUsernamePasswordInternal(userPass, originalUserPass.getPassword());
+        return authenticateUsernamePasswordInternal(userPass, originalUserPass.toPassword());
     }
 
     /**
@@ -77,15 +96,15 @@ public abstract class AbstractUsernamePasswordAuthenticationHandler extends Abst
      * @throws AccountNotFoundException the account not found exception
      */
     protected void transformPassword(final UsernamePasswordCredential userPass) throws FailedLoginException, AccountNotFoundException {
-        if (StringUtils.isBlank(userPass.getPassword())) {
+        if (StringUtils.isBlank(userPass.toPassword())) {
             throw new FailedLoginException("Password is null.");
         }
         LOGGER.debug("Attempting to encode credential password via [{}] for [{}]", this.passwordEncoder.getClass().getName(), userPass.getUsername());
-        val transformedPsw = this.passwordEncoder.encode(userPass.getPassword());
+        val transformedPsw = this.passwordEncoder.encode(userPass.toPassword());
         if (StringUtils.isBlank(transformedPsw)) {
             throw new AccountNotFoundException("Encoded password is null.");
         }
-        userPass.setPassword(transformedPsw);
+        userPass.assignPassword(transformedPsw);
     }
 
     /**
@@ -117,29 +136,9 @@ public abstract class AbstractUsernamePasswordAuthenticationHandler extends Abst
      * @throws GeneralSecurityException On authentication failure.
      * @throws PreventedException       On the indeterminate case when authentication is prevented.
      */
-    protected abstract AuthenticationHandlerExecutionResult authenticateUsernamePasswordInternal(UsernamePasswordCredential credential,
-                                                                                                 String originalPassword) throws GeneralSecurityException, PreventedException;
-
-    @Override
-    public boolean supports(final Class<? extends Credential> clazz) {
-        return UsernamePasswordCredential.class.isAssignableFrom(clazz);
-    }
-
-    @Override
-    public boolean supports(final Credential credential) {
-        if (!UsernamePasswordCredential.class.isInstance(credential)) {
-            LOGGER.debug("Credential is not one of username/password and is not accepted by handler [{}]", getName());
-            return false;
-        }
-        if (this.credentialSelectionPredicate == null) {
-            LOGGER.debug("No credential selection criteria is defined for handler [{}]. Credential is accepted for further processing", getName());
-            return true;
-        }
-        LOGGER.debug("Examining credential [{}] eligibility for authentication handler [{}]", credential, getName());
-        val result = this.credentialSelectionPredicate.test(credential);
-        LOGGER.debug("Credential [{}] eligibility is [{}] for authentication handler [{}]", credential, getName(), BooleanUtils.toStringTrueFalse(result));
-        return result;
-    }
+    protected abstract AuthenticationHandlerExecutionResult authenticateUsernamePasswordInternal(
+        UsernamePasswordCredential credential,
+        String originalPassword) throws GeneralSecurityException, PreventedException;
 
     /**
      * Used in case passwordEncoder is used to match raw password with encoded password. Mainly for BCRYPT password encoders where each encoded

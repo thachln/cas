@@ -1,14 +1,12 @@
 package org.apereo.cas;
 
-import org.apereo.cas.scim.v1.ScimV1PrincipalAttributeMapperTests;
 import org.apereo.cas.scim.v2.ScimV2PrincipalAttributeMapperTests;
-import org.apereo.cas.web.flow.PrincipalScimV1ProvisionerActionTests;
-import org.apereo.cas.web.flow.PrincipalScimV2ProvisionerActionTests;
+import org.apereo.cas.scim.v2.ScimV2PrincipalProvisionerTests;
+import org.apereo.cas.web.flow.PrincipalScimV2ProvisionerActionWithScimServerTests;
 import org.apereo.cas.web.flow.ScimWebflowConfigurerTests;
 
-import org.junit.platform.runner.JUnitPlatform;
 import org.junit.platform.suite.api.SelectClasses;
-import org.junit.runner.RunWith;
+import org.junit.platform.suite.api.Suite;
 
 /**
  * This is {@link AllScimTestsSuite}.
@@ -17,12 +15,11 @@ import org.junit.runner.RunWith;
  * @since 5.3.0
  */
 @SelectClasses({
+    PrincipalScimV2ProvisionerActionWithScimServerTests.class,
     ScimWebflowConfigurerTests.class,
-    ScimV1PrincipalAttributeMapperTests.class,
-    ScimV2PrincipalAttributeMapperTests.class,
-    PrincipalScimV1ProvisionerActionTests.class,
-    PrincipalScimV2ProvisionerActionTests.class
+    ScimV2PrincipalProvisionerTests.class,
+    ScimV2PrincipalAttributeMapperTests.class
 })
-@RunWith(JUnitPlatform.class)
+@Suite
 public class AllScimTestsSuite {
 }

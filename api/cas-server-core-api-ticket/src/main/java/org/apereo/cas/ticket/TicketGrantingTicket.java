@@ -19,7 +19,7 @@ import java.util.Map;
  * @since 3.0.0
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
-public interface TicketGrantingTicket extends Ticket {
+public interface TicketGrantingTicket extends TicketGrantingTicketAwareTicket {
 
     /**
      * The prefix to use when generating an id for a Ticket Granting Ticket.
@@ -27,33 +27,20 @@ public interface TicketGrantingTicket extends Ticket {
     String PREFIX = "TGT";
 
     /**
-     * Method to retrieve the authentication.
-     *
-     * @return the authentication
-     */
-    Authentication getAuthentication();
-
-    /**
      * Grant a ServiceTicket for a specific service.
      *
-     * @param id                         The unique identifier for this ticket.
-     * @param service                    The service for which we are granting a ticket
-     * @param expirationPolicy           the expiration policy.
-     * @param credentialProvided         current credential event for issuing this ticket. Could be null.
-     * @param onlyTrackMostRecentSession track the most recent session by keeping the latest service ticket
+     * @param id                 The unique identifier for this ticket.
+     * @param service            The service for which we are granting a ticket
+     * @param expirationPolicy   the expiration policy.
+     * @param credentialProvided current credential event for issuing this ticket. Could be null.
+     * @param trackingPolicy     the tracking policy
      * @return the service ticket granted to a specific service for the principal of the TicketGrantingTicket
      */
-    ServiceTicket grantServiceTicket(String id, Service service,
+    ServiceTicket grantServiceTicket(String id,
+                                     Service service,
                                      ExpirationPolicy expirationPolicy,
                                      boolean credentialProvided,
-                                     boolean onlyTrackMostRecentSession);
-
-    /**
-     * Gets an immutable map of service ticket and services accessed by this ticket-granting ticket.
-     *
-     * @return an immutable map of service ticket and services accessed by this ticket-granting ticket.
-     */
-    Map<String, Service> getServices();
+                                     ServiceTicketSessionTrackingPolicy trackingPolicy);
 
     /**
      * Gets proxy granting tickets created by this TGT.
@@ -83,13 +70,12 @@ public interface TicketGrantingTicket extends Ticket {
     TicketGrantingTicket getRoot();
 
     /**
-     * Gets all authentications ({@link #getAuthentication()} from this
+     * Gets all authentications ({@link AuthenticationAwareTicket#getAuthentication()} from this
      * instance and all dependent tickets that reference this one.
      *
      * @return Non -null list of authentication associated with this ticket in leaf-first order.
      */
     List<Authentication> getChainedAuthentications();
-
 
     /**
      * Gets the service that produced a proxy-granting ticket.

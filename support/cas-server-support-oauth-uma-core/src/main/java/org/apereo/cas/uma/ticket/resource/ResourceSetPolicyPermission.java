@@ -4,13 +4,15 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.Accessors;
 
-import javax.persistence.Column;
-import javax.persistence.Embeddable;
-import javax.persistence.Id;
-import javax.persistence.Lob;
-import javax.persistence.Table;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
+import jakarta.persistence.Table;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -27,9 +29,9 @@ import java.util.LinkedHashMap;
 @Table(name = "UMA_ResourceSetPolicyPermission")
 @EqualsAndHashCode(of = "id")
 @NoArgsConstructor
+@Accessors(chain = true)
 public class ResourceSetPolicyPermission implements Serializable {
-    private static final int MAP_SIZE = 8;
-
+    @Serial
     private static final long serialVersionUID = 1664113523427391736L;
 
     @org.springframework.data.annotation.Id
@@ -41,9 +43,9 @@ public class ResourceSetPolicyPermission implements Serializable {
 
     @Lob
     @Column(length = Integer.MAX_VALUE)
-    private HashSet<String> scopes = new HashSet<>(MAP_SIZE);
+    private HashSet<String> scopes = new HashSet<>();
 
     @Lob
     @Column(length = Integer.MAX_VALUE)
-    private LinkedHashMap<String, Object> claims = new LinkedHashMap<>(MAP_SIZE);
+    private LinkedHashMap<String, Object> claims = new LinkedHashMap<>();
 }

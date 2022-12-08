@@ -4,6 +4,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ResourceLoader;
 
+import java.util.Optional;
+
 /**
  * This is {@link CasConfigurationPropertiesSourceLocator}.
  *
@@ -14,11 +16,23 @@ import org.springframework.core.io.ResourceLoader;
 public interface CasConfigurationPropertiesSourceLocator {
 
     /**
+     * Standalone configuration profile.
+     */
+    String PROFILE_STANDALONE = "standalone";
+
+    /**
+     * Embedded configuration profile.
+     * This is mainly an alias for {@link #PROFILE_STANDALONE}
+     * and functionality should be identical.
+     */
+    String PROFILE_EMBEDDED = "embedded";
+
+    /**
      * Locate property sources for CAS via the given environment and other resources.
      *
      * @param environment    the environment
      * @param resourceLoader the resource loader
      * @return the property source
      */
-    PropertySource<?> locate(Environment environment, ResourceLoader resourceLoader);
+    Optional<PropertySource<?>> locate(Environment environment, ResourceLoader resourceLoader);
 }

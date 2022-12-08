@@ -13,7 +13,9 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Scope;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.function.Function;
 
 /**
  * Base validation specification for the CAS protocol. This specification checks
@@ -23,13 +25,29 @@ import javax.servlet.http.HttpServletRequest;
  * @author Scott Battaglia
  * @since 3.0.0
  */
-@Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+@Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
 @Slf4j
 @Setter
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 public abstract class AbstractCasProtocolValidationSpecification implements CasProtocolValidationSpecification {
+    /**
+     * Evaluator that passes true if assertion is defined and not null.
+     */
+    public static final Function<Assertion, Boolean> ASSERTION_ALWAYS_SATISFIED = assertion -> {
+        LOGGER.trace("Assertion is always satisfied");
+        return assertion != null;
+    };
+
+    /**
+     * Evaluator that makes sure chained authentications in the assertion is exactly of length 1.
+     */
+    public static final Function<Assertion, Boolean> ASSERTION_SINGLE_AUTHENTICATION = assertion -> {
+        LOGGER.trace("Number of chained authentications in the assertion [{}]", assertion.chainedAuthentications().size());
+        return assertion.chainedAuthentications().size() == 1;
+    };
+
     private final ServicesManager servicesManager;
 
     /**
@@ -41,13 +59,13 @@ public abstract class AbstractCasProtocolValidationSpecification implements CasP
     public boolean isSatisfiedBy(final Assertion assertion, final HttpServletRequest request) {
         LOGGER.trace("Is validation specification set to enforce [{}] protocol behavior? [{}]. Is assertion issued from a new login? [{}]",
             CasProtocolConstants.PARAMETER_RENEW, BooleanUtils.toStringYesNo(this.renew),
-            BooleanUtils.toStringYesNo(assertion.isFromNewLogin()));
+            BooleanUtils.toStringYesNo(assertion.fromNewLogin()));
         var satisfied = isSatisfiedByInternal(assertion);
         if (!satisfied) {
             LOGGER.warn("[{}] is not internally satisfied by the produced assertion", getClass().getSimpleName());
             return false;
         }
-        satisfied = !this.renew || assertion.isFromNewLogin();
+        satisfied = !this.renew || assertion.fromNewLogin();
         if (!satisfied) {
             LOGGER.warn("[{}] is to enforce the [{}] CAS protocol behavior, yet the assertion is not issued from a new login", getClass().getSimpleName(),
                 CasProtocolConstants.PARAMETER_RENEW);

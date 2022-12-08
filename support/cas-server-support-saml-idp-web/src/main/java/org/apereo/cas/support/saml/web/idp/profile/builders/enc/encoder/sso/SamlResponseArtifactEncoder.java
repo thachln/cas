@@ -15,9 +15,8 @@ import org.opensaml.saml.saml2.binding.encoding.impl.HTTPArtifactEncoder;
 import org.opensaml.saml.saml2.core.RequestAbstractType;
 import org.opensaml.saml.saml2.core.Response;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Objects;
 
 /**
@@ -42,14 +41,15 @@ public class SamlResponseArtifactEncoder extends BaseHttpServletAwareSamlObjectE
     protected void finalizeEncode(final RequestAbstractType authnRequest,
                                   final BaseSAML2MessageEncoder e,
                                   final Response samlResponse,
-                                  final String relayState) throws Exception {
+                                  final String relayState,
+                                  final MessageContext messageContext) {
         val encoder = (HTTPArtifactEncoder) e;
         encoder.setArtifactMap(this.samlArtifactMap);
 
-        val ctx = getEncoderMessageContext(authnRequest, samlResponse, relayState);
+        val ctx = getEncoderMessageContext(authnRequest, samlResponse, relayState, messageContext);
         prepareArtifactContext(samlResponse, ctx);
         encoder.setMessageContext(ctx);
-        super.finalizeEncode(authnRequest, encoder, samlResponse, relayState);
+        super.finalizeEncode(authnRequest, encoder, samlResponse, relayState, messageContext);
     }
 
     @Override

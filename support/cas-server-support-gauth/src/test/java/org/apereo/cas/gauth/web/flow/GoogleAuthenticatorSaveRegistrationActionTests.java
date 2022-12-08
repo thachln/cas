@@ -1,10 +1,11 @@
 package org.apereo.cas.gauth.web.flow;
 
-import org.apereo.cas.authentication.OneTimeTokenAccount;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.gauth.BaseGoogleAuthenticatorTests;
+import org.apereo.cas.gauth.credential.GoogleAuthenticatorAccount;
 import org.apereo.cas.otp.repository.credentials.OneTimeTokenCredentialRepository;
 import org.apereo.cas.otp.web.flow.OneTimeTokenAccountCreateRegistrationAction;
+import org.apereo.cas.otp.web.flow.OneTimeTokenAccountSaveRegistrationAction;
 import org.apereo.cas.web.flow.CasWebflowConstants;
 
 import com.warrenstrange.googleauth.IGoogleAuthenticator;
@@ -31,8 +32,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.webflow.context.ExternalContextHolder.setExternalContext;
-import static org.springframework.webflow.execution.RequestContextHolder.setRequestContext;
+import static org.springframework.webflow.context.ExternalContextHolder.*;
+import static org.springframework.webflow.execution.RequestContextHolder.*;
 
 /**
  * This is {@link GoogleAuthenticatorSaveRegistrationActionTests}.
@@ -46,9 +47,8 @@ import static org.springframework.webflow.execution.RequestContextHolder.setRequ
 })
 @Tag("WebflowMfaActions")
 public class GoogleAuthenticatorSaveRegistrationActionTests {
-
     @Autowired
-    @Qualifier("googleSaveAccountRegistrationAction")
+    @Qualifier(CasWebflowConstants.ACTION_ID_GOOGLE_SAVE_ACCOUNT_REGISTRATION)
     private Action googleSaveAccountRegistrationAction;
 
     @Autowired
@@ -59,7 +59,6 @@ public class GoogleAuthenticatorSaveRegistrationActionTests {
     public void beforeEach() {
         googleAuthenticatorAccountRegistry.deleteAll();
     }
-
     @Test
     public void verifyMultipleRegDisabled(@Autowired final CasConfigurationProperties casProperties) throws Exception {
         val context = new MockRequestContext();
@@ -69,7 +68,7 @@ public class GoogleAuthenticatorSaveRegistrationActionTests {
         setRequestContext(context);
         setExternalContext(context.getExternalContext());
 
-        val acct = OneTimeTokenAccount.builder()
+        val acct = GoogleAuthenticatorAccount.builder()
             .username("casuser")
             .name(UUID.randomUUID().toString())
             .secretKey("secret")
@@ -79,13 +78,13 @@ public class GoogleAuthenticatorSaveRegistrationActionTests {
         googleAuthenticatorAccountRegistry.save(acct);
 
         context.getFlowScope().put(OneTimeTokenAccountCreateRegistrationAction.FLOW_SCOPE_ATTR_ACCOUNT, acct);
-        casProperties.getAuthn().getMfa().getGauth().setMultipleDeviceRegistrationEnabled(false);
+        casProperties.getAuthn().getMfa().getGauth().getCore().setMultipleDeviceRegistrationEnabled(false);
         assertEquals(CasWebflowConstants.TRANSITION_ID_ERROR, googleSaveAccountRegistrationAction.execute(context).getId());
     }
 
     @Test
     public void verifyAccountValidationFails() throws Exception {
-        val acct = OneTimeTokenAccount.builder()
+        val acct = GoogleAuthenticatorAccount.builder()
             .username("casuser")
             .name(UUID.randomUUID().toString())
             .secretKey("secret")
@@ -96,7 +95,7 @@ public class GoogleAuthenticatorSaveRegistrationActionTests {
         val context = new MockRequestContext();
         val request = new MockHttpServletRequest();
         request.addParameter(GoogleAuthenticatorSaveRegistrationAction.REQUEST_PARAMETER_TOKEN, "918273");
-        request.addParameter(GoogleAuthenticatorSaveRegistrationAction.REQUEST_PARAMETER_ACCOUNT_NAME, acct.getName());
+        request.addParameter(OneTimeTokenAccountSaveRegistrationAction.REQUEST_PARAMETER_ACCOUNT_NAME, acct.getName());
         val response = new MockHttpServletResponse();
         context.setExternalContext(new ServletExternalContext(new MockServletContext(), request, response));
         setRequestContext(context);
@@ -108,7 +107,7 @@ public class GoogleAuthenticatorSaveRegistrationActionTests {
 
     @Test
     public void verifyAccountValidationOnly() throws Exception {
-        val acct = OneTimeTokenAccount.builder()
+        val acct = GoogleAuthenticatorAccount.builder()
             .username("casuser")
             .name(UUID.randomUUID().toString())
             .secretKey("secret")
@@ -119,8 +118,8 @@ public class GoogleAuthenticatorSaveRegistrationActionTests {
         val context = new MockRequestContext();
         val request = new MockHttpServletRequest();
         request.setParameter(GoogleAuthenticatorSaveRegistrationAction.REQUEST_PARAMETER_TOKEN, "123456");
-        request.addParameter(GoogleAuthenticatorSaveRegistrationAction.REQUEST_PARAMETER_ACCOUNT_NAME, acct.getName());
-        request.addParameter(GoogleAuthenticatorSaveRegistrationAction.REQUEST_PARAMETER_VALIDATE, "true");
+        request.addParameter(OneTimeTokenAccountSaveRegistrationAction.REQUEST_PARAMETER_ACCOUNT_NAME, acct.getName());
+        request.addParameter(OneTimeTokenAccountSaveRegistrationAction.REQUEST_PARAMETER_VALIDATE, "true");
         val response = new MockHttpServletResponse();
         context.setExternalContext(new ServletExternalContext(new MockServletContext(), request, response));
         setRequestContext(context);
@@ -139,7 +138,7 @@ public class GoogleAuthenticatorSaveRegistrationActionTests {
         assertEquals(CasWebflowConstants.TRANSITION_ID_SUCCESS, googleSaveAccountRegistrationAction.execute(context).getId());
     }
 
-    @TestConfiguration("GoogleAuthenticatorSaveRegistrationActionTests")
+    @TestConfiguration(value = "GoogleAuthenticatorSaveRegistrationActionTests", proxyBeanMethods = false)
     public static class GoogleAuthenticatorSaveRegistrationActionTestConfiguration {
         @Bean
         public IGoogleAuthenticator googleAuthenticatorInstance() {

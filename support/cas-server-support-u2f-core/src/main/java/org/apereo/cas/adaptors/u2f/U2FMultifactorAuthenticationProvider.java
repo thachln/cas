@@ -1,10 +1,12 @@
 package org.apereo.cas.adaptors.u2f;
 
 import org.apereo.cas.authentication.AbstractMultifactorAuthenticationProvider;
-import org.apereo.cas.configuration.model.support.mfa.u2f.U2FMultifactorProperties;
+import org.apereo.cas.configuration.model.support.mfa.u2f.U2FMultifactorAuthenticationProperties;
 
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+
+import java.io.Serial;
 
 /**
  * This is {@link U2FMultifactorAuthenticationProvider}.
@@ -15,11 +17,12 @@ import org.apache.commons.lang3.StringUtils;
 @NoArgsConstructor
 public class U2FMultifactorAuthenticationProvider extends AbstractMultifactorAuthenticationProvider {
 
+    @Serial
     private static final long serialVersionUID = 157455070794156717L;
 
     @Override
     public String getId() {
-        return StringUtils.defaultIfBlank(super.getId(), U2FMultifactorProperties.DEFAULT_IDENTIFIER);
+        return StringUtils.defaultIfBlank(super.getId(), U2FMultifactorAuthenticationProperties.DEFAULT_IDENTIFIER);
     }
 
     @Override

@@ -21,8 +21,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 import javax.sql.DataSource;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,15 +37,15 @@ import static org.junit.jupiter.api.Assertions.*;
     RefreshAutoConfiguration.class,
     CasEclipseLinkJpaConfiguration.class,
     CasCoreUtilConfiguration.class
-}, properties = "cas.jdbc.show-sql=true")
+}, properties = "cas.jdbc.show-sql=false")
 @Tag("JDBC")
-@EnableTransactionManagement(proxyTargetClass = true)
+@EnableTransactionManagement(proxyTargetClass = false)
 public class CasEclipseLinkJpaBeanFactoryTests {
     @Autowired
     private CasConfigurationProperties casProperties;
 
     @Autowired
-    @Qualifier("jpaBeanFactory")
+    @Qualifier(JpaBeanFactory.DEFAULT_BEAN_NAME)
     private JpaBeanFactory jpaBeanFactory;
 
     @SneakyThrows
@@ -54,23 +54,25 @@ public class CasEclipseLinkJpaBeanFactoryTests {
     }
 
     @Test
-    public void verifyOperation() {
+    public void verifyOperation() throws Exception {
         val adapter = jpaBeanFactory.newJpaVendorAdapter();
         assertNotNull(adapter);
 
         val ctx = JpaConfigurationContext.builder()
             .dataSource(dataSource())
-            .packagesToScan(CollectionUtils.wrap(SampleEntity.class.getPackage().getName()))
+            .packagesToScan(CollectionUtils.wrapSet(SampleEntity.class.getPackage().getName()))
             .persistenceUnitName("sampleContext")
             .jpaVendorAdapter(adapter)
             .build();
-        val bean = jpaBeanFactory.newEntityManagerFactoryBean(ctx, casProperties.getAudit().getJdbc());
+        val bean = jpaBeanFactory.newEntityManagerFactoryBean(ctx,
+            casProperties.getAudit().getJdbc()).getObject();
         assertNotNull(bean);
     }
 
     @Entity
     @Getter
     @NoArgsConstructor
+    @SuppressWarnings("UnusedMethod")
     private static class SampleEntity {
         @Id
         private long id;

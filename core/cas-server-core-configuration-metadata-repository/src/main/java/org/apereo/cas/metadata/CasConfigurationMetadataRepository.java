@@ -1,9 +1,9 @@
 package org.apereo.cas.metadata;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.util.function.FunctionUtils;
 
 import lombok.Getter;
-import lombok.SneakyThrows;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.jooq.lambda.Unchecked;
@@ -14,6 +14,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * This is {@link CasConfigurationMetadataRepository}.
@@ -26,6 +28,9 @@ import java.util.Arrays;
 public class CasConfigurationMetadataRepository {
     private final ConfigurationMetadataRepository repository;
 
+    /**
+     * Instantiates a new Cas configuration metadata repository.
+     */
     public CasConfigurationMetadataRepository() {
         this("classpath*:META-INF/spring-configuration-metadata.json");
     }
@@ -37,24 +42,31 @@ public class CasConfigurationMetadataRepository {
      *
      * @param resource the resource
      */
-    @SneakyThrows
     public CasConfigurationMetadataRepository(final String resource) {
-        val resources = new PathMatchingResourcePatternResolver().getResources(resource);
         val builder = CasConfigurationMetadataRepositoryJsonBuilder.create();
-        Arrays.stream(resources).forEach(Unchecked.consumer(r -> {
-            try (val in = r.getInputStream()) {
-                builder.withJsonResource(in);
-            }
-        }));
+        FunctionUtils.doUnchecked(__ -> {
+            val resources = new PathMatchingResourcePatternResolver().getResources(resource);
+            Arrays.stream(resources).forEach(Unchecked.consumer(r -> {
+                try (val in = r.getInputStream()) {
+                    builder.withJsonResource(in);
+                }
+            }));
+        });
         repository = builder.build();
     }
 
-    @SneakyThrows
+    /**
+     * Instantiates a new Cas configuration metadata repository.
+     *
+     * @param resource the resource
+     */
     public CasConfigurationMetadataRepository(final Resource resource) {
         val builder = CasConfigurationMetadataRepositoryJsonBuilder.create();
-        try (val in = resource.getInputStream()) {
-            builder.withJsonResource(in);
-        }
+        FunctionUtils.doUnchecked(__ -> {
+            try (val in = resource.getInputStream()) {
+                builder.withJsonResource(in);
+            }
+        });
         repository = builder.build();
     }
 
@@ -75,9 +87,23 @@ public class CasConfigurationMetadataRepository {
      * Is cas property ?.
      *
      * @param prop the prop
-     * @return true/false
+     * @return true /false
      */
     public static boolean isCasProperty(final ConfigurationMetadataProperty prop) {
         return prop.getName().startsWith(CasConfigurationProperties.PREFIX.concat("."));
+    }
+
+    /**
+     * Gets properties by class type.
+     *
+     * @param clazz the clazz
+     * @return the properties by class type
+     */
+    public Set<ConfigurationMetadataProperty> getPropertiesWithType(final Class clazz) {
+        return repository.getAllProperties().values()
+            .stream()
+            .filter(prop -> StringUtils.isNotBlank(prop.getType()))
+            .filter(prop -> prop.getType().contains(clazz.getName()))
+            .collect(Collectors.toSet());
     }
 }

@@ -13,7 +13,7 @@ import org.apereo.cas.token.JwtBuilder;
 public class UmaAuthorizationApiTokenAuthenticator extends BaseUmaTokenAuthenticator {
 
     public UmaAuthorizationApiTokenAuthenticator(final TicketRegistry ticketRegistry,
-                                                 final JwtBuilder accessTokenJwtBuilder) {
+        final JwtBuilder accessTokenJwtBuilder) {
         super(ticketRegistry, accessTokenJwtBuilder);
     }
 

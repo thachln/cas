@@ -22,10 +22,9 @@ import org.springframework.boot.autoconfigure.thymeleaf.ThymeleafProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.thymeleaf.spring5.SpringTemplateEngine;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -64,7 +63,7 @@ public class ProxyControllerTests extends AbstractCentralAuthenticationServiceTe
     }
 
     @Test
-    public void verifyExistingPGT() {
+    public void verifyExistingPGT() throws Exception {
         val ticket = new ProxyGrantingTicketImpl(
             WebUtils.PARAMETER_TICKET_GRANTING_TICKET_ID, CoreAuthenticationTestUtils.getAuthentication(),
             NeverExpiresExpirationPolicy.INSTANCE);
@@ -79,7 +78,7 @@ public class ProxyControllerTests extends AbstractCentralAuthenticationServiceTe
     }
 
     @Test
-    public void verifyNotAuthorizedPGT() {
+    public void verifyNotAuthorizedPGT() throws Exception {
         val ticket = new ProxyGrantingTicketImpl(WebUtils.PARAMETER_TICKET_GRANTING_TICKET_ID,
             CoreAuthenticationTestUtils.getAuthentication(),
             NeverExpiresExpirationPolicy.INSTANCE);
@@ -92,8 +91,7 @@ public class ProxyControllerTests extends AbstractCentralAuthenticationServiceTe
         assertFalse(map.containsKey(CasProtocolConstants.PARAMETER_TICKET));
     }
 
-    @TestConfiguration("ProxyTestConfiguration")
-    @Lazy(false)
+    @TestConfiguration(value = "ProxyTestConfiguration", proxyBeanMethods = false)
     public static class ProxyTestConfiguration {
         @Bean
         public SpringTemplateEngine springTemplateEngine() {

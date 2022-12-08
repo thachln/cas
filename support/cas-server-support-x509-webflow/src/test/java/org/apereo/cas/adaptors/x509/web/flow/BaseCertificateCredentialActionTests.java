@@ -1,6 +1,5 @@
 package org.apereo.cas.adaptors.x509.web.flow;
 
-import org.apereo.cas.AbstractCentralAuthenticationServiceTests;
 import org.apereo.cas.adaptors.x509.authentication.CasX509Certificate;
 import org.apereo.cas.adaptors.x509.config.X509AuthenticationConfiguration;
 import org.apereo.cas.adaptors.x509.config.X509CertificateExtractorConfiguration;
@@ -30,15 +29,16 @@ import org.apereo.cas.config.support.CasWebApplicationServiceFactoryConfiguratio
 import org.apereo.cas.logout.config.CasCoreLogoutConfiguration;
 import org.apereo.cas.validation.config.CasCoreValidationConfiguration;
 import org.apereo.cas.web.config.CasCookieConfiguration;
+import org.apereo.cas.web.flow.CasWebflowConstants;
 import org.apereo.cas.web.flow.config.CasCoreWebflowConfiguration;
 import org.apereo.cas.web.flow.config.CasMultifactorAuthenticationWebflowConfiguration;
 import org.apereo.cas.web.flow.config.CasWebflowContextConfiguration;
 import org.apereo.cas.web.flow.config.X509AuthenticationWebflowConfiguration;
 
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.autoconfigure.RefreshAutoConfiguration;
 import org.springframework.webflow.execution.Action;
@@ -52,9 +52,9 @@ import org.springframework.webflow.execution.Action;
 @SpringBootTest(classes = {
     AopAutoConfiguration.class,
     RefreshAutoConfiguration.class,
+    WebMvcAutoConfiguration.class,
     CasCoreServicesConfiguration.class,
     CasAuthenticationEventExecutionPlanTestConfiguration.class,
-    AbstractCentralAuthenticationServiceTests.CasTestConfiguration.class,
     CasCoreServicesAuthenticationConfiguration.class,
     CasWebApplicationServiceFactoryConfiguration.class,
     CasDefaultServiceTicketIdGeneratorsConfiguration.class,
@@ -105,6 +105,6 @@ public abstract class BaseCertificateCredentialActionTests {
     public static final CasX509Certificate VALID_CERTIFICATE = new CasX509Certificate(true);
 
     @Autowired
-    @Qualifier("x509Check")
-    protected ObjectProvider<Action> action;
+    @Qualifier(CasWebflowConstants.ACTION_ID_X509_CHECK)
+    protected Action action;
 }

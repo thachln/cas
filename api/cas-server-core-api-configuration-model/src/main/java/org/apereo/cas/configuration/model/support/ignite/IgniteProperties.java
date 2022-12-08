@@ -1,6 +1,7 @@
 package org.apereo.cas.configuration.model.support.ignite;
 
 import org.apereo.cas.configuration.model.core.util.EncryptionRandomizedSigningJwtCryptographyProperties;
+import org.apereo.cas.configuration.support.DurationCapable;
 import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
@@ -9,9 +10,9 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -26,6 +27,7 @@ import java.util.stream.Stream;
 @Accessors(chain = true)
 public class IgniteProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = -5259465262649559156L;
 
     /**
@@ -51,7 +53,7 @@ public class IgniteProperties implements Serializable {
      * </ul>
      */
     @RequiredProperty
-    private List<String> igniteAddress = Stream.of("localhost:47500").collect(Collectors.toList());
+    private List<String> igniteAddress = Stream.of("localhost:47500").toList();
 
     /**
      * Settings related to tickets cache.
@@ -102,6 +104,7 @@ public class IgniteProperties implements Serializable {
      * Sets timeout for receiving acknowledgement for sent message.
      * If acknowledgement is not received within this timeout, sending is considered as failed and SPI tries to repeat message sending.
      */
+    @DurationCapable
     private String ackTimeout = "PT2S";
 
     /**
@@ -109,6 +112,7 @@ public class IgniteProperties implements Serializable {
      * If non-shared IP finder is used and node fails to connect to any address from IP finder,
      * node keeps trying to join within this timeout. If all addresses are still unresponsive, exception is thrown and node startup fails.
      */
+    @DurationCapable
     private String joinTimeout = "PT1S";
 
     /**
@@ -127,12 +131,14 @@ public class IgniteProperties implements Serializable {
     /**
      * Sets maximum network timeout to use for network operations.
      */
+    @DurationCapable
     private String networkTimeout = "PT5S";
 
     /**
      * Sets socket operations timeout. This timeout is used to limit connection time and write-to-socket time.
      * Note that when running Ignite on Amazon EC2, socket timeout must be set to a value significantly greater than the default (e.g. to 30000).
      */
+    @DurationCapable
     private String socketTimeout = "PT5S";
 
     /**
@@ -188,6 +194,7 @@ public class IgniteProperties implements Serializable {
     @RequiresModule(name = "cas-server-support-ignite-ticket-registry")
     public static class TicketsCache implements Serializable {
 
+        @Serial
         private static final long serialVersionUID = 4715167757542984471L;
 
         /**

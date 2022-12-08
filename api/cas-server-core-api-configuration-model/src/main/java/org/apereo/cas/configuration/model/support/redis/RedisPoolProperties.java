@@ -1,11 +1,14 @@
 package org.apereo.cas.configuration.model.support.redis;
 
+import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -18,8 +21,10 @@ import java.io.Serializable;
 @Setter
 @Accessors(chain = true)
 @RequiresModule(name = "cas-server-support-redis-core")
+@JsonFilter("RedisPoolProperties")
 public class RedisPoolProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 8534823157764550894L;
 
     /**
@@ -129,5 +134,6 @@ public class RedisPoolProperties implements Serializable {
     /**
      * Enable the pooling configuration.
      */
+    @RequiredProperty
     private boolean enabled;
 }

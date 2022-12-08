@@ -2,6 +2,7 @@ package org.apereo.cas.services;
 
 import org.apereo.cas.authentication.AuthenticationPolicy;
 import org.apereo.cas.authentication.policy.RestfulAuthenticationPolicy;
+import org.apereo.cas.configuration.model.core.authentication.RestAuthenticationPolicyProperties;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -10,6 +11,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.Accessors;
+import lombok.val;
+
+import java.io.Serial;
 
 /**
  * This is {@link RestfulRegisteredServiceAuthenticationPolicyCriteria}.
@@ -25,6 +29,7 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class RestfulRegisteredServiceAuthenticationPolicyCriteria implements RegisteredServiceAuthenticationPolicyCriteria {
+    @Serial
     private static final long serialVersionUID = -2915826778096374574L;
 
     private String url;
@@ -35,6 +40,10 @@ public class RestfulRegisteredServiceAuthenticationPolicyCriteria implements Reg
 
     @Override
     public AuthenticationPolicy toAuthenticationPolicy(final RegisteredService registeredService) {
-        return new RestfulAuthenticationPolicy(this.url, this.basicAuthUsername, this.basicAuthPassword);
+        val props = new RestAuthenticationPolicyProperties();
+        props.setUrl(url);
+        props.setBasicAuthUsername(basicAuthUsername);
+        props.setBasicAuthPassword(basicAuthPassword);
+        return new RestfulAuthenticationPolicy(props);
     }
 }

@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.io.Serial;
+
 /**
  * This is {@link TokenCredential} that represents the user credentials in form of an encrypted token.
  *
@@ -18,16 +20,11 @@ import lombok.ToString;
 @Setter
 public class TokenCredential extends BasicIdentifiableCredential {
 
+    @Serial
     private static final long serialVersionUID = 2749515041385101770L;
 
     private Service service;
 
-    /**
-     * Instantiates a new Token credential.
-     *
-     * @param tokenId the token
-     * @param service the service
-     */
     public TokenCredential(final String tokenId, final Service service) {
         super(tokenId);
         this.service = service;

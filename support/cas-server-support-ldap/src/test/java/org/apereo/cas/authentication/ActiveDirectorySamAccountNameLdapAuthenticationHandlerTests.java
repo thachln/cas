@@ -1,6 +1,6 @@
 package org.apereo.cas.authentication;
 
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import org.junit.jupiter.api.Tag;
 import org.springframework.test.context.TestPropertySource;
@@ -28,11 +28,12 @@ import org.springframework.test.context.TestPropertySource;
     "cas.authn.ldap[0].min-pool-size=0",
     "cas.authn.ldap[0].trust-store=" + BaseActiveDirectoryLdapAuthenticationHandlerTests.AD_TRUST_STORE,
     "cas.authn.ldap[0].trust-store-type=JKS",
+    "cas.authn.ldap[0].trust-manager=ANY",
     "cas.authn.ldap[0].trust-store-password=changeit",
-    "cas.authn.ldap[0].hostname-verifier=-default"
+    "cas.authn.ldap[0].hostname-verifier=default"
 })
-@EnabledIfPortOpen(port = 10390)
-@Tag("Ldap")
+@EnabledIfListeningOnPort(port = 10390)
+@Tag("ActiveDirectory")
 public class ActiveDirectorySamAccountNameLdapAuthenticationHandlerTests extends BaseActiveDirectoryLdapAuthenticationHandlerTests {
 
     /**

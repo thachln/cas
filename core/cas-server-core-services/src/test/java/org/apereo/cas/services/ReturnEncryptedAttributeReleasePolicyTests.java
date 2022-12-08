@@ -2,6 +2,7 @@ package org.apereo.cas.services;
 
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
 import org.apereo.cas.util.CollectionUtils;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.val;
@@ -27,7 +28,8 @@ import static org.mockito.Mockito.*;
 public class ReturnEncryptedAttributeReleasePolicyTests {
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "EncryptingAttributeReleasePolicyTests.json");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
     @Test
     public void verifySerialization() throws IOException {
@@ -44,14 +46,18 @@ public class ReturnEncryptedAttributeReleasePolicyTests {
     public void verifyNoPublicKey() {
         val policy = new ReturnEncryptedAttributeReleasePolicy(CollectionUtils.wrapList("cn"));
         val registeredService = CoreAuthenticationTestUtils.getRegisteredService();
-        var results = policy.getAttributes(CoreAuthenticationTestUtils.getPrincipal("casuser"),
-            CoreAuthenticationTestUtils.getService(), registeredService);
+
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(registeredService)
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(CoreAuthenticationTestUtils.getPrincipal("casuser"))
+            .build();
+        var results = policy.getAttributes(context);
         assertTrue(results.isEmpty());
 
         val servicePublicKey = new RegisteredServicePublicKeyImpl();
         when(registeredService.getPublicKey()).thenReturn(servicePublicKey);
-        results = policy.getAttributes(CoreAuthenticationTestUtils.getPrincipal("casuser"),
-            CoreAuthenticationTestUtils.getService(), registeredService);
+        results = policy.getAttributes(context);
         assertTrue(results.isEmpty());
     }
 
@@ -63,8 +69,12 @@ public class ReturnEncryptedAttributeReleasePolicyTests {
         when(servicePublicKey.getAlgorithm()).thenReturn("BAD");
         when(servicePublicKey.createInstance()).thenReturn(mock(PublicKey.class));
         when(registeredService.getPublicKey()).thenReturn(servicePublicKey);
-        val results = policy.getAttributes(CoreAuthenticationTestUtils.getPrincipal("casuser"),
-            CoreAuthenticationTestUtils.getService(), registeredService);
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(registeredService)
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(CoreAuthenticationTestUtils.getPrincipal("casuser"))
+            .build();
+        val results = policy.getAttributes(context);
         assertTrue(results.isEmpty());
     }
 
@@ -74,9 +84,12 @@ public class ReturnEncryptedAttributeReleasePolicyTests {
         val registeredService = CoreAuthenticationTestUtils.getRegisteredService();
         val servicePublicKey = new RegisteredServicePublicKeyImpl("classpath:keys/RSA1024Public.key", "RSA");
         when(registeredService.getPublicKey()).thenReturn(servicePublicKey);
-        val results = policy.getAttributes(
-            CoreAuthenticationTestUtils.getPrincipal("casuser"),
-            CoreAuthenticationTestUtils.getService(), registeredService);
+        val context = RegisteredServiceAttributeReleasePolicyContext.builder()
+            .registeredService(registeredService)
+            .service(CoreAuthenticationTestUtils.getService())
+            .principal(CoreAuthenticationTestUtils.getPrincipal("casuser"))
+            .build();
+        val results = policy.getAttributes(context);
         assertEquals(policy.getAllowedAttributes().size(), results.size());
     }
 }

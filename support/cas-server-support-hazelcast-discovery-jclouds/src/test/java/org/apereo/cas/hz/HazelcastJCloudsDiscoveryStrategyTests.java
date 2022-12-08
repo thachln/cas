@@ -5,6 +5,7 @@ import org.apereo.cas.configuration.model.support.hazelcast.HazelcastClusterProp
 import com.hazelcast.config.Config;
 import com.hazelcast.config.JoinConfig;
 import com.hazelcast.config.NetworkConfig;
+import com.hazelcast.jclouds.JCloudsDiscoveryStrategyFactory;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -42,5 +43,18 @@ public class HazelcastJCloudsDiscoveryStrategyTests {
         val hz = new HazelcastJCloudsDiscoveryStrategy();
         val result = hz.get(cluster, mock(JoinConfig.class), mock(Config.class), mock(NetworkConfig.class));
         assertNotNull(result);
+        assertTrue(result.isPresent());
+
+        val properties = result.get().getProperties();
+        for (val propertyDefinition : new JCloudsDiscoveryStrategyFactory().getConfigurationProperties()) {
+            val value = properties.get(propertyDefinition.key());
+            if (value == null) {
+                assertTrue(propertyDefinition.optional(),
+                    () -> "Property " + propertyDefinition.key() + " is not optional and should be given");
+            } else {
+                assertDoesNotThrow(() -> propertyDefinition.typeConverter().convert(value),
+                    () -> "Property " + propertyDefinition.key() + " has invalid value '" + value + '\'');
+            }
+        }
     }
 }

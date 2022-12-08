@@ -4,6 +4,8 @@ title: CAS - Security Guide
 category: Planning
 ---
 
+{% include variables.html %}
+
 # Security Guide
 
 CAS is security software that provides secure Web-based single sign-on to Web-based applications. Single sign-on
@@ -15,16 +17,21 @@ be considered to achieve suitable security.
 <div class="alert alert-info"><strong>Reporting Issues</strong><p>The security team asks that you please <strong>DO NOT</strong> create publicly-viewable issues or posts to discuss what you may consider a security vulnerability. To report issues properly and learn about how responses are produced, please <a href="/cas/developer/Sec-Vuln-Response.html">see this guide</a>.</p></div>
 
 ## Announcements
-
-- [July 24 2020 Vulnerability Disclosure](https://apereo.github.io/2020/07/24/credvuln/)
-- [Feb 8 2020 Vulnerability Disclosure](https://apereo.github.io/2020/02/08/webflowcrypto/)
-- [Dec 20 2019 Vulnerability Disclosure](https://apereo.github.io/2019/12/20/surrogatevuln/)
-- [Nov 21 2019 Vulnerability Disclosure](https://apereo.github.io/2019/11/24/smfavuln/)
-- [Sep 27 2019 Vulnerability Disclosure](https://apereo.github.io/2019/09/27/numvulndisc/)
-- [Sep 26 2018 Vulnerability Disclosure](https://apereo.github.io/2018/09/26/mfavulndisc/)
-- [Mar 6 2017 Vulnerability Disclosure](https://apereo.github.io/2017/03/06/moncfgsecvulndisc/)
-- [Oct 24 2016 Vulnerability Disclosure](https://apereo.github.io/2016/10/24/servlvulndisc/)
-- [Apr 8 2016 Vulnerability Disclosure](https://apereo.github.io/2016/04/08/commonsvulndisc/)
+     
+- [March 6 2022](https://apereo.github.io/2022/03/06/oidc-vuln/)
+- [December 11 2021](https://apereo.github.io/2021/12/11/log4j-vuln/)
+- [October 18 2021](https://apereo.github.io/2021/10/18/restvuln/)
+- [Feb 13 2021](https://apereo.github.io/2021/02/13/gauthvuln/)
+- [Oct 14 2020](https://apereo.github.io/2020/10/14/gauthvuln/)
+- [July 24 2020](https://apereo.github.io/2020/07/24/credvuln/)
+- [Feb 8 2020](https://apereo.github.io/2020/02/08/webflowcrypto/)
+- [Dec 20 2019](https://apereo.github.io/2019/12/20/surrogatevuln/)
+- [Nov 21 2019](https://apereo.github.io/2019/11/24/smfavuln/)
+- [Sep 27 2019](https://apereo.github.io/2019/09/27/numvulndisc/)
+- [Sep 26 2018](https://apereo.github.io/2018/09/26/mfavulndisc/)
+- [Mar 6 2017](https://apereo.github.io/2017/03/06/moncfgsecvulndisc/)
+- [Oct 24 2016](https://apereo.github.io/2016/10/24/servlvulndisc/)
+- [Apr 8 2016](https://apereo.github.io/2016/04/08/commonsvulndisc/)
 
 ## System Security Considerations
 
@@ -47,8 +54,7 @@ from the CAS server to the application must be done using HTTPS:
 - when the generated service ticket is sent back to the application on the "service" url
 - when a proxy callback url is called.
 
-To see the relevant list of CAS properties and tune this behavior, please [review this guide](../configuration/Configuration-Properties.html#http-client).
-
+{% include_cached casproperties.html properties="cas.http-client." %}
 
 ### Connections to Dependent Systems
 
@@ -61,9 +67,6 @@ Client certification validation can be another good solution for LDAP to bring s
 As stated previously, connections to other systems must be secured. But if the CAS server is deployed on several nodes,
 the same applies to the CAS server itself. If a cache-based ticket registry runs without any security issue on a single
 CAS server, synchronization can become a security problem when using multiple nodes if the network is not protected.
-
-Any disk storage is also vulnerable if not properly secured. EhCache overflow to disk may be turned off to increase
-protection whereas advanced encryption data mechanism should be used for the database disk storage.
 
 ## Deployment-Driven Security Features
 
@@ -81,7 +84,7 @@ Forced authentication is suitable for services where higher security is desired 
 authentication is configured on a per-service basis, but the [service management](#service-management) facility
 provides some support for implementing forced authentication as a matter of centralized security policy.
 Forced authentication may be combined with 
-[multi-factor authentication](../configuration/Configuration-Properties.html#multifactor-authentication) features to
+[multi-factor authentication](../mfa/Configuring-Multifactor-Authentication.html) features to
 implement arbitrary service-specific access control policy.
 
 
@@ -154,7 +157,7 @@ open for all applications may create an opportunity for security attacks.
 A ticket-granting cookie is an HTTP cookie set by CAS upon the establishment of a single sign-on session.
 The cookie value is by default encrypted and signed via settings defined in CAS properties.
 While sample data is provided for initial deployments, these keys **MUST** be regenerated per your specific
-environment. Please [see this guide](../installation/Configuring-SSO.html) for more info.
+environment. Please [see this guide](../authentication/Configuring-SSO.html) for more info.
 
 ### Password Management Secure Links
 
@@ -170,20 +173,14 @@ Protocol tickets that are issued by CAS and shared with other applications such 
 
 <div class="alert alert-warning"><strong>Pay Attention</strong><p>Encrypting and signing a generated ticket will, depending on the encryption method and algorithm used, increase the generated ticket length. Not all CAS clients are equipped to handle lengthy ticket strings and may get upset with you. Evaluate existing integrations before turning this on and consider whether this feature is truly needed for your deployment.</p></div>
 
-To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#protocol-ticket-security).
+
+{% include_cached {{ version }}/signing-encryption-configuration.md configKey="cas.ticket" signingKeySize="512" encryptionKeySize="256" encryptionAlg="AES_128_CBC_HMAC_SHA_256" %}
 
 
 ### Ticket Registry Encryption
 
 Secure ticket replication as it regards clustered CAS deployments may be required to ensure generated tickets by CAS are not tampered with in transit. CAS covers this issue by allowing tickets to be natively encrypted and signed. While sample data is provided for initial deployments, these keys **MUST** be regenerated per your specific environment.
 Please [see this guide](../installation/Ticket-Registry-Replication-Encryption.html) for more info.
-
-### Administrative Pages Security
-
-CAS provides a large variety of web interfaces that are aimed at system administrators and deployers.
-These screens along with a number of REST endpoints allow a CAS deployer to manage and reconfigure CAS behavior without resorting to
-native command-line interfaces. Needless to say, these endpoints and screens must be secured and allowed proper access only to
-authorized parties. Please [see this guide](../monitoring/Monitoring-Statistics.html) for more info.
 
 ### Ticket Expiration Policies
 
@@ -220,8 +217,7 @@ CAS supports a policy-driven feature to limit successive failed authentication a
 and denial of service attacks. The feature is beneficial in environments where back-end authentication stores lack
 equivalent features. In cases where this support is available in underlying systems, we encourage using it instead
 of CAS features; the justification is that enabling support in underlying systems provides the feature in all dependent
-systems including CAS. See the
-[login throttling configuration](../installation/Configuring-Authentication-Components.html#login-throttling)
+systems including CAS. See the [login throttling configuration](../authentication/Configuring-Authentication-Throttling.html) 
 section for further information.
 
 ### Credential Encryption
@@ -230,7 +226,7 @@ To learn how sensitive CAS settings can be secured via encryption, [please revie
 
 ### CAS Security Filter
 
-The CAS project provides a number of a blunt [generic security filters][cas-sec-filter] suitable for patching-in-place Java
+The CAS project provides a number of a blunt security filters suitable for patching-in-place Java
 CAS server and Java CAS client deployments vulnerable to certain request parameter based bad-CAS-protocol-input attacks.
 The filters are configured to sanitize authentication request parameters and reject the request if it is not compliant with
 the CAS protocol in the event that for instance, a parameter is repeated multiple times, includes multiple values, contains unacceptable values, etc.
@@ -245,14 +241,15 @@ One application of CORS is when a resource makes a cross-origin HTTP request whe
 different domain than the one which the first resource itself serves. This should help more with CAS-enabled
 applications are accessed via XHR/Ajax requests.
 
-To see the relevant list of CAS properties and tune this behavior, please [review this guide](../configuration/Configuration-Properties.html#http-web-requests).
+{% include_cached casproperties.html properties="cas.http-web-request" %}
 
 #### Security Response Headers
 
 As part of the CAS Security Filter, the CAS project automatically provides the necessary configuration to
 insert HTTP Security headers into the web response to prevent against HSTS, XSS, X-FRAME and other attacks.
 These settings are presently on by default.
-To see the relevant list of CAS properties and tune this behavior, please [review this guide](../configuration/Configuration-Properties.html#http-web-requests).
+
+{% include_cached casproperties.html properties="cas.http-web-request" %}
 
 To review and learn more about these options, please visit [this guide][cas-sec-filter].
 
@@ -281,7 +278,7 @@ configured for forced authentication, authentication would be required for servi
 long-term session.
 
 Long term authentication support must be explicitly enabled through
-[configuration and UI customization](../installation/Configuring-Authentication-Components.html#long-term-authentication)
+[configuration and UI customization](../authentication/Configuring-LongTerm-Authentication.html)
 during the installation process. Thus deployers choose to offer long-term authentication support, and when available
 users may elect to use it via selection on the CAS login form.
 
@@ -296,5 +293,3 @@ some security benefit to awareness of this process, and CAS supports a _warn_ fl
 on the CAS login screen to provide an interstitial notification page that is displayed prior to accessing a service.
 By default the notification page offers the user an option to proceed with CAS authentication or abort by
 navigating away from the target service.
-
-[cas-sec-filter]: https://github.com/apereo/cas-server-security-filter

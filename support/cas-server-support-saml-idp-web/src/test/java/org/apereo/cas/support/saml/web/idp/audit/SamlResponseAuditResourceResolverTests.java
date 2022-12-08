@@ -23,14 +23,14 @@ import static org.mockito.Mockito.*;
  * @author Misagh Moayyed
  * @since 5.3.0
  */
-@Tag("SAML")
+@Tag("SAML2")
 public class SamlResponseAuditResourceResolverTests {
     @Test
     public void verifyActionUnknown() {
         val r = new SamlResponseAuditResourceResolver();
         val result = r.resolveFrom(mock(JoinPoint.class), new Object());
         assertNotNull(result);
-        assertTrue(result.length == 0);
+        assertEquals(0, result.length);
     }
 
     @Test
@@ -43,7 +43,7 @@ public class SamlResponseAuditResourceResolverTests {
         when(envelope.getBody()).thenReturn(body);
         val result = r.resolveFrom(mock(JoinPoint.class), envelope);
         assertNotNull(result);
-        assertTrue(result.length == 0);
+        assertEquals(0, result.length);
     }
 
     @Test
@@ -54,10 +54,14 @@ public class SamlResponseAuditResourceResolverTests {
         when(issuer.getValue()).thenReturn("https://idp.example.org");
         when(response.getIssuer()).thenReturn(issuer);
         when(response.getDestination()).thenReturn("https://sp.example.org");
+        when(response.getID()).thenReturn("_123456789");
 
         var result = r.resolveFrom(mock(JoinPoint.class), response);
         assertNotNull(result);
         assertTrue(result.length > 0);
+        assertTrue(result[0].contains("https://idp.example.org"));
+        assertTrue(result[0].contains("https://sp.example.org"));
+        assertTrue(result[0].contains("_123456789"));
 
         val envelope = mock(Envelope.class);
         val body = mock(Body.class);

@@ -1,5 +1,7 @@
 package org.apereo.cas.token;
 
+import org.apereo.cas.authentication.principal.WebApplicationServiceFactory;
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.services.RegisteredServiceAccessStrategyUtils;
 import org.apereo.cas.services.RegisteredServiceCipherExecutor;
@@ -7,26 +9,29 @@ import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.LoggingUtils;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.function.FunctionUtils;
 
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.PlainHeader;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.PlainJWT;
+import com.nimbusds.jwt.SignedJWT;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.hjson.JsonValue;
-import org.hjson.Stringify;
 
 import java.io.Serializable;
+import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -39,15 +44,18 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Getter
 public class JwtBuilder {
-    private static final int MAP_SIZE = 8;
-
-    private final String issuer;
-
     private final CipherExecutor<Serializable, String> defaultTokenCipherExecutor;
 
     private final ServicesManager servicesManager;
 
     private final RegisteredServiceCipherExecutor registeredServiceCipherExecutor;
+
+    private final CasConfigurationProperties casProperties;
+
+    public JwtBuilder(final CipherExecutor<Serializable, String> cipherExecutor,
+                      final ServicesManager servicesManager, final CasConfigurationProperties properties) {
+        this(cipherExecutor, servicesManager, RegisteredServiceCipherExecutor.noOp(), properties);
+    }
 
     /**
      * Parse jwt.
@@ -91,28 +99,34 @@ public class JwtBuilder {
      * @param jwtJson the jwt json
      * @return the string
      */
-    @SneakyThrows
     public JWTClaimsSet unpack(final Optional<RegisteredService> service, final String jwtJson) {
-        service.ifPresent(svc -> {
-            LOGGER.trace("Located service [{}] in service registry", svc);
-            RegisteredServiceAccessStrategyUtils.ensureServiceAccessIsAllowed(svc);
-        });
+        return FunctionUtils.doUnchecked(() -> {
+            service.ifPresent(svc -> {
+                LOGGER.trace("Located service [{}] in service registry", svc);
+                RegisteredServiceAccessStrategyUtils.ensureServiceAccessIsAllowed(svc);
+            });
 
-        if (service.isPresent()) {
-            val registeredService = service.get();
-            LOGGER.trace("Locating service specific signing and encryption keys for [{}] in service registry", registeredService);
-            if (registeredServiceCipherExecutor.supports(registeredService)) {
-                LOGGER.trace("Decoding JWT based on keys provided by service [{}]", registeredService.getServiceId());
-                return parse(registeredServiceCipherExecutor.decode(jwtJson, Optional.of(registeredService)));
+            val jwt = JWTParser.parse(jwtJson);
+            if (jwt instanceof SignedJWT) {
+                if (service.isPresent()) {
+                    val registeredService = service.get();
+                    LOGGER.trace("Locating service signing and encryption keys for [{}]", registeredService.getServiceId());
+                    if (registeredServiceCipherExecutor.supports(registeredService)) {
+                        LOGGER.trace("Decoding JWT based on keys provided by service [{}]", registeredService.getServiceId());
+                        return parse(registeredServiceCipherExecutor.decode(jwtJson, Optional.of(registeredService)));
+                    }
+                }
+
+                return FunctionUtils.doIf(defaultTokenCipherExecutor.isEnabled(),
+                    () -> {
+                        LOGGER.trace("Decoding JWT based on default global keys");
+                        return parse(defaultTokenCipherExecutor.decode(jwtJson));
+                    }, () -> {
+                        throw new IllegalArgumentException("Unable to validate JWT signature");
+                    }).get();
             }
-        }
-
-        if (defaultTokenCipherExecutor.isEnabled()) {
-            LOGGER.trace("Decoding JWT based on default global keys");
-            return parse(defaultTokenCipherExecutor.decode(jwtJson));
-        }
-
-        return parse(jwtJson);
+            return parse(jwtJson);
+        });
     }
 
     /**
@@ -123,42 +137,54 @@ public class JwtBuilder {
      */
     public String build(final JwtRequest payload) {
         val serviceAudience = payload.getServiceAudience();
+        Objects.requireNonNull(payload.getIssuer(), "Issuer cannot be undefined");
         val claims = new JWTClaimsSet.Builder()
             .audience(serviceAudience)
-            .issuer(issuer)
+            .issuer(payload.getIssuer())
             .jwtID(payload.getJwtId())
             .issueTime(payload.getIssueDate())
             .subject(payload.getSubject());
 
-        payload.getAttributes().forEach((k, v) -> {
-            if (v.size() == 1) {
-                claims.claim(k, CollectionUtils.firstElement(v).get());
-            } else {
-                claims.claim(k, v);
+        payload.getAttributes().forEach((name, value) -> {
+            var claimValue = value.size() == 1 ? CollectionUtils.firstElement(value).get() : value;
+            if (claimValue instanceof ZonedDateTime) {
+                claimValue = claimValue.toString();
             }
+            claims.claim(name, claimValue);
         });
         claims.expirationTime(payload.getValidUntilDate());
-
         val claimsSet = claims.build();
-        val jwtJson = claimsSet.toJSONObject().toJSONString();
-
-        if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Generated JWT [{}]", JsonValue.readJSON(jwtJson).toString(Stringify.FORMATTED));
-        }
+        
         LOGGER.trace("Locating service [{}] in service registry", serviceAudience);
         val registeredService = payload.getRegisteredService().isEmpty()
             ? locateRegisteredService(serviceAudience)
             : payload.getRegisteredService().get();
+        return build(registeredService, claimsSet);
+    }
+
+    /**
+     * Build JWT.
+     *
+     * @param registeredService the registered service
+     * @param claimsSet         the claims set
+     * @return the string
+     */
+    public String build(final RegisteredService registeredService,
+                        final JWTClaimsSet claimsSet) {
+
         RegisteredServiceAccessStrategyUtils.ensureServiceAccessIsAllowed(registeredService);
 
-        LOGGER.trace("Locating service specific signing and encryption keys for [{}] in service registry", serviceAudience);
+        val jwtJson = claimsSet.toString();
+        LOGGER.debug("Generated JWT [{}]", jwtJson);
+
+        LOGGER.trace("Locating service specific signing and encryption keys for service [{}]", registeredService.getName());
         if (registeredServiceCipherExecutor.supports(registeredService)) {
             LOGGER.trace("Encoding JWT based on keys provided by service [{}]", registeredService.getServiceId());
             return registeredServiceCipherExecutor.encode(jwtJson, Optional.of(registeredService));
         }
 
         if (defaultTokenCipherExecutor.isEnabled()) {
-            LOGGER.trace("Encoding JWT based on default global keys for [{}]", serviceAudience);
+            LOGGER.trace("Encoding JWT based on default global keys for service [{}]", registeredService.getName());
             return defaultTokenCipherExecutor.encode(jwtJson);
         }
         val token = buildPlain(claimsSet, Optional.of(registeredService));
@@ -173,30 +199,34 @@ public class JwtBuilder {
      * @return the registered service
      */
     protected RegisteredService locateRegisteredService(final String serviceAudience) {
-        return this.servicesManager.findServiceBy(serviceAudience);
+        return servicesManager.findServiceBy(new WebApplicationServiceFactory().createService(serviceAudience));
     }
 
     /**
      * The type Jwt request that allows the builder to create JWTs.
      */
-    @Builder
+    @SuperBuilder
     @Getter
+    @ToString
+    @SuppressWarnings("JavaUtilDate")
     public static class JwtRequest {
         private final String jwtId;
 
         private final String serviceAudience;
 
-        private final Date issueDate;
+        @Builder.Default
+        private final Date issueDate = new Date();
 
         private final String subject;
 
         private final Date validUntilDate;
 
+        private final String issuer;
+
         @Builder.Default
-        private final Map<String, List<Object>> attributes = new LinkedHashMap<>(MAP_SIZE);
+        private final Map<String, List<Object>> attributes = new LinkedHashMap<>();
 
         @Builder.Default
         private Optional<RegisteredService> registeredService = Optional.empty();
-
     }
 }

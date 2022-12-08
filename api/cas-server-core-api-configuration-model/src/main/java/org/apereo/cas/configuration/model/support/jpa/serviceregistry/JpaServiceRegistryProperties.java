@@ -1,14 +1,15 @@
 package org.apereo.cas.configuration.model.support.jpa.serviceregistry;
 
 import org.apereo.cas.configuration.model.support.jpa.AbstractJpaProperties;
+import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.Serial;
 
 /**
  * Configuration properties class for JPA service registry.
@@ -20,17 +21,17 @@ import java.util.List;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("JpaServiceRegistryProperties")
 public class JpaServiceRegistryProperties extends AbstractJpaProperties {
 
+    @Serial
     private static final long serialVersionUID = 352435146313504995L;
 
     /**
-     * List of class names, fully qualified, that
-     * should be managed by the JPA persistence unit
-     * in addition to what CAS may discover dynamically
-     * from various extensions at runtime.
+     * Whether managing services via JPA is enabled.
      */
-    private List<String> managedEntities = new ArrayList<>();
+    @RequiredProperty
+    private boolean enabled = true;
 
     public JpaServiceRegistryProperties() {
         super.setUrl("jdbc:hsqldb:mem:cas-service-registry");

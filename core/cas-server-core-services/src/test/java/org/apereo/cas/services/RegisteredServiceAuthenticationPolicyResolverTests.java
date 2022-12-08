@@ -2,7 +2,7 @@ package org.apereo.cas.services;
 
 import org.apereo.cas.authentication.DefaultAuthenticationServiceSelectionPlan;
 import org.apereo.cas.authentication.DefaultAuthenticationServiceSelectionStrategy;
-import org.apereo.cas.authentication.DefaultAuthenticationTransaction;
+import org.apereo.cas.authentication.DefaultAuthenticationTransactionFactory;
 import org.apereo.cas.authentication.policy.AllAuthenticationHandlersSucceededAuthenticationPolicy;
 import org.apereo.cas.authentication.policy.AtLeastOneCredentialValidatedAuthenticationPolicy;
 import org.apereo.cas.authentication.policy.GroovyScriptAuthenticationPolicy;
@@ -19,6 +19,7 @@ import org.springframework.context.support.StaticApplicationContext;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -90,6 +91,7 @@ public class RegisteredServiceAuthenticationPolicyResolverTests {
             .applicationContext(appCtx)
             .environments(new HashSet<>(0))
             .servicesCache(Caffeine.newBuilder().build())
+            .registeredServiceLocators(List.of(new DefaultServicesManagerRegisteredServiceLocator()))
             .build();
         this.servicesManager = new DefaultServicesManager(context);
         this.servicesManager.load();
@@ -100,7 +102,7 @@ public class RegisteredServiceAuthenticationPolicyResolverTests {
         val resolver = new RegisteredServiceAuthenticationPolicyResolver(this.servicesManager,
             new DefaultAuthenticationServiceSelectionPlan(new DefaultAuthenticationServiceSelectionStrategy()));
 
-        val transaction = DefaultAuthenticationTransaction.of(RegisteredServiceTestUtils.getService("serviceid1"),
+        val transaction = new DefaultAuthenticationTransactionFactory().newTransaction(RegisteredServiceTestUtils.getService("serviceid1"),
             RegisteredServiceTestUtils.getCredentialsWithSameUsernameAndPassword("casuser"));
 
         val policies = resolver.resolve(transaction);
@@ -113,7 +115,7 @@ public class RegisteredServiceAuthenticationPolicyResolverTests {
         val resolver = new RegisteredServiceAuthenticationPolicyResolver(this.servicesManager,
             new DefaultAuthenticationServiceSelectionPlan(new DefaultAuthenticationServiceSelectionStrategy()));
 
-        val transaction = DefaultAuthenticationTransaction.of(RegisteredServiceTestUtils.getService("serviceid3"),
+        val transaction = new DefaultAuthenticationTransactionFactory().newTransaction(RegisteredServiceTestUtils.getService("serviceid3"),
             RegisteredServiceTestUtils.getCredentialsWithSameUsernameAndPassword("casuser"));
 
         val policies = resolver.resolve(transaction);
@@ -125,15 +127,17 @@ public class RegisteredServiceAuthenticationPolicyResolverTests {
     public void checkDefaultPolicy() {
         val resolver = new RegisteredServiceAuthenticationPolicyResolver(this.servicesManager,
             new DefaultAuthenticationServiceSelectionPlan(new DefaultAuthenticationServiceSelectionStrategy()));
+        val service = RegisteredServiceTestUtils.getService("serviceid2");
+        val transaction = new DefaultAuthenticationTransactionFactory().newTransaction(
+            service, RegisteredServiceTestUtils.getCredentialsWithSameUsernameAndPassword("casuser"));
 
-        val transaction = DefaultAuthenticationTransaction.of(
-            RegisteredServiceTestUtils.getService("serviceid2"),
-            RegisteredServiceTestUtils.getCredentialsWithSameUsernameAndPassword("casuser"));
-
-        assertTrue(resolver.supports(transaction));
+        assertFalse(resolver.supports(transaction));
         val policies = resolver.resolve(transaction);
-        assertFalse(policies.isEmpty());
-        assertTrue(policies.iterator().next() instanceof AtLeastOneCredentialValidatedAuthenticationPolicy);
+        assertTrue(policies.isEmpty());
+
+        val authPolicy = servicesManager.findServiceBy(service).getAuthenticationPolicy();
+        assertNotNull(authPolicy);
+        assertNull(authPolicy.getCriteria());
     }
 
     @Test
@@ -141,7 +145,7 @@ public class RegisteredServiceAuthenticationPolicyResolverTests {
         val resolver = new RegisteredServiceAuthenticationPolicyResolver(this.servicesManager,
             new DefaultAuthenticationServiceSelectionPlan(new DefaultAuthenticationServiceSelectionStrategy()));
 
-        val transaction = DefaultAuthenticationTransaction.of(RegisteredServiceTestUtils.getService("serviceid4"),
+        val transaction = new DefaultAuthenticationTransactionFactory().newTransaction(RegisteredServiceTestUtils.getService("serviceid4"),
             RegisteredServiceTestUtils.getCredentialsWithSameUsernameAndPassword("casuser"));
 
         val policies = resolver.resolve(transaction);
@@ -154,7 +158,7 @@ public class RegisteredServiceAuthenticationPolicyResolverTests {
         val resolver = new RegisteredServiceAuthenticationPolicyResolver(this.servicesManager,
             new DefaultAuthenticationServiceSelectionPlan(new DefaultAuthenticationServiceSelectionStrategy()));
 
-        val transaction = DefaultAuthenticationTransaction.of(RegisteredServiceTestUtils.getService("serviceid5"),
+        val transaction = new DefaultAuthenticationTransactionFactory().newTransaction(RegisteredServiceTestUtils.getService("serviceid5"),
             RegisteredServiceTestUtils.getCredentialsWithSameUsernameAndPassword("casuser"));
 
         val policies = resolver.resolve(transaction);
@@ -166,7 +170,7 @@ public class RegisteredServiceAuthenticationPolicyResolverTests {
     public void checkDisabledPolicy() {
         val resolver = new RegisteredServiceAuthenticationPolicyResolver(this.servicesManager,
             new DefaultAuthenticationServiceSelectionPlan(new DefaultAuthenticationServiceSelectionStrategy()));
-        val transaction = DefaultAuthenticationTransaction.of(RegisteredServiceTestUtils.getService("not-found-service"),
+        val transaction = new DefaultAuthenticationTransactionFactory().newTransaction(RegisteredServiceTestUtils.getService("not-found-service"),
             RegisteredServiceTestUtils.getCredentialsWithSameUsernameAndPassword("casuser"));
         assertThrows(UnauthorizedSsoServiceException.class, () -> resolver.supports(transaction));
     }
@@ -175,7 +179,7 @@ public class RegisteredServiceAuthenticationPolicyResolverTests {
     public void checkRestPolicy() {
         val resolver = new RegisteredServiceAuthenticationPolicyResolver(this.servicesManager,
             new DefaultAuthenticationServiceSelectionPlan(new DefaultAuthenticationServiceSelectionStrategy()));
-        val transaction = DefaultAuthenticationTransaction.of(RegisteredServiceTestUtils.getService("serviceid6"),
+        val transaction = new DefaultAuthenticationTransactionFactory().newTransaction(RegisteredServiceTestUtils.getService("serviceid6"),
             RegisteredServiceTestUtils.getCredentialsWithSameUsernameAndPassword("casuser"));
         val policies = resolver.resolve(transaction);
         assertEquals(1, policies.size());

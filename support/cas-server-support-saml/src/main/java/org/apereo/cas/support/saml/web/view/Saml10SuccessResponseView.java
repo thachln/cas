@@ -22,7 +22,6 @@ import java.util.Map;
  * Authentication attribute it will look at is the authMethod (if supplied).
  * <p>
  * Note that this class will currently not handle proxy authentication.
- * <p>
  *
  * @author Scott Battaglia
  * @author Marvin S. Addison
@@ -33,24 +32,23 @@ public class Saml10SuccessResponseView extends AbstractSaml10ResponseView {
     public Saml10SuccessResponseView(final ProtocolAttributeEncoder protocolAttributeEncoder,
                                      final ServicesManager servicesManager,
                                      final ArgumentExtractor samlArgumentExtractor,
-                                     final String encoding,
                                      final AuthenticationAttributeReleasePolicy authAttrReleasePolicy,
                                      final AuthenticationServiceSelectionPlan serviceSelectionStrategy,
                                      final CasProtocolAttributesRenderer attributesRenderer,
                                      final SamlResponseBuilder samlResponseBuilder) {
         super(true, protocolAttributeEncoder, servicesManager, samlArgumentExtractor,
-            encoding, authAttrReleasePolicy, serviceSelectionStrategy, attributesRenderer, samlResponseBuilder);
+            authAttrReleasePolicy, serviceSelectionStrategy, attributesRenderer, samlResponseBuilder);
     }
 
     @Override
     protected void prepareResponse(final Response response, final Map<String, Object> model) {
-        val service = getAssertionFrom(model).getService();
+        val service = getAssertionFrom(model).service();
         val authentication = getPrimaryAuthenticationFrom(model);
         val principal = getPrincipal(model);
         val registeredService = this.servicesManager.findServiceBy(service);
         val authnAttributes = getCasProtocolAuthenticationAttributes(model, registeredService);
         val principalAttributes = getPrincipalAttributesAsMultiValuedAttributes(model);
-        this.samlResponseBuilder.prepareSuccessfulResponse(response, service, authentication,
+        samlResponseBuilder.prepareSuccessfulResponse(response, service, authentication,
             principal, authnAttributes, principalAttributes);
     }
 }

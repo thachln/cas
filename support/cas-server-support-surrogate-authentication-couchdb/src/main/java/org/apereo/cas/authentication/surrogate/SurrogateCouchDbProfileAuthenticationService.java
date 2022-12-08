@@ -12,7 +12,6 @@ import lombok.val;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -34,7 +33,7 @@ public class SurrogateCouchDbProfileAuthenticationService extends BaseSurrogateA
     }
 
     @Override
-    protected boolean canAuthenticateAsInternal(final String surrogate, final Principal principal, final Optional<Service> service) {
+    protected boolean canImpersonateInternal(final String surrogate, final Principal principal, final Optional<Service> service) {
         LOGGER.warn("User [{}] attempting surrogate for [{}]", principal.getId(), surrogate);
         val user = couchDb.findByUsername(principal.getId());
         LOGGER.debug("User [{}]", user);
@@ -62,17 +61,17 @@ public class SurrogateCouchDbProfileAuthenticationService extends BaseSurrogateA
     }
 
     @Override
-    public Collection<String> getEligibleAccountsForSurrogateToProxy(final String username) {
+    public Collection<String> getImpersonationAccounts(final String username) {
         LOGGER.debug("Listing eligible accounts for user [{}].", username);
         val user = couchDb.findByUsername(username);
         if (user == null) {
             LOGGER.debug("User [{}] not found for surrogacy.", username);
-            return Collections.EMPTY_LIST;
+            return new ArrayList<>();
         }
         val users = user.getAttribute(surrogatePrincipalsAttribute);
         if (users == null) {
             LOGGER.debug("User [{}] has no surrogate principals entry.", user.getUsername());
-            return Collections.EMPTY_LIST;
+            return new ArrayList<>();
         }
         return CollectionUtils.toCollection(users, ArrayList.class);
     }

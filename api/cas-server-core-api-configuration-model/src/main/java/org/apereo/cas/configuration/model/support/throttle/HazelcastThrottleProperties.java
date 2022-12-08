@@ -3,9 +3,12 @@ package org.apereo.cas.configuration.model.support.throttle;
 import org.apereo.cas.configuration.model.support.hazelcast.BaseHazelcastProperties;
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+
+import java.io.Serial;
 
 /**
  * Configuration properties class for cas.throttle.
@@ -17,6 +20,8 @@ import lombok.experimental.Accessors;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("HazelcastThrottleProperties")
 public class HazelcastThrottleProperties extends BaseHazelcastProperties {
+    @Serial
     private static final long serialVersionUID = 5813165633105563813L;
 }

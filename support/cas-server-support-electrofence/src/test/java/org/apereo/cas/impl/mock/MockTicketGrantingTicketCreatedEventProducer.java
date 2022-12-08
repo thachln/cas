@@ -6,11 +6,11 @@ import org.apereo.cas.support.events.dao.CasEvent;
 import org.apereo.cas.support.events.ticket.CasTicketGrantingTicketCreatedEvent;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.RandomUtils;
-import org.apereo.cas.util.serialization.TicketIdSanitizationUtils;
 
 import lombok.NoArgsConstructor;
 import lombok.val;
 import org.apache.commons.lang3.tuple.Pair;
+import org.jooq.lambda.Unchecked;
 
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -27,7 +27,7 @@ import java.util.stream.IntStream;
  * @since 5.1.0
  */
 @NoArgsConstructor
-@SuppressWarnings("JdkObsolete")
+@SuppressWarnings("JavaUtilDate")
 public class MockTicketGrantingTicketCreatedEventProducer {
 
     private static final List<String> ALL_USER_AGENTS = CollectionUtils.wrapList(
@@ -74,21 +74,31 @@ public class MockTicketGrantingTicketCreatedEventProducer {
         return ALL_IP_ADDRS.get(index);
     }
 
-    private static void createEvent(final int i, final CasEventRepository casEventRepository) {
+    public static CasEvent createEvent(final String user, final CasEventRepository casEventRepository) throws Exception {
+        return createEvent(user, RandomUtils.nextInt(), casEventRepository);
+    }
+
+    public static CasEvent createEvent(final String user, final int i,
+                                       final CasEventRepository casEventRepository) throws Exception {
         val dto = new CasEvent();
         dto.setType(CasTicketGrantingTicketCreatedEvent.class.getName());
         dto.putTimestamp(new Date().getTime());
         dto.setCreationTime(ZonedDateTime.now(ZoneOffset.UTC).minusDays(5).toString());
-        dto.putEventId(TicketIdSanitizationUtils.sanitize("TGT-" + i + '-' + RandomUtils.randomAlphanumeric(16)));
-        dto.setPrincipalId("casuser");
+        dto.putEventId("TGT-" + i + '-' + RandomUtils.randomAlphanumeric(16));
+        dto.setPrincipalId(user);
         dto.putClientIpAddress(getMockClientIpAddress());
         dto.putServerIpAddress("127.0.0.1");
         dto.putAgent(getMockUserAgent());
         dto.putGeoLocation(getMockGeoLocation());
         casEventRepository.save(dto);
+        return dto;
+    }
+    
+    public static void createEvent(final int i, final CasEventRepository casEventRepository) throws Exception {
+        createEvent("casuser", i, casEventRepository);
     }
 
-    public static void createEvents(final CasEventRepository casEventRepository) {
-        IntStream.range(1, 1000).forEach(i -> createEvent(i, casEventRepository));
+    public static void createEvents(final CasEventRepository casEventRepository) throws Exception {
+        IntStream.range(1, 1000).forEach(Unchecked.intConsumer(i -> createEvent(i, casEventRepository)));
     }
 }

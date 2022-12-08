@@ -75,4 +75,10 @@ public class GlibcCryptPasswordEncoderTests {
         assertFalse(encoder.matches("rawPassword", null));
     }
 
+    @Test
+    public void verifyNoSalt() {
+        val encoder = new GlibcCryptPasswordEncoder("MD5", 10, "secret");
+        assertNotNull(encoder.encode("value"));
+    }
+
 }

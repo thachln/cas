@@ -1,11 +1,13 @@
 package org.apereo.cas.configuration.model.core.web.tomcat;
 
+import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -20,11 +22,13 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public class CasEmbeddedApacheTomcatSslValveProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 3164446071136700242L;
 
     /**
      * Enable the SSL valve for apache tomcat.
      */
+    @RequiredProperty
     private boolean enabled;
 
     /**

@@ -4,8 +4,8 @@ import org.apereo.cas.support.saml.idp.metadata.generator.BaseSamlIdPMetadataGen
 import org.apereo.cas.support.saml.idp.metadata.generator.SamlIdPMetadataGeneratorConfigurationContext;
 import org.apereo.cas.support.saml.services.SamlRegisteredService;
 import org.apereo.cas.support.saml.services.idp.metadata.SamlIdPMetadataDocument;
+import org.apereo.cas.util.spring.SpringExpressionLanguageValueResolver;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.tuple.Pair;
@@ -35,18 +35,16 @@ public class AmazonS3SamlIdPMetadataGenerator extends BaseSamlIdPMetadataGenerat
                                             final S3Client s3Client, final String bucketName) {
         super(context);
         this.s3Client = s3Client;
-        this.bucketName = bucketName;
+        this.bucketName = SpringExpressionLanguageValueResolver.getInstance().resolve(bucketName);
     }
 
     @Override
-    @SneakyThrows
-    public Pair<String, String> buildSelfSignedEncryptionCert(final Optional<SamlRegisteredService> registeredService) {
+    public Pair<String, String> buildSelfSignedEncryptionCert(final Optional<SamlRegisteredService> registeredService) throws Exception {
         return generateCertificateAndKey();
     }
 
     @Override
-    @SneakyThrows
-    public Pair<String, String> buildSelfSignedSigningCert(final Optional<SamlRegisteredService> registeredService) {
+    public Pair<String, String> buildSelfSignedSigningCert(final Optional<SamlRegisteredService> registeredService) throws Exception {
         return generateCertificateAndKey();
     }
 
@@ -54,8 +52,8 @@ public class AmazonS3SamlIdPMetadataGenerator extends BaseSamlIdPMetadataGenerat
     protected SamlIdPMetadataDocument finalizeMetadataDocument(final SamlIdPMetadataDocument doc,
                                                                final Optional<SamlRegisteredService> registeredService) {
         val bucketNameToUse = AmazonS3SamlIdPMetadataUtils.determineBucketNameFor(registeredService, this.bucketName, s3Client);
-        if (!s3Client.listBuckets(ListBucketsRequest.builder().build())
-            .buckets().stream().anyMatch(b -> b.name().equalsIgnoreCase(bucketNameToUse))) {
+        if (s3Client.listBuckets(ListBucketsRequest.builder().build())
+            .buckets().stream().noneMatch(b -> b.name().equalsIgnoreCase(bucketNameToUse))) {
             LOGGER.trace("Bucket [{}] does not exist. Creating...", bucketNameToUse);
             val bucket = s3Client.createBucket(CreateBucketRequest.builder().bucket(bucketNameToUse).build());
             LOGGER.debug("Created bucket [{}]", bucket.location());

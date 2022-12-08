@@ -1,8 +1,13 @@
 package org.apereo.cas.ticket.expiration;
 
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.services.RegisteredServiceTestUtils;
+import org.apereo.cas.ticket.DefaultServiceTicketSessionTrackingPolicy;
+import org.apereo.cas.ticket.ServiceTicketSessionTrackingPolicy;
 import org.apereo.cas.ticket.TicketGrantingTicketImpl;
+import org.apereo.cas.ticket.registry.DefaultTicketRegistry;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 import org.apereo.cas.util.serialization.SerializationUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,7 +16,6 @@ import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.annotation.DirtiesContext;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,15 +25,19 @@ import java.time.ZoneOffset;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
+ * Test cases for {@link TicketGrantingTicketExpirationPolicy}.
+ *
  * @author William G. Thompson, Jr.
  * @since 3.4.10
  */
-@DirtiesContext
 @Tag("Tickets")
 public class TicketGrantingTicketExpirationPolicyTests {
 
     private static final long HARD_TIMEOUT = 200;
-    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
+
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
+
     private static final File JSON_FILE = new File(FileUtils.getTempDirectoryPath(), "ticketGrantingTicketExpirationPolicyTests.json");
 
     private static final long SLIDING_TIMEOUT = 50;
@@ -37,7 +45,14 @@ public class TicketGrantingTicketExpirationPolicyTests {
     private static final String TGT_ID = "test";
 
     private TicketGrantingTicketExpirationPolicy expirationPolicy;
+
     private TicketGrantingTicketImpl ticketGrantingTicket;
+
+    private static ServiceTicketSessionTrackingPolicy getTrackingPolicy() {
+        val props = new CasConfigurationProperties();
+        props.getTicket().getTgt().getCore().setOnlyTrackMostRecentSession(true);
+        return new DefaultServiceTicketSessionTrackingPolicy(props, new DefaultTicketRegistry());
+    }
 
     @BeforeEach
     public void initialize() {
@@ -50,7 +65,8 @@ public class TicketGrantingTicketExpirationPolicyTests {
         val creationTime = this.ticketGrantingTicket.getCreationTime();
 
         this.expirationPolicy.setClock(Clock.fixed(creationTime.plusSeconds(HARD_TIMEOUT).minusNanos(1).toInstant(), ZoneOffset.UTC));
-        ticketGrantingTicket.grantServiceTicket(TGT_ID, RegisteredServiceTestUtils.getService(), expirationPolicy, false, true);
+        ticketGrantingTicket.grantServiceTicket(TGT_ID, RegisteredServiceTestUtils.getService(),
+            expirationPolicy, false, getTrackingPolicy());
         assertFalse(ticketGrantingTicket.isExpired());
 
         this.expirationPolicy.setClock(Clock.fixed(creationTime.plusSeconds(HARD_TIMEOUT).plusNanos(1).toInstant(), ZoneOffset.UTC));
@@ -59,7 +75,8 @@ public class TicketGrantingTicketExpirationPolicyTests {
 
     @Test
     public void verifyTgtIsExpiredBySlidingWindow() {
-        ticketGrantingTicket.grantServiceTicket(TGT_ID, RegisteredServiceTestUtils.getService(), expirationPolicy, false, true);
+        ticketGrantingTicket.grantServiceTicket(TGT_ID, RegisteredServiceTestUtils.getService(),
+            expirationPolicy, false, getTrackingPolicy());
 
         this.expirationPolicy.setClock(Clock.fixed(this.ticketGrantingTicket.getLastTimeUsed().plusSeconds(SLIDING_TIMEOUT).minusNanos(1).toInstant(), ZoneOffset.UTC));
         assertFalse(ticketGrantingTicket.isExpired());

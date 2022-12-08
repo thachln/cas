@@ -12,6 +12,16 @@ import java.net.URL;
 public interface HttpClient {
 
     /**
+     * Bean name for the client implementation that supports CAS trust store.
+     */
+    String BEAN_NAME_HTTPCLIENT_TRUST_STORE = "supportsTrustStoreSslSocketFactoryHttpClient";
+
+    /**
+     * Bean name for the client implementation that does not follow redirects.
+     */
+    String BEAN_NAME_HTTPCLIENT_NO_REDIRECT = "noRedirectHttpClient";
+
+    /**
      * Sends a message to a particular endpoint.  Option of sending it without
      * waiting to ensure a response was returned.
      * This is useful when it doesn't matter about the response as you'll perform no action based on the response.
@@ -51,7 +61,12 @@ public interface HttpClient {
      *
      * @return the wrapped http client
      */
-    org.apache.http.client.HttpClient getWrappedHttpClient();
+    org.apache.http.client.HttpClient wrappedHttpClient();
 
-    HttpClientFactory getHttpClientFactory();
+    /**
+     * Gets http client factory.
+     *
+     * @return the http client factory
+     */
+    HttpClientFactory httpClientFactory();
 }

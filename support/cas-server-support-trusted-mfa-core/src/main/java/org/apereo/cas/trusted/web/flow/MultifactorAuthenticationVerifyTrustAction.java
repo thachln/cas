@@ -1,19 +1,19 @@
 package org.apereo.cas.trusted.web.flow;
 
 import org.apereo.cas.audit.AuditableExecution;
-import org.apereo.cas.configuration.model.support.mfa.TrustedDevicesMultifactorProperties;
+import org.apereo.cas.configuration.model.support.mfa.trusteddevice.TrustedDevicesMultifactorProperties;
 import org.apereo.cas.trusted.authentication.MultifactorAuthenticationTrustedDeviceBypassEvaluator;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustStorage;
 import org.apereo.cas.trusted.util.MultifactorAuthenticationTrustUtils;
 import org.apereo.cas.trusted.web.flow.fingerprint.DeviceFingerprintStrategy;
 import org.apereo.cas.web.flow.CasWebflowConstants;
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.support.WebUtils;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
 
@@ -26,7 +26,7 @@ import org.springframework.webflow.execution.RequestContext;
 @Slf4j
 @RequiredArgsConstructor
 @Getter
-public class MultifactorAuthenticationVerifyTrustAction extends AbstractAction {
+public class MultifactorAuthenticationVerifyTrustAction extends BaseCasWebflowAction {
 
     private final MultifactorAuthenticationTrustStorage storage;
 
@@ -58,7 +58,9 @@ public class MultifactorAuthenticationVerifyTrustAction extends AbstractAction {
             LOGGER.debug("No valid trusted authentication records could be found for [{}]", principal);
             return no();
         }
-        val fingerprint = deviceFingerprintStrategy.determineFingerprint(principal, requestContext, false);
+        val request = WebUtils.getHttpServletRequestFromExternalWebflowContext(requestContext);
+        val response = WebUtils.getHttpServletResponseFromExternalWebflowContext(requestContext);
+        val fingerprint = deviceFingerprintStrategy.determineFingerprintComponent(principal, request, response);
         LOGGER.trace("Retrieving authentication records for [{}] that matches [{}]", principal, fingerprint);
         if (results.stream().noneMatch(entry -> entry.getDeviceFingerprint().equals(fingerprint))) {
             LOGGER.debug("No trusted authentication records could be found for [{}] to match the current device fingerprint", principal);
@@ -69,7 +71,7 @@ public class MultifactorAuthenticationVerifyTrustAction extends AbstractAction {
         MultifactorAuthenticationTrustUtils.setMultifactorAuthenticationTrustedInScope(requestContext);
         MultifactorAuthenticationTrustUtils.trackTrustedMultifactorAuthenticationAttribute(
             authn,
-            trustedProperties.getAuthenticationContextAttribute());
+            trustedProperties.getCore().getAuthenticationContextAttribute());
         return yes();
     }
 }

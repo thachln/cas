@@ -5,8 +5,10 @@ import org.apereo.cas.configuration.support.RequiresModule;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
 import java.io.File;
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -23,7 +25,9 @@ import java.io.Serializable;
 @RequiresModule(name = "cas-server-core-configuration", automated = true)
 @Accessors(chain = true)
 public class StandaloneConfigurationProperties implements Serializable {
+    @Serial
     private static final long serialVersionUID = -7749293768878152908L;
+
     /**
      * Describes a directory path where CAS configuration may be found.
      */
@@ -40,33 +44,6 @@ public class StandaloneConfigurationProperties implements Serializable {
      * or system/environment variables as properties are bootstrapped and fetched.
      * They are placed here to allow CAS to recognize their validity when passed.
      */
+    @NestedConfigurationProperty
     private StandaloneConfigurationSecurityProperties configurationSecurity = new StandaloneConfigurationSecurityProperties();
-
-    @RequiresModule(name = "cas-server-core-configuration", automated = true)
-    @Getter
-    @Setter
-    @Accessors(chain = true)
-    public static class StandaloneConfigurationSecurityProperties implements Serializable {
-        private static final long serialVersionUID = 8571848605614437022L;
-
-        /**
-         * Algorithm to use when deciphering settings.
-         */
-        private String alg;
-
-        /**
-         * Security provider to use when deciphering settings.
-         */
-        private String provider;
-
-        /**
-         * Total number of iterations to use when deciphering settings.
-         */
-        private long iteration;
-
-        /**
-         * Secret key/password to use when deciphering settings.
-         */
-        private String psw;
-    }
 }

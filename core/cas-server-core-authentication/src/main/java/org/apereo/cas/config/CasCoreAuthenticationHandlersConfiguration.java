@@ -14,28 +14,32 @@ import org.apereo.cas.authentication.principal.resolvers.ProxyingPrincipalResolv
 import org.apereo.cas.authentication.support.password.PasswordEncoderUtils;
 import org.apereo.cas.authentication.support.password.PasswordPolicyContext;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.util.ResourceUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 import org.apereo.cas.util.http.HttpClient;
+import org.apereo.cas.util.spring.beans.BeanCondition;
+import org.apereo.cas.util.spring.beans.BeanContainer;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.apereo.services.persondir.IPersonAttributeDao;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -48,162 +52,188 @@ import java.util.stream.Stream;
  * @author Dmitriy Kopylenko
  * @since 5.1.0
  */
-@Configuration("casCoreAuthenticationHandlersConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 @Slf4j
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.Authentication)
+@AutoConfiguration
 public class CasCoreAuthenticationHandlersConfiguration {
 
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("supportsTrustStoreSslSocketFactoryHttpClient")
-    private ObjectProvider<HttpClient> supportsTrustStoreSslSocketFactoryHttpClient;
-
-    @Autowired
-    @Qualifier("servicesManager")
-    private ObjectProvider<ServicesManager> servicesManager;
-
-    @Autowired
-    private ConfigurableApplicationContext applicationContext;
-
-    @ConditionalOnProperty(prefix = "cas.sso", name = "proxy-authn-enabled", havingValue = "true", matchIfMissing = true)
-    @Bean
-    @RefreshScope
-    public AuthenticationHandler proxyAuthenticationHandler() {
-        return new HttpBasedServiceCredentialsAuthenticationHandler(null,
-            servicesManager.getObject(),
-            proxyPrincipalFactory(), Integer.MIN_VALUE,
-            supportsTrustStoreSslSocketFactoryHttpClient.getObject());
-    }
-
-    @ConditionalOnMissingBean(name = "proxyPrincipalFactory")
-    @Bean
-    @RefreshScope
-    public PrincipalFactory proxyPrincipalFactory() {
-        return PrincipalFactoryUtils.newPrincipalFactory();
-    }
-
-    @ConditionalOnMissingBean(name = "proxyPrincipalResolver")
-    @Bean
-    @RefreshScope
-    public PrincipalResolver proxyPrincipalResolver() {
-        return new ProxyingPrincipalResolver(proxyPrincipalFactory());
-    }
-
-    @RefreshScope
-    @Bean
-    @ConditionalOnMissingBean(name = "acceptUsersAuthenticationHandler")
-    public AuthenticationHandler acceptUsersAuthenticationHandler() {
-        val props = casProperties.getAuthn().getAccept();
-        val h = new AcceptUsersAuthenticationHandler(props.getName(),
-            servicesManager.getObject(),
-            acceptUsersPrincipalFactory(),
-            props.getOrder(),
-            getParsedUsers());
-        h.setPasswordEncoder(PasswordEncoderUtils.newPasswordEncoder(props.getPasswordEncoder(), applicationContext));
-        h.setPasswordPolicyConfiguration(acceptPasswordPolicyConfiguration());
-        h.setCredentialSelectionPredicate(CoreAuthenticationUtils.newCredentialSelectionPredicate(props.getCredentialCriteria()));
-        h.setPrincipalNameTransformer(PrincipalNameTransformerUtils.newPrincipalNameTransformer(props.getPrincipalTransformation()));
-        val passwordPolicy = props.getPasswordPolicy();
-        h.setPasswordPolicyHandlingStrategy(CoreAuthenticationUtils.newPasswordPolicyHandlingStrategy(passwordPolicy, applicationContext));
-        if (passwordPolicy.isEnabled()) {
-            val cfg = new PasswordPolicyContext(passwordPolicy);
-            if (passwordPolicy.isAccountStateHandlingEnabled()) {
-                cfg.setAccountStateHandler((response, configuration) -> new ArrayList<>(0));
-            } else {
-                LOGGER.debug("Handling account states is disabled via CAS configuration");
-            }
-            h.setPasswordPolicyConfiguration(cfg);
-        }
-        return h;
-    }
-
-    @ConditionalOnMissingBean(name = "acceptUsersPrincipalFactory")
-    @Bean
-    @RefreshScope
-    public PrincipalFactory acceptUsersPrincipalFactory() {
-        return PrincipalFactoryUtils.newPrincipalFactory();
-    }
-
-    @ConditionalOnMissingBean(name = "proxyAuthenticationEventExecutionPlanConfigurer")
-    @Bean
-    @ConditionalOnProperty(prefix = "cas.sso", name = "proxy-authn-enabled", havingValue = "true", matchIfMissing = true)
-    public AuthenticationEventExecutionPlanConfigurer proxyAuthenticationEventExecutionPlanConfigurer() {
-        return plan -> plan.registerAuthenticationHandlerWithPrincipalResolver(proxyAuthenticationHandler(), proxyPrincipalResolver());
-    }
-
-    @ConditionalOnMissingBean(name = "acceptPasswordPolicyConfiguration")
-    @Bean
-    @RefreshScope
-    public PasswordPolicyContext acceptPasswordPolicyConfiguration() {
-        return new PasswordPolicyContext();
-    }
-
-    @ConditionalOnMissingBean(name = "jaasPasswordPolicyConfiguration")
-    @Bean
-    @RefreshScope
-    public PasswordPolicyContext jaasPasswordPolicyConfiguration() {
-        return new PasswordPolicyContext();
-    }
-
-    private Map<String, String> getParsedUsers() {
-        val accept = casProperties.getAuthn().getAccept();
-        val usersProperty = accept.getUsers();
-        if (accept.isEnabled() && StringUtils.isNotBlank(usersProperty) && usersProperty.contains("::")) {
-            val pattern = Pattern.compile("::");
-            return Stream.of(usersProperty.split(","))
-                .map(pattern::split)
-                .collect(Collectors.toMap(userAndPassword -> userAndPassword[0], userAndPassword -> userAndPassword[1]));
-        }
-        return new HashMap<>(0);
-    }
-
-    /**
-     * The Jaas authentication configuration.
-     */
-    @Configuration("jaasAuthenticationConfiguration")
+    @Configuration(value = "CasCoreAuthenticationHandlersProxyConfiguration", proxyBeanMethods = false)
     @EnableConfigurationProperties(CasConfigurationProperties.class)
-    public class JaasAuthenticationConfiguration {
+    public static class CasCoreAuthenticationHandlersProxyConfiguration {
+        private static final BeanCondition CONDITION = BeanCondition.on("cas.sso.proxy-authn-enabled").isTrue().evenIfMissing();
 
-        @Autowired
-        @Qualifier("attributeRepository")
-        private ObjectProvider<IPersonAttributeDao> attributeRepository;
+        @Bean
+        @ConditionalOnMissingBean(name = "proxyAuthenticationHandler")
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public AuthenticationHandler proxyAuthenticationHandler(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(ServicesManager.BEAN_NAME) final ServicesManager servicesManager,
+            @Qualifier("proxyPrincipalFactory") final PrincipalFactory proxyPrincipalFactory,
+            @Qualifier(HttpClient.BEAN_NAME_HTTPCLIENT_TRUST_STORE) final HttpClient supportsTrustStoreSslSocketFactoryHttpClient) throws Exception {
+            return BeanSupplier.of(AuthenticationHandler.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> new HttpBasedServiceCredentialsAuthenticationHandler(null,
+                    servicesManager, proxyPrincipalFactory, Integer.MIN_VALUE,
+                    supportsTrustStoreSslSocketFactoryHttpClient))
+                .otherwiseProxy()
+                .get();
+        }
+
+        @ConditionalOnMissingBean(name = "proxyPrincipalFactory")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public PrincipalFactory proxyPrincipalFactory(final ConfigurableApplicationContext applicationContext) throws Exception {
+            return BeanSupplier.of(PrincipalFactory.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(PrincipalFactoryUtils::newPrincipalFactory)
+                .otherwiseProxy()
+                .get();
+        }
+
+        @ConditionalOnMissingBean(name = "proxyPrincipalResolver")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public PrincipalResolver proxyPrincipalResolver(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("proxyPrincipalFactory") final PrincipalFactory proxyPrincipalFactory) throws Exception {
+            return BeanSupplier.of(PrincipalResolver.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> new ProxyingPrincipalResolver(proxyPrincipalFactory))
+                .otherwiseProxy()
+                .get();
+        }
+
+        @ConditionalOnMissingBean(name = "proxyAuthenticationEventExecutionPlanConfigurer")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public AuthenticationEventExecutionPlanConfigurer proxyAuthenticationEventExecutionPlanConfigurer(
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier("proxyAuthenticationHandler") final AuthenticationHandler proxyAuthenticationHandler,
+            @Qualifier("proxyPrincipalResolver") final PrincipalResolver proxyPrincipalResolver) throws Exception {
+            return BeanSupplier.of(AuthenticationEventExecutionPlanConfigurer.class)
+                .when(CONDITION.given(applicationContext.getEnvironment()))
+                .supply(() -> plan -> plan.registerAuthenticationHandlerWithPrincipalResolver(proxyAuthenticationHandler, proxyPrincipalResolver))
+                .otherwiseProxy()
+                .get();
+        }
+    }
+
+    @Configuration(value = "CasCoreAuthenticationHandlersAcceptConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreAuthenticationHandlersAcceptConfiguration {
+
+        private static Map<String, String> getParsedUsers(final CasConfigurationProperties casProperties) {
+            val accept = casProperties.getAuthn().getAccept();
+            val usersProperty = accept.getUsers();
+            if (accept.isEnabled() && StringUtils.isNotBlank(usersProperty) && usersProperty.contains("::")) {
+                val pattern = Pattern.compile("::");
+                return Stream.of(usersProperty.split(","))
+                    .map(pattern::split)
+                    .collect(Collectors.toMap(userAndPassword -> userAndPassword[0], userAndPassword -> userAndPassword[1]));
+            }
+            return new HashMap<>(0);
+        }
+
+
+        @ConditionalOnMissingBean(name = "acceptPasswordPolicyConfiguration")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public PasswordPolicyContext acceptPasswordPolicyConfiguration() {
+            return new PasswordPolicyContext();
+        }
+
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @Bean
+        @ConditionalOnMissingBean(name = "acceptUsersAuthenticationHandler")
+        public AuthenticationHandler acceptUsersAuthenticationHandler(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(ServicesManager.BEAN_NAME) final ServicesManager servicesManager,
+            @Qualifier("acceptUsersPrincipalFactory") final PrincipalFactory acceptUsersPrincipalFactory,
+            @Qualifier("acceptPasswordPolicyConfiguration") final PasswordPolicyContext acceptPasswordPolicyConfiguration) {
+            val props = casProperties.getAuthn().getAccept();
+            val h = new AcceptUsersAuthenticationHandler(props.getName(),
+                servicesManager, acceptUsersPrincipalFactory, props.getOrder(), getParsedUsers(casProperties));
+            h.setState(props.getState());
+            h.setPasswordEncoder(PasswordEncoderUtils.newPasswordEncoder(props.getPasswordEncoder(), applicationContext));
+            h.setPasswordPolicyConfiguration(acceptPasswordPolicyConfiguration);
+            h.setCredentialSelectionPredicate(CoreAuthenticationUtils.newCredentialSelectionPredicate(props.getCredentialCriteria()));
+            h.setPrincipalNameTransformer(PrincipalNameTransformerUtils.newPrincipalNameTransformer(props.getPrincipalTransformation()));
+            val passwordPolicy = props.getPasswordPolicy();
+            h.setPasswordPolicyHandlingStrategy(CoreAuthenticationUtils.newPasswordPolicyHandlingStrategy(passwordPolicy, applicationContext));
+            if (passwordPolicy.isEnabled()) {
+                val cfg = new PasswordPolicyContext(passwordPolicy);
+                if (passwordPolicy.isAccountStateHandlingEnabled()) {
+                    cfg.setAccountStateHandler((response, configuration) -> new ArrayList<>(0));
+                } else {
+                    LOGGER.debug("Handling account states is disabled via CAS configuration");
+                }
+                h.setPasswordPolicyConfiguration(cfg);
+            }
+            return h;
+        }
+
+        @ConditionalOnMissingBean(name = "acceptUsersPrincipalFactory")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public PrincipalFactory acceptUsersPrincipalFactory() {
+            return PrincipalFactoryUtils.newPrincipalFactory();
+        }
+    }
+
+    @Configuration(value = "CasCoreAuthenticationHandlersJaasConfiguration", proxyBeanMethods = false)
+    @EnableConfigurationProperties(CasConfigurationProperties.class)
+    public static class CasCoreAuthenticationHandlersJaasConfiguration {
+
+        @ConditionalOnMissingBean(name = "jaasPasswordPolicyConfiguration")
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public PasswordPolicyContext jaasPasswordPolicyConfiguration() {
+            return new PasswordPolicyContext();
+        }
 
         @ConditionalOnMissingBean(name = "jaasPrincipalFactory")
         @Bean
-        @RefreshScope
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
         public PrincipalFactory jaasPrincipalFactory() {
             return PrincipalFactoryUtils.newPrincipalFactory();
         }
 
         @Bean
         @ConditionalOnMissingBean(name = "jaasPersonDirectoryPrincipalResolvers")
-        @RefreshScope
-        public List<PrincipalResolver> jaasPersonDirectoryPrincipalResolvers() {
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public BeanContainer<PrincipalResolver> jaasPersonDirectoryPrincipalResolvers(
+            final CasConfigurationProperties casProperties,
+            @Qualifier(PrincipalResolver.BEAN_NAME_ATTRIBUTE_REPOSITORY) final IPersonAttributeDao attributeRepository,
+            @Qualifier("jaasPrincipalFactory") final PrincipalFactory jaasPrincipalFactory) {
             val personDirectory = casProperties.getPersonDirectory();
-            return casProperties.getAuthn().getJaas()
+            return BeanContainer.of(casProperties.getAuthn().getJaas()
                 .stream()
                 .filter(jaas -> StringUtils.isNotBlank(jaas.getRealm()))
                 .map(jaas -> {
                     val jaasPrincipal = jaas.getPrincipal();
-                    return CoreAuthenticationUtils.newPersonDirectoryPrincipalResolver(jaasPrincipalFactory(),
-                        attributeRepository.getObject(), jaasPrincipal, personDirectory);
+                    var attributeMerger = CoreAuthenticationUtils.getAttributeMerger(casProperties.getAuthn().getAttributeRepository().getCore().getMerger());
+                    return CoreAuthenticationUtils.newPersonDirectoryPrincipalResolver(jaasPrincipalFactory,
+                        attributeRepository, attributeMerger, jaasPrincipal, personDirectory);
                 })
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
         }
 
         @ConditionalOnMissingBean(name = "jaasAuthenticationHandlers")
-        @RefreshScope
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
         @Bean
-        public List<AuthenticationHandler> jaasAuthenticationHandlers() {
-            return casProperties.getAuthn().getJaas()
+        public BeanContainer<AuthenticationHandler> jaasAuthenticationHandlers(
+            final CasConfigurationProperties casProperties,
+            final ConfigurableApplicationContext applicationContext,
+            @Qualifier(ServicesManager.BEAN_NAME) final ServicesManager servicesManager,
+            @Qualifier("jaasPrincipalFactory") final PrincipalFactory jaasPrincipalFactory) {
+            return BeanContainer.of(casProperties.getAuthn().getJaas()
                 .stream()
                 .filter(jaas -> StringUtils.isNotBlank(jaas.getRealm()))
                 .map(jaas -> {
-                    val h = new JaasAuthenticationHandler(jaas.getName(), servicesManager.getObject(),
-                        jaasPrincipalFactory(), jaas.getOrder());
-
+                    val h = new JaasAuthenticationHandler(jaas.getName(), servicesManager, jaasPrincipalFactory, jaas.getOrder());
+                    h.setState(jaas.getState());
                     h.setKerberosKdcSystemProperty(jaas.getKerberosKdcSystemProperty());
                     h.setKerberosRealmSystemProperty(jaas.getKerberosRealmSystemProperty());
                     h.setRealm(jaas.getRealm());
@@ -213,7 +243,9 @@ public class CasCoreAuthenticationHandlersConfiguration {
                         h.setLoginConfigType(jaas.getLoginConfigType());
                     }
                     if (StringUtils.isNotBlank(jaas.getLoginConfigurationFile())) {
-                        h.setLoginConfigurationFile(new File(jaas.getLoginConfigurationFile()));
+                        val file = FunctionUtils.doAndHandle(() -> ResourceUtils.getResourceFrom(jaas.getLoginConfigurationFile()).getFile());
+                        LOGGER.debug("Using JAAS login configuration file [{}] for realm [{}]", file, jaas.getRealm());
+                        h.setLoginConfigurationFile(file);
                     }
                     val passwordPolicy = jaas.getPasswordPolicy();
                     h.setPasswordPolicyHandlingStrategy(CoreAuthenticationUtils.newPasswordPolicyHandlingStrategy(passwordPolicy, applicationContext));
@@ -231,15 +263,17 @@ public class CasCoreAuthenticationHandlersConfiguration {
                     h.setCredentialSelectionPredicate(CoreAuthenticationUtils.newCredentialSelectionPredicate(jaas.getCredentialCriteria()));
                     return h;
                 })
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
         }
 
         @ConditionalOnMissingBean(name = "jaasAuthenticationEventExecutionPlanConfigurer")
         @Bean
-        @RefreshScope
-        public AuthenticationEventExecutionPlanConfigurer jaasAuthenticationEventExecutionPlanConfigurer() {
-            return plan -> plan.registerAuthenticationHandlerWithPrincipalResolvers(jaasAuthenticationHandlers(),
-                jaasPersonDirectoryPrincipalResolvers());
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        public AuthenticationEventExecutionPlanConfigurer jaasAuthenticationEventExecutionPlanConfigurer(
+            @Qualifier("jaasAuthenticationHandlers") final BeanContainer<AuthenticationHandler> jaasAuthenticationHandlers,
+            @Qualifier("jaasPersonDirectoryPrincipalResolvers") final BeanContainer<PrincipalResolver> jaasPersonDirectoryPrincipalResolvers) {
+            return plan -> plan.registerAuthenticationHandlersWithPrincipalResolver(jaasAuthenticationHandlers.toList(),
+                jaasPersonDirectoryPrincipalResolvers.toList());
         }
     }
 }

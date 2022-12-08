@@ -1,6 +1,7 @@
 package org.apereo.cas.support.geo.maxmind.config;
 
 import org.apereo.cas.authentication.adaptive.geo.GeoLocationService;
+import org.apereo.cas.config.CasGeoLocationConfiguration;
 import org.apereo.cas.support.geo.config.CasGeoLocationMaxmindConfiguration;
 
 import org.junit.jupiter.api.Tag;
@@ -20,12 +21,13 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(classes = {
     RefreshAutoConfiguration.class,
+    CasGeoLocationConfiguration.class,
     CasGeoLocationMaxmindConfiguration.class
 })
-@Tag("Simple")
+@Tag("GeoLocation")
 public class CasGeoLocationMaxmindConfigurationTests {
     @Autowired
-    @Qualifier("geoLocationService")
+    @Qualifier(GeoLocationService.BEAN_NAME)
     private GeoLocationService geoLocationService;
 
     @Test

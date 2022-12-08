@@ -1,30 +1,28 @@
 package org.apereo.cas.authentication.attribute;
 
-import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.util.LoggingUtils;
 import org.apereo.cas.util.ResourceUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 import org.apereo.cas.util.io.FileWatcherService;
+import org.apereo.cas.util.serialization.JacksonObjectMapperFactory;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.SneakyThrows;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hjson.JsonValue;
+import org.jooq.lambda.Unchecked;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 
-import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
@@ -34,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * This is {@link DefaultAttributeDefinitionStore}.
@@ -46,11 +45,8 @@ import java.util.function.Predicate;
 @EqualsAndHashCode(of = "attributeDefinitions")
 @ToString(of = "attributeDefinitions")
 public class DefaultAttributeDefinitionStore implements AttributeDefinitionStore, DisposableBean, AutoCloseable {
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-        .enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY)
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-        .findAndRegisterModules();
+    private static final ObjectMapper MAPPER = JacksonObjectMapperFactory.builder()
+        .defaultTypingEnabled(true).build().toObjectMapper();
 
     private final Map<String, AttributeDefinition> attributeDefinitions = new TreeMap<>();
 
@@ -65,13 +61,8 @@ public class DefaultAttributeDefinitionStore implements AttributeDefinitionStore
             loadAttributeDefinitionsFromInputStream(resource);
 
             if (ResourceUtils.isFile(resource)) {
-                this.storeWatcherService = new FileWatcherService(resource.getFile(), file -> {
-                    try {
-                        loadAttributeDefinitionsFromInputStream(new FileSystemResource(file));
-                    } catch (final Exception e) {
-                        LoggingUtils.error(LOGGER, e);
-                    }
-                });
+                this.storeWatcherService = new FileWatcherService(resource.getFile(),
+                    Unchecked.consumer(file -> loadAttributeDefinitionsFromInputStream(new FileSystemResource(file))));
                 this.storeWatcherService.start(getClass().getSimpleName());
             }
         }
@@ -81,35 +72,41 @@ public class DefaultAttributeDefinitionStore implements AttributeDefinitionStore
         Arrays.stream(defns).forEach(this::registerAttributeDefinition);
     }
 
-    private void loadAttributeDefinitionsFromInputStream(final Resource resource) {
-        try {
-            LOGGER.trace("Loading attribute definitions from [{}]", resource);
-            val json = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            LOGGER.trace("Loaded attribute definitions [{}] from [{}]", json, resource);
-            val map = MAPPER.readValue(JsonValue.readHjson(json).toString(), new TypeReference<Map<String, AttributeDefinition>>() {
-            });
-            map.forEach(this::registerAttributeDefinition);
-        } catch (final Exception e) {
-            LoggingUtils.warn(LOGGER, e);
+    private static String getAttributeDefinitionKey(final String key, final AttributeDefinition defn) {
+        if (StringUtils.isNotBlank(defn.getKey()) && !StringUtils.equalsIgnoreCase(defn.getKey(), key)) {
+            LOGGER.warn("Attribute definition contains a key property [{}] that differs from its registering key [{}]. "
+                        + "This is likely due to misconfiguration of the attribute definition, and CAS will use the key property [{}] "
+                        + "to register the attribute definition in the attribute store", defn.getKey(), key, defn.getKey());
+            return defn.getKey();
         }
+        return key;
     }
 
     @Override
+    @CanIgnoreReturnValue
     public AttributeDefinitionStore registerAttributeDefinition(final AttributeDefinition defn) {
         return registerAttributeDefinition(defn.getKey(), defn);
     }
 
     @Override
+    @CanIgnoreReturnValue
     public AttributeDefinitionStore registerAttributeDefinition(final String key, final AttributeDefinition defn) {
         LOGGER.trace("Registering attribute definition [{}] by key [{}]", defn, key);
+        val keyToUse = getAttributeDefinitionKey(key, defn);
+        attributeDefinitions.putIfAbsent(keyToUse, defn);
+        return this;
+    }
 
-        if (StringUtils.isNotBlank(defn.getKey()) && !StringUtils.equalsIgnoreCase(defn.getKey(), key)) {
-            LOGGER.warn("Attribute definition contains a key property [{}] that differs from its registering key [{}]. "
-                + "This is likely due to misconfiguration of the attribute definition, and CAS will use the key property [{}] "
-                + "to register the attribute definition in the attribute store", defn.getKey(), key, defn.getKey());
-            attributeDefinitions.put(defn.getKey(), defn);
+    @Override
+    @CanIgnoreReturnValue
+    public AttributeDefinitionStore removeAttributeDefinition(final String key) {
+        LOGGER.debug("Removing attribute definition by key [{}]", key);
+
+        if (this.attributeDefinitions.containsKey(key)) {
+            val defn = this.attributeDefinitions.remove(key);
+            LOGGER.debug("Attribute definition [{}] has been removed from the definition store", defn);
         } else {
-            attributeDefinitions.put(key, defn);
+            LOGGER.debug("Attribute definition with the registered key [{}] was not found and the store was not altered", key);
         }
         return this;
     }
@@ -134,7 +131,7 @@ public class DefaultAttributeDefinitionStore implements AttributeDefinitionStore
     public <T extends AttributeDefinition> Optional<T> locateAttributeDefinition(final Predicate<AttributeDefinition> predicate) {
         return attributeDefinitions.values()
             .stream()
-            .filter(predicate::test)
+            .filter(predicate)
             .map(defn -> (T) defn)
             .findFirst();
     }
@@ -145,15 +142,25 @@ public class DefaultAttributeDefinitionStore implements AttributeDefinitionStore
     }
 
     @Override
-    public Optional<Pair<AttributeDefinition, List<Object>>> resolveAttributeValues(final String key, final List<Object> attributeValues,
-                                                                                    final RegisteredService registeredService) {
+    public <T extends AttributeDefinition> Stream<T> getAttributeDefinitionsBy(final Class<T> type) {
+        return attributeDefinitions
+            .values()
+            .stream()
+            .filter(defn -> type.isAssignableFrom(defn.getClass()))
+            .map(type::cast);
+    }
+
+    @Override
+    public Optional<Pair<AttributeDefinition, List<Object>>> resolveAttributeValues(
+        final String key,
+        final AttributeDefinitionResolutionContext context) {
         val result = locateAttributeDefinition(key);
-        if (result.isEmpty()) {
-            return Optional.empty();
-        }
-        val definition = result.get();
-        val currentValues = definition.resolveAttributeValues(attributeValues, this.scope, registeredService);
-        return Optional.of(Pair.of(definition, currentValues));
+        return result
+            .map(definition -> {
+                val currentValues = definition.resolveAttributeValues(context.withScope(this.scope));
+                return Optional.of(Pair.of(definition, currentValues));
+            })
+            .orElseGet(Optional::empty);
     }
 
     @Override
@@ -161,14 +168,24 @@ public class DefaultAttributeDefinitionStore implements AttributeDefinitionStore
         return attributeDefinitions.isEmpty();
     }
 
-    @SneakyThrows
-    public AttributeDefinitionStore to(final File resource) {
-        val json = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this.attributeDefinitions);
-        LOGGER.trace("Storing attribute definitions as [{}] to [{}]", json, resource);
-        try (val writer = Files.newBufferedWriter(resource.toPath(), StandardCharsets.UTF_8)) {
-            writer.write(json);
-            writer.flush();
-        }
+    @Override
+    @CanIgnoreReturnValue
+    public AttributeDefinitionStore store(final Resource resource) {
+        return FunctionUtils.doUnchecked(() -> {
+            val json = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this.attributeDefinitions);
+            LOGGER.trace("Storing attribute definitions as [{}] to [{}]", json, resource);
+            try (val writer = Files.newBufferedWriter(resource.getFile().toPath(), StandardCharsets.UTF_8)) {
+                writer.write(json);
+                writer.flush();
+            }
+            return this;
+        });
+    }
+
+    @Override
+    @CanIgnoreReturnValue
+    public AttributeDefinitionStore importStore(final AttributeDefinitionStore samlStore) {
+        samlStore.getAttributeDefinitions().forEach(this::registerAttributeDefinition);
         return this;
     }
 
@@ -182,5 +199,20 @@ public class DefaultAttributeDefinitionStore implements AttributeDefinitionStore
     @Override
     public void destroy() {
         close();
+    }
+
+    private void loadAttributeDefinitionsFromInputStream(final Resource resource) {
+        try {
+            LOGGER.trace("Loading attribute definitions from [{}]", resource);
+            val json = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            LOGGER.trace("Loaded attribute definitions [{}] from [{}]", json, resource);
+            val map = MAPPER.readValue(JsonValue.readHjson(json).toString(), new TypeReference<Map<String, AttributeDefinition>>() {
+            });
+            map.forEach(this::registerAttributeDefinition);
+        } catch (final Exception e) {
+            LoggingUtils.warn(LOGGER, e);
+        } finally {
+            LOGGER.debug("Loaded [{}] attribute definition(s).", attributeDefinitions.size());
+        }
     }
 }

@@ -2,9 +2,12 @@ package org.apereo.cas.adaptors.yubikey;
 
 import org.apereo.cas.adaptors.yubikey.registry.PermissiveYubiKeyAccountRegistry;
 import org.apereo.cas.authentication.CoreAuthenticationTestUtils;
+import org.apereo.cas.authentication.MultifactorAuthenticationProvider;
 import org.apereo.cas.authentication.principal.PrincipalFactoryUtils;
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.util.EncodingUtils;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.spring.DirectObjectProvider;
 import org.apereo.cas.web.support.WebUtils;
 
 import com.yubico.client.v2.ResponseStatus;
@@ -32,7 +35,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.webflow.execution.RequestContextHolder.setRequestContext;
+import static org.springframework.webflow.execution.RequestContextHolder.*;
 
 /**
  * Test cases for {@link YubiKeyAuthenticationHandler}.
@@ -40,7 +43,7 @@ import static org.springframework.webflow.execution.RequestContextHolder.setRequ
  * @author Misagh Moayyed
  * @since 4.1
  */
-@Tag("MFA")
+@Tag("MFAProvider")
 public class YubiKeyAuthenticationHandlerTests {
 
     private static final Integer CLIENT_ID = 18421;
@@ -66,13 +69,18 @@ public class YubiKeyAuthenticationHandlerTests {
         setRequestContext(context);
         ExternalContextHolder.setExternalContext(context.getExternalContext());
 
-        val handler = new YubiKeyAuthenticationHandler(YubicoClient.getClient(123456, EncodingUtils.encodeBase64("123456")));
-        assertThrows(IllegalArgumentException.class, () -> handler.authenticate(new YubiKeyCredential(OTP)));
+        val handler = getHandler(YubicoClient.getClient(123456, EncodingUtils.encodeBase64("123456")));
+        assertThrows(NullPointerException.class, () -> handler.authenticate(new YubiKeyCredential(OTP), mock(Service.class)));
+    }
+
+    private static YubiKeyAuthenticationHandler getHandler(final YubicoClient client) {
+        return new YubiKeyAuthenticationHandler(client,
+            new DirectObjectProvider<>(mock(MultifactorAuthenticationProvider.class)));
     }
 
     @Test
     public void checkDefaultAccountRegistry() {
-        val handler = new YubiKeyAuthenticationHandler(YubicoClient.getClient(CLIENT_ID, SECRET_KEY));
+        val handler = getHandler(YubicoClient.getClient(CLIENT_ID, SECRET_KEY));
         assertNotNull(handler.getRegistry());
     }
 
@@ -82,8 +90,8 @@ public class YubiKeyAuthenticationHandlerTests {
         val response = mock(VerificationResponse.class);
         when(response.getStatus()).thenReturn(ResponseStatus.OK);
         when(client.verify(anyString())).thenReturn(response);
-        val handler = new YubiKeyAuthenticationHandler(client);
-        val result = handler.authenticate(new YubiKeyCredential(OTP));
+        val handler = getHandler(client);
+        val result = handler.authenticate(new YubiKeyCredential(OTP), mock(Service.class));
         assertNotNull(result);
     }
 
@@ -91,21 +99,21 @@ public class YubiKeyAuthenticationHandlerTests {
     public void checkFailsVerificationAuthn() throws Exception {
         val client = mock(YubicoClient.class);
         when(client.verify(anyString())).thenThrow(new YubicoVerificationException("fails"));
-        val handler = new YubiKeyAuthenticationHandler(client);
-        assertThrows(FailedLoginException.class, () -> handler.authenticate(new YubiKeyCredential(OTP)));
+        val handler = getHandler(client);
+        assertThrows(FailedLoginException.class, () -> handler.authenticate(new YubiKeyCredential(OTP), mock(Service.class)));
     }
 
 
     @Test
     public void checkReplayedAuthn() {
-        val handler = new YubiKeyAuthenticationHandler(YubicoClient.getClient(CLIENT_ID, SECRET_KEY));
-        assertThrows(FailedLoginException.class, () -> handler.authenticate(new YubiKeyCredential(OTP)));
+        val handler = getHandler(YubicoClient.getClient(CLIENT_ID, SECRET_KEY));
+        assertThrows(FailedLoginException.class, () -> handler.authenticate(new YubiKeyCredential(OTP), mock(Service.class)));
     }
 
     @Test
     public void checkBadConfigAuthn() {
-        val handler = new YubiKeyAuthenticationHandler(YubicoClient.getClient(123456, EncodingUtils.encodeBase64("123456")));
-        assertThrows(AccountNotFoundException.class, () -> handler.authenticate(new YubiKeyCredential("casuser")));
+        val handler = getHandler(YubicoClient.getClient(123456, EncodingUtils.encodeBase64("123456")));
+        assertThrows(AccountNotFoundException.class, () -> handler.authenticate(new YubiKeyCredential("casuser"), mock(Service.class)));
     }
 
     @Test
@@ -116,13 +124,14 @@ public class YubiKeyAuthenticationHandlerTests {
         val handler = new YubiKeyAuthenticationHandler(StringUtils.EMPTY,
             null, PrincipalFactoryUtils.newPrincipalFactory(),
             YubicoClient.getClient(CLIENT_ID, SECRET_KEY),
-            registry, null);
-        assertThrows(AccountNotFoundException.class, () -> handler.authenticate(new YubiKeyCredential(OTP)));
+            registry, null, new DirectObjectProvider<>(mock(MultifactorAuthenticationProvider.class)));
+        assertThrows(AccountNotFoundException.class, () -> handler.authenticate(new YubiKeyCredential(OTP), mock(Service.class)));
     }
 
     @Test
     public void checkEncryptedAccount() {
         val registry = new PermissiveYubiKeyAccountRegistry(new LinkedHashMap<>(), (uid, token) -> true);
+        assertNotNull(registry.save(YubiKeyAccount.builder().username(UUID.randomUUID().toString()).build()));
         registry.setCipherExecutor(new YubikeyAccountCipherExecutor(
             "1PbwSbnHeinpkZOSZjuSJ8yYpUrInm5aaV18J2Ar4rM",
             "szxK-5_eJjs-aUj-64MpUZ-GPPzGLhYPLGl0wrYjYNVAGva2P0lLe6UGKGM7k8dWxsOVGutZWgvmY3l5oVPO3w", 0, 0));

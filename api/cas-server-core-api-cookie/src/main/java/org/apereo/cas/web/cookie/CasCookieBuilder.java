@@ -2,8 +2,9 @@ package org.apereo.cas.web.cookie;
 
 import org.apereo.cas.authentication.RememberMeCredential;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * This is {@link CasCookieBuilder}.
@@ -13,6 +14,11 @@ import javax.servlet.http.HttpServletResponse;
  */
 public interface CasCookieBuilder {
     /**
+     * Bean name that generates the cookie for the ticket-granting cookie.
+     */
+    String BEAN_NAME_TICKET_GRANTING_COOKIE_BUILDER = "ticketGrantingTicketCookieGenerator";
+
+    /**
      * Adds the cookie, taking into account {@link RememberMeCredential#REQUEST_PARAMETER_REMEMBER_ME}
      * in the request.
      *
@@ -20,9 +26,10 @@ public interface CasCookieBuilder {
      * @param response    the response
      * @param rememberMe  the remember me
      * @param cookieValue the cookie value
+     * @return the cookie
      */
-    void addCookie(HttpServletRequest request, HttpServletResponse response,
-                   boolean rememberMe, String cookieValue);
+    Cookie addCookie(HttpServletRequest request, HttpServletResponse response,
+                     boolean rememberMe, String cookieValue);
 
     /**
      * Add cookie.
@@ -30,8 +37,9 @@ public interface CasCookieBuilder {
      * @param request     the request
      * @param response    the response
      * @param cookieValue the cookie value
+     * @return the cookie
      */
-    void addCookie(HttpServletRequest request, HttpServletResponse response, String cookieValue);
+    Cookie addCookie(HttpServletRequest request, HttpServletResponse response, String cookieValue);
 
     /**
      * Add cookie.
@@ -83,4 +91,22 @@ public interface CasCookieBuilder {
      * @return the string
      */
     String getCookieName();
+
+    /**
+     * Remove all cookies by the same name.
+     * Attempts to ensure all variations of the same cookie
+     * that may have been issued under root, or those with a lingering {@code /}
+     * are removed from the response.
+     *
+     * @param request  the request
+     * @param response the response
+     */
+    void removeAll(HttpServletRequest request, HttpServletResponse response);
+
+    /**
+     * Gets cas cookie value manager.
+     *
+     * @return the cas cookie value manager
+     */
+    CookieValueManager getCasCookieValueManager();
 }

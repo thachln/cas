@@ -2,18 +2,21 @@ package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.configuration.CasConfigurationPropertiesEnvironmentManager;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.support.events.listener.CasConfigurationEventListener;
+import org.apereo.cas.support.events.listener.DefaultCasConfigurationEventListener;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.context.refresh.ContextRefresher;
-import org.springframework.context.ApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 /**
  * This is {@link CasCoreEventsConfigEnvironmentConfiguration}.
@@ -21,27 +24,19 @@ import org.springframework.context.annotation.Configuration;
  * @author Misagh Moayyed
  * @since 5.1.0
  */
-@Configuration(value = "casCoreEventsConfigEnvironmentConfiguration", proxyBeanMethods = false)
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.CasConfiguration)
+@AutoConfiguration
 public class CasCoreEventsConfigEnvironmentConfiguration {
-
-    @Autowired
-    @Qualifier("configurationPropertiesEnvironmentManager")
-    private ObjectProvider<CasConfigurationPropertiesEnvironmentManager> manager;
-
-    @Autowired
-    private ObjectProvider<ConfigurationPropertiesBindingPostProcessor> binder;
-
-    @Autowired
-    private ObjectProvider<ContextRefresher> contextRefresher;
-
-    @Autowired
-    private ApplicationContext applicationContext;
 
     @ConditionalOnMissingBean(name = "casConfigurationEventListener")
     @Bean
-    public CasConfigurationEventListener casConfigurationEventListener() {
-        return new CasConfigurationEventListener(manager.getObject(), binder.getObject(),
-            contextRefresher.getObject(), applicationContext);
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public CasConfigurationEventListener casConfigurationEventListener(
+        @Qualifier("configurationPropertiesEnvironmentManager") final CasConfigurationPropertiesEnvironmentManager manager,
+        final ConfigurationPropertiesBindingPostProcessor binder,
+        final ContextRefresher contextRefresher,
+        final ConfigurableApplicationContext applicationContext) {
+        return new DefaultCasConfigurationEventListener(manager, binder, contextRefresher, applicationContext);
     }
 }

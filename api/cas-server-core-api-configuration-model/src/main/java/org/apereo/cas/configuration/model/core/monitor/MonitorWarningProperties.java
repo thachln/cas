@@ -2,11 +2,13 @@ package org.apereo.cas.configuration.model.core.monitor;
 
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -20,8 +22,10 @@ import java.io.Serializable;
 @Setter
 @NoArgsConstructor
 @Accessors(chain = true)
+@JsonFilter("MonitorWarningProperties")
 public class MonitorWarningProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 2788617778375787703L;
 
     /**

@@ -1,27 +1,32 @@
 package org.apereo.cas.config;
 
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.hz.HazelcastConfigurationFactory;
 import org.apereo.cas.ticket.TicketCatalog;
 import org.apereo.cas.ticket.TicketDefinition;
+import org.apereo.cas.ticket.registry.HazelcastTicketHolder;
 import org.apereo.cas.ticket.registry.HazelcastTicketRegistry;
 import org.apereo.cas.ticket.registry.NoOpTicketRegistryCleaner;
 import org.apereo.cas.ticket.registry.TicketRegistry;
 import org.apereo.cas.ticket.registry.TicketRegistryCleaner;
 import org.apereo.cas.util.CoreTicketUtils;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 
-import com.hazelcast.core.Hazelcast;
+import com.hazelcast.config.IndexConfig;
+import com.hazelcast.config.IndexType;
+import com.hazelcast.config.MapConfig;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.instance.impl.HazelcastInstanceFactory;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 /**
  * Spring's Java configuration component for {@code HazelcastInstance} that is consumed and used by
@@ -36,46 +41,79 @@ import org.springframework.context.annotation.Configuration;
  * @author Dmitriy Kopylenko
  * @since 4.2.0
  */
-@Configuration("hazelcastTicketRegistryConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
 @Slf4j
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.TicketRegistry, module = "hazelcast")
+@AutoConfiguration
 public class HazelcastTicketRegistryConfiguration {
 
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("ticketCatalog")
-    private ObjectProvider<TicketCatalog> ticketCatalog;
-
     @Bean
-    @RefreshScope
-    public TicketRegistry ticketRegistry() {
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public TicketRegistry ticketRegistry(
+        @Qualifier("casTicketRegistryHazelcastInstance")
+        final HazelcastInstance casTicketRegistryHazelcastInstance,
+        @Qualifier(TicketCatalog.BEAN_NAME)
+        final TicketCatalog ticketCatalog,
+        final CasConfigurationProperties casProperties) {
         val hz = casProperties.getTicket().getRegistry().getHazelcast();
-        val hazelcastInstance = casTicketRegistryHazelcastInstance();
-        val r = new HazelcastTicketRegistry(hazelcastInstance, ticketCatalog.getObject(), hz.getPageSize());
+        val r = new HazelcastTicketRegistry(casTicketRegistryHazelcastInstance, ticketCatalog, hz.getPageSize());
         r.setCipherExecutor(CoreTicketUtils.newTicketRegistryCipherExecutor(hz.getCrypto(), "hazelcast"));
         return r;
     }
 
-    @ConditionalOnMissingBean(name = "casTicketRegistryHazelcastInstance")
     @Bean(destroyMethod = "shutdown")
-    public HazelcastInstance casTicketRegistryHazelcastInstance() {
+    @ConditionalOnMissingBean(name = "casTicketRegistryHazelcastInstance")
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public HazelcastInstance casTicketRegistryHazelcastInstance(
+        @Qualifier(TicketCatalog.BEAN_NAME)
+        final TicketCatalog ticketCatalog,
+        final CasConfigurationProperties casProperties) {
         val hz = casProperties.getTicket().getRegistry().getHazelcast();
-        LOGGER.debug("Creating Hazelcast instance for members [{}]", hz.getCluster().getMembers());
-        val hazelcastInstance = Hazelcast.newHazelcastInstance(HazelcastConfigurationFactory.build(hz));
-        val catalog = ticketCatalog.getObject();
-        catalog.findAll()
+        LOGGER.debug("Creating Hazelcast instance for members [{}]", hz.getCluster().getNetwork().getMembers());
+        val hazelcastInstance = HazelcastInstanceFactory.getOrCreateHazelcastInstance(HazelcastConfigurationFactory.build(hz));
+        val ticketDefinitions = ticketCatalog.findAll();
+
+        ticketDefinitions
             .stream()
-            .map(TicketDefinition::getProperties)
-            .peek(p -> LOGGER.debug("Created Hazelcast map configuration for [{}]", p))
-            .map(p -> HazelcastConfigurationFactory.buildMapConfig(hz, p.getStorageName(), p.getStorageTimeout()))
-            .forEach(m -> hazelcastInstance.getConfig().addMapConfig(m));
+            .map(defn -> {
+                LOGGER.debug("Creating Hazelcast map configuration for [{}]", defn.getProperties());
+                val props = defn.getProperties();
+                val cfg = HazelcastConfigurationFactory.buildMapConfig(hz, props.getStorageName(), props.getStorageTimeout());
+                if (cfg instanceof MapConfig mapConfig) {
+                    mapConfig.addIndexConfig(new IndexConfig(IndexType.HASH, "id"));
+                    mapConfig.addIndexConfig(new IndexConfig(IndexType.HASH, "type"));
+                    mapConfig.addIndexConfig(new IndexConfig(IndexType.HASH, "principal"));
+                }
+                return cfg;
+            })
+            .forEach(map -> HazelcastConfigurationFactory.setConfigMap(map, hazelcastInstance.getConfig()));
+
+        if (hz.getCore().isEnableJet()) {
+            ticketDefinitions.forEach(defn -> {
+                val query = buildCreateMappingQuery(defn);
+                LOGGER.trace("Creating mapping for [{}] via [{}]", defn.getPrefix(), query);
+                try (val createResults = hazelcastInstance.getSql().execute(query)) {
+                    LOGGER.info("Created Hazelcast SQL mapping for [{}]", defn.getPrefix());
+                }
+            });
+        }
         return hazelcastInstance;
     }
 
+    private static String buildCreateMappingQuery(final TicketDefinition defn) {
+        val builder = new StringBuilder(String.format("CREATE MAPPING IF NOT EXISTS \"%s\" ", defn.getProperties().getStorageName()));
+        builder.append("TYPE IMap ");
+        builder.append("OPTIONS (");
+        builder.append("'keyFormat' = 'java',");
+        builder.append("'keyJavaClass' = 'java.lang.String',");
+        builder.append("'valueFormat' = 'java',");
+        builder.append(String.format("'valueJavaClass' = '%s'", HazelcastTicketHolder.class.getName()));
+        builder.append(')');
+        return builder.toString();
+    }
 
     @Bean
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     public TicketRegistryCleaner ticketRegistryCleaner() {
         return NoOpTicketRegistryCleaner.getInstance();
     }

@@ -1,7 +1,14 @@
 package org.apereo.cas.web.flow.resolver.impl.mfa;
 
+import org.apereo.cas.audit.AuditActionResolvers;
+import org.apereo.cas.audit.AuditResourceResolvers;
+import org.apereo.cas.audit.AuditableActions;
+import org.apereo.cas.authentication.Authentication;
+import org.apereo.cas.authentication.MultifactorAuthenticationProvider;
 import org.apereo.cas.authentication.MultifactorAuthenticationTrigger;
 import org.apereo.cas.authentication.MultifactorAuthenticationUtils;
+import org.apereo.cas.authentication.principal.Service;
+import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.web.flow.authentication.BaseMultifactorAuthenticationProviderEventResolver;
 import org.apereo.cas.web.flow.resolver.impl.CasWebflowEventResolutionConfigurationContext;
@@ -12,6 +19,9 @@ import lombok.val;
 import org.apereo.inspektr.audit.annotation.Audit;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Optional;
 import java.util.Set;
@@ -26,9 +36,9 @@ import java.util.Set;
 public class DefaultMultifactorAuthenticationProviderWebflowEventResolver extends BaseMultifactorAuthenticationProviderEventResolver {
     private final MultifactorAuthenticationTrigger multifactorAuthenticationTrigger;
 
-    public DefaultMultifactorAuthenticationProviderWebflowEventResolver(final CasWebflowEventResolutionConfigurationContext webflowEventResolutionConfigurationContext,
+    public DefaultMultifactorAuthenticationProviderWebflowEventResolver(final CasWebflowEventResolutionConfigurationContext configurationContext,
                                                                         final MultifactorAuthenticationTrigger multifactorAuthenticationTrigger) {
-        super(webflowEventResolutionConfigurationContext);
+        super(configurationContext);
         this.multifactorAuthenticationTrigger = multifactorAuthenticationTrigger;
     }
 
@@ -38,24 +48,51 @@ public class DefaultMultifactorAuthenticationProviderWebflowEventResolver extend
         val service = resolveServiceFromAuthenticationRequest(context);
         val authentication = WebUtils.getAuthentication(context);
         val request = WebUtils.getHttpServletRequestFromExternalWebflowContext(context);
-
-        val result = multifactorAuthenticationTrigger.isActivated(authentication, registeredService, request, service);
-        return result.map(provider -> {
-            LOGGER.trace("Building event based on the authentication provider [{}] and service [{}]", provider, registeredService);
-            val eventMap = MultifactorAuthenticationUtils.buildEventAttributeMap(authentication.getPrincipal(),
-                Optional.ofNullable(registeredService), provider);
-            eventMap.put(MultifactorAuthenticationTrigger.class.getSimpleName(), multifactorAuthenticationTrigger.getName());
-            val event = MultifactorAuthenticationUtils.validateEventIdForMatchingTransitionInContext(
-                provider.getId(), Optional.of(context), eventMap);
-            return CollectionUtils.wrapSet(event);
-        }).orElse(null);
+        val response = WebUtils.getHttpServletResponseFromExternalWebflowContext(context);
+        val result = determineMultifactorAuthenticationProvider(registeredService, authentication, request, response, service);
+        return result
+            .map(provider -> {
+                LOGGER.trace("Building event based on the authentication provider [{}] and service [{}]", provider, registeredService);
+                val eventMap = MultifactorAuthenticationUtils.buildEventAttributeMap(authentication.getPrincipal(),
+                    Optional.ofNullable(registeredService), provider);
+                eventMap.put(MultifactorAuthenticationTrigger.class.getSimpleName(), multifactorAuthenticationTrigger.getName());
+                val event = MultifactorAuthenticationUtils.validateEventIdForMatchingTransitionInContext(
+                    provider.getId(), Optional.of(context), eventMap);
+                return CollectionUtils.wrapSet(event);
+            })
+            .orElse(null);
     }
 
-    @Audit(action = "AUTHENTICATION_EVENT",
-        actionResolverName = "AUTHENTICATION_EVENT_ACTION_RESOLVER",
-        resourceResolverName = "AUTHENTICATION_EVENT_RESOURCE_RESOLVER")
+    @Audit(action = AuditableActions.AUTHENTICATION_EVENT,
+        actionResolverName = AuditActionResolvers.AUTHENTICATION_EVENT_ACTION_RESOLVER,
+        resourceResolverName = AuditResourceResolvers.AUTHENTICATION_EVENT_RESOURCE_RESOLVER)
     @Override
     public Event resolveSingle(final RequestContext context) {
         return super.resolveSingle(context);
+    }
+
+    /**
+     * Determine multifactor authentication provider optional.
+     *
+     * @param registeredService the registered service
+     * @param authentication    the authentication
+     * @param request           the request
+     * @param response          the response
+     * @param service           the service
+     * @return the optional
+     */
+    protected Optional<MultifactorAuthenticationProvider> determineMultifactorAuthenticationProvider(
+        final RegisteredService registeredService,
+        final Authentication authentication,
+        final HttpServletRequest request,
+        final HttpServletResponse response,
+        final Service service) {
+        if (registeredService != null && registeredService.getMultifactorAuthenticationPolicy().isBypassEnabled()) {
+            return Optional.empty();
+        }
+        if (multifactorAuthenticationTrigger.supports(request, registeredService, authentication, service)) {
+            return multifactorAuthenticationTrigger.isActivated(authentication, registeredService, request, response, service);
+        }
+        return Optional.empty();
     }
 }

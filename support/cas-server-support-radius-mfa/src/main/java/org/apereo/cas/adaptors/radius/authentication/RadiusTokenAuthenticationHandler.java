@@ -5,21 +5,27 @@ import org.apereo.cas.adaptors.radius.RadiusUtils;
 import org.apereo.cas.authentication.AuthenticationHandlerExecutionResult;
 import org.apereo.cas.authentication.CoreAuthenticationUtils;
 import org.apereo.cas.authentication.Credential;
+import org.apereo.cas.authentication.MultifactorAuthenticationHandler;
+import org.apereo.cas.authentication.MultifactorAuthenticationProvider;
 import org.apereo.cas.authentication.handler.support.AbstractPreAndPostProcessingAuthenticationHandler;
 import org.apereo.cas.authentication.principal.PrincipalFactory;
+import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.web.support.WebUtils;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import net.jradius.dictionary.Attr_State;
 import net.jradius.packet.attribute.value.AttributeValue;
+import org.springframework.beans.factory.ObjectProvider;
 
 import javax.security.auth.login.FailedLoginException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -29,7 +35,8 @@ import java.util.Optional;
  * @since 5.0.0
  */
 @Slf4j
-public class RadiusTokenAuthenticationHandler extends AbstractPreAndPostProcessingAuthenticationHandler {
+@Getter
+public class RadiusTokenAuthenticationHandler extends AbstractPreAndPostProcessingAuthenticationHandler implements MultifactorAuthenticationHandler {
 
     private final List<RadiusServer> servers;
 
@@ -37,16 +44,22 @@ public class RadiusTokenAuthenticationHandler extends AbstractPreAndPostProcessi
 
     private final boolean failoverOnAuthenticationFailure;
 
-    public RadiusTokenAuthenticationHandler(final String name, final ServicesManager servicesManager,
+    private final ObjectProvider<MultifactorAuthenticationProvider> multifactorAuthenticationProvider;
+
+
+    public RadiusTokenAuthenticationHandler(final String name,
+                                            final ServicesManager servicesManager,
                                             final PrincipalFactory principalFactory,
                                             final List<RadiusServer> servers,
                                             final boolean failoverOnException,
                                             final boolean failoverOnAuthenticationFailure,
-                                            final Integer order) {
+                                            final Integer order,
+                                            final ObjectProvider<MultifactorAuthenticationProvider> multifactorAuthenticationProvider) {
         super(name, servicesManager, principalFactory, order);
         this.servers = servers;
         this.failoverOnException = failoverOnException;
         this.failoverOnAuthenticationFailure = failoverOnAuthenticationFailure;
+        this.multifactorAuthenticationProvider = multifactorAuthenticationProvider;
 
         LOGGER.debug("Using [{}]", getClass().getSimpleName());
     }
@@ -62,15 +75,13 @@ public class RadiusTokenAuthenticationHandler extends AbstractPreAndPostProcessi
     }
 
     @Override
-    protected AuthenticationHandlerExecutionResult doAuthentication(final Credential credential) throws GeneralSecurityException {
+    protected AuthenticationHandlerExecutionResult doAuthentication(final Credential credential, final Service service) throws GeneralSecurityException {
         try {
             val radiusCredential = (RadiusTokenCredential) credential;
             val password = radiusCredential.getToken();
 
-            val authentication = WebUtils.getInProgressAuthentication();
-            if (authentication == null) {
-                throw new IllegalArgumentException("CAS has no reference to an authentication event to locate a principal");
-            }
+            val authentication = Objects.requireNonNull(WebUtils.getInProgressAuthentication(),
+                "CAS has no reference to an authentication event to locate a principal");
             val principal = authentication.getPrincipal();
             val username = principal.getId();
 

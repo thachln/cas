@@ -4,36 +4,34 @@ title: CAS - LDAP Service Registry
 category: Services
 ---
 
+{% include variables.html %}
+
 # LDAP Service Registry
 
-Service registry implementation which stores the services in a LDAP Directory and attempts to *map* service records to LDAP entries in order to configure 
-settings for retrieval, search and persistence of service definitions. By default, entries are assigned the `objectclass` that is `casRegisteredService` attribute and are looked up by the `uid` attribute.
+Service registry implementation which stores the services in a LDAP Directory 
+and attempts to *map* service records to LDAP entries in order to configure 
+settings for retrieval, search and persistence of service definitions. By default, 
+entries are assigned the `objectclass` that is `casRegisteredService` attribute and are looked up by the `uid` attribute.
 
 Support is enabled by adding the following module into the overlay:
 
-```xml
-<dependency>
-    <groupId>org.apereo.cas</groupId>
-    <artifactId>cas-server-support-ldap-service-registry</artifactId>
-    <version>${cas.version}</version>
-</dependency>
-```
+{% include_cached casmodule.html group="org.apereo.cas" module="cas-server-support-ldap-service-registry" %}
 
 ## Configuration
 
 The default mapper has support for the following optional items:
 
-| Field                             | Default Value
-|-----------------------------------|---------------------------------------------------
-| `objectClass`                     | casRegisteredService
-| `serviceDefinitionAttribute`      | description
-| `idAttribute`                     | uid
+| Field                        | Default Value        |
+|------------------------------|----------------------|
+| `objectClass`                | casRegisteredService |
+| `serviceDefinitionAttribute` | description          |
+| `idAttribute`                | uid                  |
 
 Service definitions are by default stored inside the `serviceDefinitionAttribute` attribute as
 JSON objects. The format and syntax of the JSON is identical to that of
 [JSON Service Registry](JSON-Service-Management.html). That's all, as far as the schema goes.
 
-To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#ldap-service-registry).
+{% include_cached casproperties.html properties="cas.service-registry.ldap" %}
 
 ## Auto Initialization
 

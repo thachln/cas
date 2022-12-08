@@ -1,14 +1,16 @@
 package org.apereo.cas.web.flow;
 
-import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.model.support.captcha.GoogleRecaptchaProperties;
+import org.apereo.cas.web.CaptchaActivationStrategy;
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.support.WebUtils;
 
 import lombok.RequiredArgsConstructor;
-import lombok.val;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.action.EventFactorySupport;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
+
+import java.util.function.Consumer;
 
 /**
  * This is {@link InitializeCaptchaAction}.
@@ -17,13 +19,20 @@ import org.springframework.webflow.execution.RequestContext;
  * @since 6.2.0
  */
 @RequiredArgsConstructor
-public class InitializeCaptchaAction extends AbstractAction {
-    private final CasConfigurationProperties casProperties;
+public class InitializeCaptchaAction extends BaseCasWebflowAction {
+    private final CaptchaActivationStrategy activationStrategy;
 
+    private final Consumer<RequestContext> onActivationConsumer;
+
+    private final GoogleRecaptchaProperties recaptchaProperties;
+    
     @Override
     protected Event doExecute(final RequestContext requestContext) {
-        val googleRecaptcha = casProperties.getGoogleRecaptcha();
-        WebUtils.putRecaptchaPropertiesFlowScope(requestContext, googleRecaptcha);
+        activationStrategy.shouldActivate(requestContext, recaptchaProperties)
+            .ifPresent(properties -> {
+                WebUtils.putRecaptchaPropertiesFlowScope(requestContext, properties);
+                onActivationConsumer.accept(requestContext);
+            });
         return new EventFactorySupport().success(this);
     }
 }

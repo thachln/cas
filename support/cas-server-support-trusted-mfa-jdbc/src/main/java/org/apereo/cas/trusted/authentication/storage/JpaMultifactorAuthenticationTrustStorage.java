@@ -1,23 +1,23 @@
 package org.apereo.cas.trusted.authentication.storage;
 
-import org.apereo.cas.configuration.model.support.mfa.TrustedDevicesMultifactorProperties;
+import org.apereo.cas.configuration.model.support.mfa.trusteddevice.TrustedDevicesMultifactorProperties;
 import org.apereo.cas.jpa.AbstractJpaEntityFactory;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustRecord;
 import org.apereo.cas.trusted.authentication.api.MultifactorAuthenticationTrustRecordKeyGenerator;
 import org.apereo.cas.trusted.authentication.storage.generic.JpaMultifactorAuthenticationTrustRecord;
 import org.apereo.cas.util.DateTimeUtils;
 import org.apereo.cas.util.crypto.CipherExecutor;
+import org.apereo.cas.util.function.FunctionUtils;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.beanutils.BeanUtils;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.persistence.EntityManager;
-import javax.persistence.NoResultException;
-import javax.persistence.PersistenceContext;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
+import jakarta.persistence.PersistenceContext;
 import java.io.Serializable;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -30,14 +30,14 @@ import java.util.Set;
  * @author Misagh Moayyed
  * @since 5.0.0
  */
-@EnableTransactionManagement(proxyTargetClass = true)
+@EnableTransactionManagement(proxyTargetClass = false)
 @Transactional(transactionManager = "transactionManagerMfaAuthnTrust")
 @Slf4j
 public class JpaMultifactorAuthenticationTrustStorage extends BaseMultifactorAuthenticationTrustStorage {
     private static final String ENTITY_NAME = JpaMultifactorAuthenticationTrustRecord.class.getSimpleName();
 
-    @PersistenceContext(unitName = "mfaTrustedAuthnEntityManagerFactory")
-    private transient EntityManager entityManager;
+    @PersistenceContext(unitName = "jpaMfaTrustedAuthnContext")
+    private EntityManager entityManager;
 
     public JpaMultifactorAuthenticationTrustStorage(final TrustedDevicesMultifactorProperties properties,
                                                     final CipherExecutor<Serializable, String> cipherExecutor,
@@ -112,13 +112,14 @@ public class JpaMultifactorAuthenticationTrustStorage extends BaseMultifactorAut
         return null;
     }
 
-    @SneakyThrows
     @Override
     public MultifactorAuthenticationTrustRecord saveInternal(final MultifactorAuthenticationTrustRecord record) {
-        val destination = getEntityFactory().newInstance();
-        BeanUtils.copyProperties(destination, record);
-        LOGGER.trace("Saving multifactor authentication trust record [{}]", destination);
-        return this.entityManager.merge(destination);
+        return FunctionUtils.doUnchecked(() -> {
+            val destination = getEntityFactory().newInstance();
+            BeanUtils.copyProperties(destination, record);
+            LOGGER.trace("Saving multifactor authentication trust record [{}]", destination);
+            return this.entityManager.merge(destination);
+        });
     }
 
     private AbstractJpaEntityFactory<MultifactorAuthenticationTrustRecord> getEntityFactory() {

@@ -8,13 +8,13 @@ import org.apereo.cas.validation.CasProtocolAttributesRenderer;
 
 import org.springframework.web.servlet.View;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 
 /**
  * Renders and prepares CAS3 views. This view is responsible
- * to simply just prep the base model, and delegates to
+ * to just prep the base model, and delegates to
  * a the real view to render the final output.
  *
  * @author Misagh Moayyed
@@ -34,8 +34,11 @@ public class Cas30ResponseView extends Cas20ResponseView {
 
     @Override
     protected void prepareMergedOutputModel(final Map<String, Object> model, final HttpServletRequest request,
-                                            final HttpServletResponse response) throws Exception {
+                                            final HttpServletResponse response)
+        throws Exception {
         super.prepareMergedOutputModel(model, request, response);
         prepareCasResponseAttributesForViewModel(model);
     }
+
+
 }

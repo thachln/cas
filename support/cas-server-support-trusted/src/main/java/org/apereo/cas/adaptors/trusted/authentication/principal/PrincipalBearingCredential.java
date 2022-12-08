@@ -3,12 +3,14 @@ package org.apereo.cas.adaptors.trusted.authentication.principal;
 import org.apereo.cas.authentication.credential.AbstractCredential;
 import org.apereo.cas.authentication.principal.Principal;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NonNull;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
+
+import java.io.Serial;
 
 /**
  * Credential that bear the fully resolved and authenticated Principal, or an
@@ -25,28 +27,19 @@ import lombok.ToString;
  * @since 3.0.0
  */
 @Getter
+@Setter
 @ToString(callSuper = true)
+@AllArgsConstructor
+@NoArgsConstructor
 public class PrincipalBearingCredential extends AbstractCredential {
-
-    /**
-     * Serialization version marker.
-     */
+    
+    @Serial
     private static final long serialVersionUID = 8866786438439775669L;
 
     /**
      * The trusted principal.
      */
     private Principal principal;
-
-    /**
-     * Instantiates a new principal bearing credential.
-     *
-     * @param principal the principal
-     */
-    @JsonCreator
-    public PrincipalBearingCredential(@JsonProperty("principal") final @NonNull Principal principal) {
-        this.principal = principal;
-    }
 
     @JsonIgnore
     @Override

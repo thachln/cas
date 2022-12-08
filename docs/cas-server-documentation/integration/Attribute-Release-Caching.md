@@ -3,6 +3,9 @@ layout: default
 title: CAS - Attribute Release Caching
 category: Attributes
 ---
+
+{% include variables.html %}
+
 # Attribute Release Caching
 
 By default, [resolved attributes](Attribute-Resolution.html) are cached to the
@@ -12,15 +15,17 @@ to the service upon release time.
 
 Note: Remember that while the below policies are typically applied at release time on a per-service level, 
 CAS automatically does create attribute release caching policies at a more global with configurable timeouts
-and durations. See [the relevant settings](../configuration/Configuration-Properties.html#authentication-attributes) for more info.
+and durations. 
+
+{% include_cached casproperties.html properties="cas.authn.attribute-repository.core" %}
 
 The following settings are shared by all principal attribute repositories:
 
-| Name                                     | Value
-|------------------------------------------|--------------------------------------------------------------------------------------------------------
-| `mergingStrategy`  | Indicate the merging strategy when combining attributes from multiple sources. Accepted values are `MULTIVALUED`, `ADD`, `NONE`, `MULTIVALUED` 
-| `attributeRepositoryIds`  | A `Set` of attribute repository identifiers to consult for attribute resolution at release time.
-| `ignoreResolvedAttributes`  | Ignore the collection of attributes that may have been resolved during the principal resolution phase, typically via attribute repositories.
+| Name                       | Value                                                                                                                                          |
+|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| `mergingStrategy`          | Indicate the merging strategy when combining attributes from multiple sources. Accepted values are `MULTIVALUED`, `ADD`, `NONE`, `MULTIVALUED` |
+| `attributeRepositoryIds`   | A `Set` of attribute repository identifiers to consult for attribute resolution at release time.                                               |
+| `ignoreResolvedAttributes` | Ignore the collection of attributes that may have been resolved during the principal resolution phase, typically via attribute repositories.   |
 
 ## Default
 
@@ -52,7 +57,7 @@ Sample configuration follows:
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 100,
@@ -86,7 +91,7 @@ For example:
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 100,
@@ -114,7 +119,7 @@ For example:
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 100,
@@ -143,7 +148,7 @@ For example:
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "sample",
   "name" : "sample",
   "id" : 100,
@@ -168,7 +173,7 @@ again to fetch attributes and cache them for `30` minutes.
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "^(https|imaps)://.*",
   "name" : "HTTPS and IMAPS",
   "id" : 1,
@@ -192,7 +197,7 @@ and should only be contacted at release time for this service:
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "^(https|imaps)://.*",
   "name" : "HTTPS and IMAPS",
   "id" : 1,

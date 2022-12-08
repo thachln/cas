@@ -39,7 +39,7 @@ public class OidcJwtAccessTokenEncoderTests extends AbstractOidcTests {
     }
 
     @Test
-    public void verifyEncodingWithoutEncryptionForService() {
+    public void verifyEncodingWithoutEncryptionForService() throws Exception {
         val accessToken = getAccessToken();
         val registeredService = getOidcRegisteredService(accessToken.getClientId());
         registeredService.setJwtAccessToken(true);
@@ -49,31 +49,31 @@ public class OidcJwtAccessTokenEncoderTests extends AbstractOidcTests {
         ));
         this.servicesManager.save(registeredService);
 
-        val token1 = getAccessTokenEncoder(accessToken, registeredService).encode();
-        val token2 = getAccessTokenEncoder(accessToken, registeredService).encode();
+        val token1 = getAccessTokenEncoder(accessToken, registeredService).encode(accessToken.getId());
+        val token2 = getAccessTokenEncoder(accessToken, registeredService).encode(accessToken.getId());
         assertEquals(token1, token2);
     }
 
     @Test
-    public void verifyExtractionAsParameterForService() {
+    public void verifyExtractionAsParameterForService() throws Exception {
         val accessToken = getAccessToken();
         val registeredService = getRegisteredServiceForJwtAccessTokenWithKeys(accessToken);
         val encoder = getAccessTokenEncoder(accessToken, registeredService);
 
-        val encodedAccessToken = encoder.encode();
+        val encodedAccessToken = encoder.encode(accessToken.getId());
         val decoded = encoder.decode(encodedAccessToken);
         assertNotNull(decoded);
         assertEquals(accessToken.getId(), decoded);
     }
 
     @Test
-    public void verifyEncodingWithNoCiphersForService() {
+    public void verifyEncodingWithNoCiphersForService() throws Exception {
         val accessToken = getAccessToken(StringUtils.EMPTY, "encoding-service-clientid");
         val registeredService = getRegisteredServiceForJwtAccessTokenWithKeys(accessToken);
 
         val encoder = getAccessTokenEncoder(accessToken, registeredService);
-        val token1 = encoder.encode();
-        val token2 = encoder.encode();
+        val token1 = encoder.encode(accessToken.getId());
+        val token2 = encoder.encode(accessToken.getId());
         assertEquals(token1, token2);
 
         val decoded1 = encoder.decode(token1);

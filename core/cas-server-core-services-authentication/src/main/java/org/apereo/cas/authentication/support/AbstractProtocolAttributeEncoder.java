@@ -2,6 +2,7 @@ package org.apereo.cas.authentication.support;
 
 import org.apereo.cas.CasViewConstants;
 import org.apereo.cas.authentication.ProtocolAttributeEncoder;
+import org.apereo.cas.authentication.principal.WebApplicationService;
 import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.services.RegisteredServiceCipherExecutor;
 import org.apereo.cas.services.ServicesManager;
@@ -34,13 +35,26 @@ public abstract class AbstractProtocolAttributeEncoder implements ProtocolAttrib
 
     private final RegisteredServiceCipherExecutor cipherExecutor;
 
+    private static void removeAttributeAndCacheForEncoding(final Map<String, Object> attributes,
+                                                           final Map<String, String> cachedAttributesToEncode,
+                                                           final String attributeName) {
+        val messageFormat = "Removed [{}] as an authentication attribute and cached it locally.";
+        val collection = (Collection<?>) attributes.remove(attributeName);
+        if (collection != null && collection.size() == 1) {
+            cachedAttributesToEncode.put(attributeName, collection.iterator().next().toString());
+            LOGGER.debug(messageFormat, attributeName);
+        }
+    }
+
     @Override
-    public Map<String, Object> encodeAttributes(final Map<String, Object> attributes, final RegisteredService registeredService) {
+    public Map<String, Object> encodeAttributes(final Map<String, Object> attributes,
+                                                final RegisteredService registeredService, final WebApplicationService webApplicationService) {
         LOGGER.trace("Starting to encode attributes for release to service [{}]", registeredService);
-        val newEncodedAttributes = new HashMap<String, Object>(attributes);
+        val newEncodedAttributes = new HashMap<>(attributes);
         if (registeredService != null && registeredService.getAccessStrategy().isServiceAccessAllowed()) {
             val cachedAttributesToEncode = initialize(newEncodedAttributes);
-            encodeAttributesInternal(newEncodedAttributes, cachedAttributesToEncode, this.cipherExecutor, registeredService);
+            encodeAttributesInternal(newEncodedAttributes, cachedAttributesToEncode,
+                this.cipherExecutor, registeredService, webApplicationService);
             LOGGER.debug("[{}] encoded attributes are available for release to [{}]: [{}]",
                 newEncodedAttributes.size(), registeredService.getName(), newEncodedAttributes.keySet());
         } else {
@@ -57,9 +71,11 @@ public abstract class AbstractProtocolAttributeEncoder implements ProtocolAttrib
      * @param cachedAttributesToEncode the cached attributes to encode
      * @param cipher                   the cipher object initialized per service public key
      * @param registeredService        the registered service
+     * @param webApplicationService    the web application service
      */
     protected abstract void encodeAttributesInternal(Map<String, Object> attributes, Map<String, String> cachedAttributesToEncode,
-                                                     RegisteredServiceCipherExecutor cipher, RegisteredService registeredService);
+                                                     RegisteredServiceCipherExecutor cipher, RegisteredService registeredService,
+                                                     WebApplicationService webApplicationService);
 
     /**
      * Initialize the encoding process. Removes the
@@ -78,16 +94,5 @@ public abstract class AbstractProtocolAttributeEncoder implements ProtocolAttrib
         removeAttributeAndCacheForEncoding(attributes, cachedAttributesToEncode, CasViewConstants.MODEL_ATTRIBUTE_NAME_PROXY_GRANTING_TICKET);
         removeAttributeAndCacheForEncoding(attributes, cachedAttributesToEncode, CasViewConstants.MODEL_ATTRIBUTE_NAME_PROXY_GRANTING_TICKET_IOU);
         return cachedAttributesToEncode;
-    }
-
-    private static void removeAttributeAndCacheForEncoding(final Map<String, Object> attributes,
-                                                           final Map<String, String> cachedAttributesToEncode,
-                                                           final String attributeName) {
-        val messageFormat = "Removed [{}] as an authentication attribute and cached it locally.";
-        val collection = (Collection<?>) attributes.remove(attributeName);
-        if (collection != null && collection.size() == 1) {
-            cachedAttributesToEncode.put(attributeName, collection.iterator().next().toString());
-            LOGGER.debug(messageFormat, attributeName);
-        }
     }
 }

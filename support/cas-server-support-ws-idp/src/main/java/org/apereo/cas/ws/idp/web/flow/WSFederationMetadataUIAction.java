@@ -3,13 +3,13 @@ package org.apereo.cas.ws.idp.web.flow;
 import org.apereo.cas.authentication.AuthenticationServiceSelectionStrategy;
 import org.apereo.cas.services.RegisteredServiceAccessStrategyUtils;
 import org.apereo.cas.services.ServicesManager;
+import org.apereo.cas.web.flow.actions.BaseCasWebflowAction;
 import org.apereo.cas.web.flow.services.DefaultRegisteredServiceUserInterfaceInfo;
 import org.apereo.cas.web.support.WebUtils;
 import org.apereo.cas.ws.idp.services.WSFederationRegisteredService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.val;
-import org.springframework.webflow.action.AbstractAction;
 import org.springframework.webflow.execution.Event;
 import org.springframework.webflow.execution.RequestContext;
 
@@ -20,7 +20,7 @@ import org.springframework.webflow.execution.RequestContext;
  * @since 5.1.0
  */
 @RequiredArgsConstructor
-public class WSFederationMetadataUIAction extends AbstractAction {
+public class WSFederationMetadataUIAction extends BaseCasWebflowAction {
     private final transient ServicesManager servicesManager;
     private final transient AuthenticationServiceSelectionStrategy serviceSelectionStrategy;
 

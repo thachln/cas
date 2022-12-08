@@ -1,5 +1,6 @@
 package org.apereo.cas.configuration.model.support.mongo;
 
+import org.apereo.cas.configuration.support.DurationCapable;
 import org.apereo.cas.configuration.support.RequiredProperty;
 import org.apereo.cas.configuration.support.RequiresModule;
 
@@ -9,6 +10,7 @@ import lombok.experimental.Accessors;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -23,6 +25,7 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public abstract class BaseMongoDbProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = -2471243083598934186L;
 
     /**
@@ -70,6 +73,7 @@ public abstract class BaseMongoDbProperties implements Serializable {
     /**
      * MongoDb database connection timeout.
      */
+    @DurationCapable
     private String timeout = "PT5S";
 
     /**
@@ -119,7 +123,7 @@ public abstract class BaseMongoDbProperties implements Serializable {
      * Sets whether writes should be retried if they fail due to a network error.
      */
     private boolean retryWrites;
-    
+
     /**
      * Name of the database to use for authentication.
      */
@@ -129,7 +133,7 @@ public abstract class BaseMongoDbProperties implements Serializable {
      * Whether connections require SSL.
      */
     private boolean sslEnabled;
-    
+
     /**
      * A replica set in MongoDB is a group of {@code mongod} processes that maintain
      * the same data set. Replica sets provide redundancy and high availability, and are the basis for all production deployments.

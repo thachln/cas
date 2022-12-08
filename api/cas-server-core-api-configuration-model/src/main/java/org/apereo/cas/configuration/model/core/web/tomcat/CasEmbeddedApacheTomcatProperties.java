@@ -2,12 +2,16 @@ package org.apereo.cas.configuration.model.core.web.tomcat;
 
 import org.apereo.cas.configuration.support.RequiresModule;
 
+import com.fasterxml.jackson.annotation.JsonFilter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This is {@link CasEmbeddedApacheTomcatProperties}.
@@ -19,11 +23,13 @@ import java.io.Serializable;
 @Getter
 @Setter
 @Accessors(chain = true)
+@JsonFilter("CasEmbeddedApacheTomcatProperties")
 public class CasEmbeddedApacheTomcatProperties implements Serializable {
+    @Serial
     private static final long serialVersionUID = -99143821503580896L;
 
     /**
-     * Controls the 'server' attribute of the tomcat connector.
+     * Controls the {@code server} attribute of the tomcat connector.
      */
     private String serverName = "Apereo CAS";
 
@@ -44,20 +50,13 @@ public class CasEmbeddedApacheTomcatProperties implements Serializable {
     /**
      * Embedded container HTTP port settings as an additional option.
      */
-    @NestedConfigurationProperty
-    private CasEmbeddedApacheTomcatHttpProperties http = new CasEmbeddedApacheTomcatHttpProperties();
+    private List<CasEmbeddedApacheTomcatHttpProperties> http = new ArrayList<>();
 
     /**
      * Embedded container tomcat clustering options.
      */
     @NestedConfigurationProperty
     private CasEmbeddedApacheTomcatClusteringProperties clustering = new CasEmbeddedApacheTomcatClusteringProperties();
-
-    /**
-     * Embedded container tomcat APR options.
-     */
-    @NestedConfigurationProperty
-    private CasEmbeddedApacheTomcatApachePortableRuntimeProperties apr = new CasEmbeddedApacheTomcatApachePortableRuntimeProperties();
 
     /**
      * Http proxy configuration properties.

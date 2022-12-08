@@ -10,7 +10,9 @@ import org.apereo.cas.services.RegisteredService;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.io.Serial;
 
 /**
  * Multifactor Bypass Provider based on Authentication.
@@ -20,21 +22,38 @@ import javax.servlet.http.HttpServletRequest;
  */
 @Slf4j
 public class AuthenticationMultifactorAuthenticationProviderBypassEvaluator extends BaseMultifactorAuthenticationProviderBypassEvaluator {
+    @Serial
     private static final long serialVersionUID = 5582655921143779773L;
+
     private final MultifactorAuthenticationProviderBypassProperties bypassProperties;
 
-    public AuthenticationMultifactorAuthenticationProviderBypassEvaluator(final MultifactorAuthenticationProviderBypassProperties bypassProperties,
-                                                                          final String providerId) {
+    public AuthenticationMultifactorAuthenticationProviderBypassEvaluator(
+        final MultifactorAuthenticationProviderBypassProperties bypassProperties,
+        final String providerId) {
         super(providerId);
         this.bypassProperties = bypassProperties;
     }
 
+    /**
+     * Skip bypass and support event based on authentication attributes.
+     *
+     * @param bypass the bypass settings for the provider.
+     * @param authn  the authn
+     * @return true/false
+     */
+    protected static boolean locateMatchingAttributeBasedOnAuthenticationAttributes(
+        final MultifactorAuthenticationProviderBypassProperties bypass, final Authentication authn) {
+        return locateMatchingAttributeValue(bypass.getAuthenticationAttributeName(),
+            bypass.getAuthenticationAttributeValue(), authn.getAttributes(), false);
+    }
+
     @Override
-    public boolean shouldMultifactorAuthenticationProviderExecuteInternal(final Authentication authentication,
-                                                                          final RegisteredService registeredService,
-                                                                          final MultifactorAuthenticationProvider provider,
-                                                                          final HttpServletRequest request) {
-        val principal = authentication.getPrincipal();
+    public boolean shouldMultifactorAuthenticationProviderExecuteInternal(
+        final Authentication authentication,
+        final RegisteredService registeredService,
+        final MultifactorAuthenticationProvider provider,
+        final HttpServletRequest request) {
+        val principal = resolvePrincipal(authentication.getPrincipal());
         val bypassByAuthn = locateMatchingAttributeBasedOnAuthenticationAttributes(bypassProperties, authentication);
         if (bypassByAuthn) {
             LOGGER.debug("Bypass rules for authentication for principal [{}] indicate the request may be ignored", principal.getId());
@@ -62,18 +81,5 @@ public class AuthenticationMultifactorAuthenticationProviderBypassEvaluator exte
         }
 
         return true;
-    }
-
-    /**
-     * Skip bypass and support event based on authentication attributes.
-     *
-     * @param bypass the bypass settings for the provider.
-     * @param authn  the authn
-     * @return true/false
-     */
-    protected static boolean locateMatchingAttributeBasedOnAuthenticationAttributes(
-        final MultifactorAuthenticationProviderBypassProperties bypass, final Authentication authn) {
-        return locateMatchingAttributeValue(bypass.getAuthenticationAttributeName(),
-            bypass.getAuthenticationAttributeValue(), authn.getAttributes(), false);
     }
 }

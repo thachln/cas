@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.val;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Getter
 @SpringBootTest(classes = AbstractMultifactorAuthenticationTrustStorageTests.SharedTestConfiguration.class)
-@Tag("MFA")
+@Tag("MFATrustedDevices")
 public class MultifactorAuthenticationTrustStorageCleanerTests extends AbstractMultifactorAuthenticationTrustStorageTests {
     @Autowired
     @Qualifier("mfaTrustStorageCleaner")
@@ -32,14 +31,12 @@ public class MultifactorAuthenticationTrustStorageCleanerTests extends AbstractM
 
     @Test
     public void verifyAction() {
-        assertDoesNotThrow(new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                val record = getMultifactorAuthenticationTrustRecord();
-                record.setRecordDate(ZonedDateTime.now(ZoneOffset.UTC).minusDays(1));
-                getMfaTrustEngine().save(record);
-                mfaTrustStorageCleaner.clean();
-            }
+        assertNotNull(mfaTrustStorageCleaner.getStorage());
+        assertDoesNotThrow(() -> {
+            val record = getMultifactorAuthenticationTrustRecord();
+            record.setRecordDate(ZonedDateTime.now(ZoneOffset.UTC).minusDays(1));
+            getMfaTrustEngine().save(record);
+            mfaTrustStorageCleaner.clean();
         });
     }
 }

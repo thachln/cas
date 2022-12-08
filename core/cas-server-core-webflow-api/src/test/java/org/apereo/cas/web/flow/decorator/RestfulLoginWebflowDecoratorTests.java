@@ -1,6 +1,6 @@
 package org.apereo.cas.web.flow.decorator;
 
-import org.apereo.cas.configuration.model.core.web.flow.WebflowLoginDecoratorProperties;
+import org.apereo.cas.configuration.model.core.web.flow.RestfulWebflowLoginDecoratorProperties;
 import org.apereo.cas.util.CollectionUtils;
 import org.apereo.cas.util.MockWebServer;
 
@@ -27,9 +27,14 @@ import static org.mockito.Mockito.*;
  */
 @Tag("RestfulApi")
 public class RestfulLoginWebflowDecoratorTests {
+    @SneakyThrows
+    private static String getJsonData() {
+        return new ObjectMapper().writeValueAsString(CollectionUtils.wrap("key", "value"));
+    }
+
     @Test
     public void verifyOperation() {
-        val props = new WebflowLoginDecoratorProperties.Rest();
+        val props = new RestfulWebflowLoginDecoratorProperties();
         props.setUrl("http://localhost:9465");
 
         val rest = new RestfulLoginWebflowDecorator(props);
@@ -42,10 +47,5 @@ public class RestfulLoginWebflowDecoratorTests {
             rest.decorate(requestContext, mock(ApplicationContext.class));
             assertTrue(requestContext.getFlowScope().contains("decoration"));
         }
-    }
-
-    @SneakyThrows
-    private static String getJsonData() {
-        return new ObjectMapper().writeValueAsString(CollectionUtils.wrap("key", "value"));
     }
 }

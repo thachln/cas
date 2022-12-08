@@ -1,10 +1,10 @@
 package org.apereo.cas.web.flow;
 
 import org.apereo.cas.config.CoreSamlConfiguration;
+import org.apereo.cas.config.DelegatedAuthenticationWebflowConfiguration;
+import org.apereo.cas.config.Pac4jAuthenticationEventExecutionPlanConfiguration;
+import org.apereo.cas.config.Pac4jDelegatedAuthenticationConfiguration;
 import org.apereo.cas.config.SamlIdentityProviderDiscoveryConfiguration;
-import org.apereo.cas.support.pac4j.config.Pac4jDelegatedAuthenticationConfiguration;
-import org.apereo.cas.support.pac4j.config.support.authentication.Pac4jAuthenticationEventExecutionPlanConfiguration;
-import org.apereo.cas.web.flow.config.DelegatedAuthenticationWebflowConfiguration;
 
 import lombok.val;
 import org.junit.jupiter.api.Tag;
@@ -31,10 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
     Pac4jAuthenticationEventExecutionPlanConfiguration.class,
     Pac4jDelegatedAuthenticationConfiguration.class,
     DelegatedAuthenticationWebflowConfiguration.class,
-    SamlIdentityProviderDiscoveryConfiguration.class,
-    BaseWebflowConfigurerTests.SharedTestConfiguration.class
+    SamlIdentityProviderDiscoveryConfiguration.class
 })
-@Tag("SAML")
+@Tag("SAML2Web")
 public class SamlIdentityProviderDiscoveryWebflowConfigurerTests extends BaseWebflowConfigurerTests {
     @Test
     public void verifyOperation() {

@@ -6,6 +6,8 @@ import org.jooq.lambda.fi.util.function.CheckedFunction;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,6 +20,16 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Tag("Utility")
 public class FunctionUtilsTests {
+
+    @Test
+    public void verifyDoIf0() {
+        val result = new AtomicBoolean();
+        FunctionUtils.doIf(true, input -> result.set(true), (Consumer<String>) s -> result.set(false)).accept("input");
+        assertTrue(result.get());
+
+        FunctionUtils.doIf(false, input -> result.set(true), (Consumer<String>) s -> result.set(false)).accept("input");
+        assertFalse(result.get());
+    }
 
     @Test
     public void verifyDoIf1() {
@@ -72,6 +84,9 @@ public class FunctionUtilsTests {
             throw new IllegalArgumentException();
         }, Suppliers.ofInstance(Boolean.FALSE));
         assertFalse(supplier.get());
+        assertDoesNotThrow(() -> FunctionUtils.doIfNotNull(null, __ -> {
+            throw new IllegalArgumentException();
+        }));
     }
 
     @Test
@@ -84,35 +99,29 @@ public class FunctionUtilsTests {
     @Test
     public void verifyDoAndHandle() {
         assertThrows(IllegalArgumentException.class,
-            () -> FunctionUtils.doAndHandle(o -> {
+            () -> FunctionUtils.doAndHandle((CheckedFunction<Object, Boolean>) o -> {
                 throw new IllegalArgumentException();
-            }, (CheckedFunction<Throwable, Boolean>) o -> {
+            }, o -> {
                 throw new IllegalArgumentException();
             }).apply(Void.class));
 
-        assertFalse(FunctionUtils.doAndHandle(o -> {
+        assertFalse(FunctionUtils.doAndHandle((CheckedFunction<Object, Boolean>) o -> {
             throw new IllegalArgumentException();
-        }, (CheckedFunction<Throwable, Boolean>) o -> false).apply(Void.class));
+        }, o -> false).apply(Void.class));
     }
 
     @Test
     public void verifyDoAndHandle2() {
         var supplier = FunctionUtils.doAndHandle(
-            new Supplier<Object>() {
-                @Override
-                public Object get() {
-                    throw new IllegalArgumentException();
-                }
+            () -> {
+                throw new IllegalArgumentException();
             }, o -> {
                 throw new IllegalArgumentException();
             });
         assertThrows(IllegalArgumentException.class, supplier::get);
         supplier = FunctionUtils.doAndHandle(
-            new Supplier<Object>() {
-                @Override
-                public Object get() {
-                    throw new IllegalArgumentException();
-                }
+            () -> {
+                throw new IllegalArgumentException();
             }, o -> false);
         assertFalse((Boolean) supplier.get());
     }

@@ -4,6 +4,9 @@ import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.support.events.AbstractCasEvent;
 
 import lombok.Getter;
+import lombok.ToString;
+
+import java.io.Serial;
 
 /**
  * This is {@link CasSurrogateAuthenticationSuccessfulEvent}.
@@ -12,21 +15,16 @@ import lombok.Getter;
  * @since 5.2.0
  */
 @Getter
+@ToString(callSuper = true)
 public class CasSurrogateAuthenticationSuccessfulEvent extends AbstractCasEvent {
 
+    @Serial
     private static final long serialVersionUID = 8059647975948452375L;
 
     private final Principal principal;
 
     private final String surrogate;
 
-    /**
-     * Instantiates a new Abstract cas sso event.
-     *
-     * @param source    the source
-     * @param principal the principal
-     * @param surrogate the surrogate
-     */
     public CasSurrogateAuthenticationSuccessfulEvent(final Object source, final Principal principal, final String surrogate) {
         super(source);
         this.principal = principal;

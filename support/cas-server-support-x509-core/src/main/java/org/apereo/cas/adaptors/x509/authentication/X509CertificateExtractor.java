@@ -1,6 +1,6 @@
 package org.apereo.cas.adaptors.x509.authentication;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.cert.X509Certificate;
 
 /**
@@ -14,6 +14,7 @@ import java.security.cert.X509Certificate;
 public interface X509CertificateExtractor {
 
     /**
+     * Extract certificate from request.
      * @param request HttpServletRequest that may contain X509 certificate
      * @return X509Certificate array where the first element is user's client
      * certificate

@@ -2,7 +2,7 @@ package org.apereo.cas.aup;
 
 import org.apereo.cas.config.CasAcceptableUsagePolicyMongoDbConfiguration;
 import org.apereo.cas.util.CollectionUtils;
-import org.apereo.cas.util.junit.EnabledIfPortOpen;
+import org.apereo.cas.util.junit.EnabledIfListeningOnPort;
 
 import lombok.Getter;
 import org.junit.jupiter.api.Tag;
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Tag("MongoDb")
 @Import(CasAcceptableUsagePolicyMongoDbConfiguration.class)
-@EnabledIfPortOpen(port = 27017)
+@EnabledIfListeningOnPort(port = 27017)
 @TestPropertySource(properties = {
     "cas.acceptable-usage-policy.mongo.host=localhost",
     "cas.acceptable-usage-policy.mongo.port=27017",
@@ -34,17 +34,17 @@ import static org.junit.jupiter.api.Assertions.*;
     "cas.acceptable-usage-policy.mongo.password=secret",
     "cas.acceptable-usage-policy.mongo.database-name=acceptableUsagePolicy",
     "cas.acceptable-usage-policy.mongo.authentication-database-name=admin",
-    "cas.acceptable-usage-policy.aup-attribute-name=accepted"
+    "cas.acceptable-usage-policy.core.aup-attribute-name=accepted"
 })
 @Getter
 public class MongoDbAcceptableUsagePolicyRepositoryTests extends BaseAcceptableUsagePolicyRepositoryTests {
 
     @Autowired
-    @Qualifier("acceptableUsagePolicyRepository")
+    @Qualifier(AcceptableUsagePolicyRepository.BEAN_NAME)
     protected AcceptableUsagePolicyRepository acceptableUsagePolicyRepository;
 
     @Test
-    public void verifyOperation() {
+    public void verifyOperation() throws Exception {
         assertNotNull(acceptableUsagePolicyRepository);
         verifyRepositoryAction("casuser",
             CollectionUtils.wrap("accepted", List.of("false"), "email", List.of("CASuser@example.org")));

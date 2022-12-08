@@ -5,7 +5,9 @@ import org.apereo.cas.configuration.support.RequiresModule;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -24,6 +26,7 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public class EncryptionRandomizedSigningJwtCryptographyProperties implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = -6802876221525521736L;
 
     /**
@@ -34,11 +37,13 @@ public class EncryptionRandomizedSigningJwtCryptographyProperties implements Ser
     /**
      * Settings that deal with encryption of values.
      */
+    @NestedConfigurationProperty
     private EncryptionRandomizedCryptoProperties encryption = new EncryptionRandomizedCryptoProperties();
 
     /**
      * Settings that deal with signing of values.
      */
+    @NestedConfigurationProperty
     private SigningJwtCryptoProperties signing = new SigningJwtCryptoProperties();
 
     /**

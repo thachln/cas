@@ -8,14 +8,17 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.Id;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Lob;
-import javax.persistence.Table;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Lob;
+import jakarta.persistence.Table;
+import java.io.Serial;
+import java.io.Serializable;
 
 /**
  * This is {@link SamlMetadataDocument}.
@@ -28,11 +31,14 @@ import javax.persistence.Table;
 @Getter
 @Setter
 @AllArgsConstructor
-@Builder
-public class SamlMetadataDocument {
+@SuperBuilder
+public class SamlMetadataDocument implements Serializable {
 
+    @Serial
+    private static final long serialVersionUID = -721955605616455236L;
+    
     @JsonProperty("id")
-    @javax.persistence.Id
+    @jakarta.persistence.Id
     @Id
     @Builder.Default
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "native")

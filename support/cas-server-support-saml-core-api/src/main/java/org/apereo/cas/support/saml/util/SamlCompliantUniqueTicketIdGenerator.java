@@ -3,14 +3,15 @@ package org.apereo.cas.support.saml.util;
 import org.apereo.cas.ticket.UniqueTicketIdGenerator;
 import org.apereo.cas.util.DigestUtils;
 import org.apereo.cas.util.RandomUtils;
+import org.apereo.cas.util.function.FunctionUtils;
 
 import lombok.Setter;
-import lombok.SneakyThrows;
 import lombok.val;
 import org.opensaml.saml.common.binding.artifact.AbstractSAMLArtifact;
 import org.opensaml.saml.saml1.binding.artifact.SAML1ArtifactType0001;
 import org.opensaml.saml.saml2.binding.artifact.SAML2ArtifactType0004;
 
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 
 /**
@@ -39,26 +40,19 @@ public class SamlCompliantUniqueTicketIdGenerator implements UniqueTicketIdGener
      * SAML defines the source id as the server name.
      */
     private final byte[] sourceIdDigest;
+
     /**
      * Random generator to construct the AssertionHandle.
      */
     private final SecureRandom random;
+
     /**
      * Flag to indicate SAML2 compliance. Default is SAML1.1.
      */
     private boolean saml2compliant;
 
-    /**
-     * Instantiates a new SAML compliant unique ticket id generator.
-     *
-     * @param sourceId the source id
-     */
     public SamlCompliantUniqueTicketIdGenerator(final String sourceId) {
-        try {
-            this.sourceIdDigest = DigestUtils.rawDigest("SHA", sourceId.getBytes("8859_1"));
-        } catch (final Exception e) {
-            throw new IllegalStateException("Exception generating digest of source ID.", e);
-        }
+        this.sourceIdDigest = FunctionUtils.doUnchecked(() -> DigestUtils.rawDigest("SHA", sourceId.getBytes(StandardCharsets.ISO_8859_1)));
         this.random = RandomUtils.getNativeInstance();
     }
 
@@ -67,10 +61,11 @@ public class SamlCompliantUniqueTicketIdGenerator implements UniqueTicketIdGener
      * We ignore prefixes for SAML compliance.
      */
     @Override
-    @SneakyThrows
     public String getNewTicketId(final String prefix) {
-        val artifact = getSAMLArtifactType();
-        return prefix + SEPARATOR + artifact.base64Encode();
+        return FunctionUtils.doUnchecked(() -> {
+            val artifact = getSAMLArtifactType();
+            return prefix + SEPARATOR + artifact.base64Encode();
+        });
     }
 
     private AbstractSAMLArtifact getSAMLArtifactType() {

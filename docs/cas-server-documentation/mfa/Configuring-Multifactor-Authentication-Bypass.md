@@ -4,14 +4,19 @@ title: CAS - Multifactor Authentication Bypass
 category: Multifactor Authentication
 ---
 
+{% include variables.html %}
+
 # Multifactor Authentication Bypass
 
-Each [multifactor provider](Configuring-Multifactor-Authentication.html) is equipped with options to allow for bypass. Once the provider
-is chosen to honor the authentication request, bypass rules are then consulted to calculate whether the provider should ignore the request and skip MFA conditionally.
+Each [multifactor provider](Configuring-Multifactor-Authentication.html) is equipped with 
+options to allow for bypass. Once the provider
+is chosen to honor the authentication request, bypass rules are then consulted
+to calculate whether the provider should ignore the request and skip MFA conditionally.
 
 ## Default Bypass
 
-CAS provides a default bypass policy for each [multifactor provider](Configuring-Multifactor-Authentication.html) that can be configured through CAS properties.  
+CAS provides a default bypass policy for 
+each [multifactor provider](Configuring-Multifactor-Authentication.html) that can be configured through CAS properties.  
 All providers will consult this policy for bypass events before consulting any other configured bypass providers.
 
 Bypass rules allow for the following options for each provider:
@@ -36,7 +41,8 @@ for multifactor authentication. See the documentation for each specific provider
 
 ### Configuration
 
-To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#multifactor-authentication).
+Multifactor authentication bypass configuration is defined for each provider id. To learn more about the available settings,
+examine the configuration for your choice of multifactor authentication provider.
 
 Note that ticket validation requests shall successfully go through if multifactor authentication is
 bypassed for the given provider. In such cases, no authentication context is passed back to the application and
@@ -50,7 +56,7 @@ whose access should bypass MFA may be defined as such in the CAS service registr
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "^(https|imaps)://.*",
   "id" : 100,
   "multifactorPolicy" : {
@@ -69,28 +75,43 @@ with the specified value(s).
 
 ```json
 {
-  "@class" : "org.apereo.cas.services.RegexRegisteredService",
+  "@class" : "org.apereo.cas.services.CasRegisteredService",
   "serviceId" : "^(https|imaps)://.*",
   "id" : 100,
   "multifactorPolicy" : {
     "@class" : "org.apereo.cas.services.DefaultRegisteredServiceMultifactorPolicy",
     "bypassPrincipalAttributeName": "attributeForBypass",
-    "bypassPrincipalAttributeValue": "^bypass-value-[A-Z].+",
-    "bypassEnabled" : "true"
+    "bypassPrincipalAttributeValue": "^bypass-value-[A-Z].+"
+    "bypassIfMissingPrincipalAttribute": false
   }
 }
 ```
 
-## Additional Bypass Providers
+Matching and comparison operations are case insensitive.
 
-In addition to the configurable default bypass rules, the following bypass providers can be defined and executed after default bypass rules are calculated.
+<div class="alert alert-info"><strong>Remember</strong>
+<p>Setting the <code>bypassEnabled</code> flag here is unnecessary and may cause side-effects. Once principal attribute name and match value
+are defined, the <code>bypassEnabled</code> is expected to be <code>true</code> anyway.</p>
+</div>
 
-In the case where the default rules determine that the multifactor authentication should be bypassed, the chain will be short circuited and no additional bypass providers will be consulted.
+## Other Bypass Providers
+
+In addition to the configurable default bypass rules, the following bypass providers 
+can be defined and executed after default bypass rules are calculated.
+
+In the case where the default rules determine that the multifactor authentication 
+should be bypassed, 
+
+Remember that the following bypass policies are defined per multifactor authentication provider.
+You will need to instruct CAS to activate a bypass policy based on the options listed below for the multifactor authentication in question.
+Each provider should have its own dedicated settings and properties that would allow you control its own bypass rules.
 
 ### Bypass via Groovy
 
-Multifactor authentication bypass may be determined using a Groovy script of your own design. The outcome of the script, if `true` indicates that multifactor
- authentication for the requested provider should proceed. Otherwise `false` indicates that  multifactor authentication for this provider should be skipped and bypassed. 
+Multifactor authentication bypass may be determined using a Groovy script of your 
+own design. The outcome of the script, if `true` indicates that multifactor
+ authentication for the requested provider should proceed. Otherwise `false` indicates 
+that  multifactor authentication for this provider should be skipped and bypassed. 
 
 The outline of the script may be as follows:
 
@@ -113,19 +134,22 @@ def boolean run(final Object... args) {
 
 The parameters passed are as follows:
 
-| Parameter             | Description
-|-----------------------|-----------------------------------------------------------------------
-| `authentication`      | The object representing the established authentication event.
-| `principal`           | The object representing the authenticated principal.
-| `service`             | The object representing the corresponding service definition in the registry.
-| `provider`            | The object representing the requested multifactor authentication provider.
-| `logger`              | The object responsible for issuing log messages such as `logger.info(...)`.
-| `httpRequest`         | The object responsible for capturing the http request.
+| Parameter        | Description                                                                   |
+|------------------|-------------------------------------------------------------------------------|
+| `authentication` | The object representing the established authentication event.                 |
+| `principal`      | The object representing the authenticated principal.                          |
+| `service`        | The object representing the corresponding service definition in the registry. |
+| `provider`       | The object representing the requested multifactor authentication provider.    |
+| `logger`         | The object responsible for issuing log messages such as `logger.info(...)`.   |
+| `httpRequest`    | The object responsible for capturing the http request.                        |
 
-As an example, the following script skips multifactor authentication if the application requesting it is registered in the CAS service registry under the name `MyApplication` and only does so if the provider is Duo Security and the authenticated principal contains an attribute named `mustBypassMfa` whose values contains `true`.
+As an example, the following script skips multifactor authentication if the application 
+requesting it is registered in the CAS service registry under the name `MyApplication` and 
+only does so if the provider is Duo Security and the authenticated principal contains 
+an attribute named `mustBypassMfa` whose values contains `true`.
 
 ```groovy
-def boolean run(final Object... args) {
+boolean run(final Object... args) {
     def authentication = args[0]
     def principal = args[1]
     def service = args[2]
@@ -148,13 +172,16 @@ def boolean run(final Object... args) {
 
 ### Bypass via REST
 
-Multifactor authentication bypass may be determined using a REST API of your own design. Endpoints must be designed to accept/process `application/json` via 
-`GET` requests. A returned status code `202` meaning `ACCEPTED` indicates that multifactor authentication for the requested provider should proceed. Otherwise multifactor authentication for this provider should be skipped and bypassed.
+Multifactor authentication bypass may be determined using a REST API of your 
+own design. Endpoints must be designed to accept/process `application/json` via 
+`GET` requests. A returned status code for `2xx` indicates that multifactor 
+authentication for the requested provider should proceed. Otherwise multifactor 
+authentication for this provider should be skipped and bypassed.
 
 The following parameters are passed:
 
-| Parameter        | Description
-|------------------|------------------------------------------------------------
-| `principal`      | The identifier of the authenticated principal.
-| `provider`       | The identifier of the multifactor authentication provider.
-| `service`        | The identifier of the registered service in the registry, if any.
+| Parameter   | Description                                                       |
+|-------------|-------------------------------------------------------------------|
+| `principal` | The identifier of the authenticated principal.                    |
+| `provider`  | The identifier of the multifactor authentication provider.        |
+| `service`   | The identifier of the registered service in the registry, if any. |

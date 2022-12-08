@@ -42,7 +42,7 @@ import static org.mockito.Mockito.*;
     BaseGoogleAuthenticatorTests.SharedTestConfiguration.class
 })
 @Getter
-@Tag("MFA")
+@Tag("MFAProvider")
 public class GoogleAuthenticatorOneTimeTokenCredentialValidatorTests {
 
     @Autowired
@@ -68,6 +68,12 @@ public class GoogleAuthenticatorOneTimeTokenCredentialValidatorTests {
             .build();
         assertTrue(validator.isTokenAuthorizedFor(123456, acct));
         assertFalse(validator.isTokenAuthorizedFor(987654, acct));
+    }
+
+    @Test
+    public void verifyStore() {
+        val token = new GoogleAuthenticatorToken(632435, "casuser");
+        assertDoesNotThrow(() -> validator.store(token));
     }
 
     @Test
@@ -131,7 +137,7 @@ public class GoogleAuthenticatorOneTimeTokenCredentialValidatorTests {
 
     @Test
     public void verifyMultipleAccountsWithNoId() {
-        for (int i = 0; i < 2; i++) {
+        for (var i = 0; i < 2; i++) {
             val acct = GoogleAuthenticatorAccount.builder()
                 .username("casuser")
                 .name(String.format("account-%s", i))
@@ -146,7 +152,7 @@ public class GoogleAuthenticatorOneTimeTokenCredentialValidatorTests {
             () -> validator.validate(CoreAuthenticationTestUtils.getAuthentication("casuser"), cred));
     }
 
-    @TestConfiguration("GoogleAuthenticatorOneTimeTokenCredentialValidatorTestConfiguration")
+    @TestConfiguration(value = "GoogleAuthenticatorOneTimeTokenCredentialValidatorTestConfiguration", proxyBeanMethods = false)
     public static class GoogleAuthenticatorOneTimeTokenCredentialValidatorTestConfiguration {
         @Bean
         public IGoogleAuthenticator googleAuthenticatorInstance() {

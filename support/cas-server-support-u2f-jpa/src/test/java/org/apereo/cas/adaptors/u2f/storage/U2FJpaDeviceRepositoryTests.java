@@ -8,9 +8,9 @@ import org.apereo.cas.util.crypto.CertUtils;
 import com.yubico.u2f.data.DeviceRegistration;
 import lombok.Getter;
 import lombok.val;
+import org.apereo.inspektr.common.Cleanable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
@@ -39,10 +39,10 @@ import static org.junit.jupiter.api.Assertions.*;
     AopAutoConfiguration.class,
     RefreshAutoConfiguration.class
 },
-    properties = "cas.jdbc.show-sql=true"
+    properties = "cas.jdbc.show-sql=false"
 )
-@EnableTransactionManagement(proxyTargetClass = true)
-@EnableAspectJAutoProxy(proxyTargetClass = true)
+@EnableTransactionManagement(proxyTargetClass = false)
+@EnableAspectJAutoProxy(proxyTargetClass = false)
 @Tag("JDBC")
 @Getter
 public class U2FJpaDeviceRepositoryTests extends AbstractU2FDeviceRepositoryTests {
@@ -52,7 +52,7 @@ public class U2FJpaDeviceRepositoryTests extends AbstractU2FDeviceRepositoryTest
 
     @Autowired
     @Qualifier("u2fDeviceRepositoryCleanerScheduler")
-    private Runnable cleanerScheduler;
+    private Cleanable cleanerScheduler;
 
     @Test
     public void verifyOperation() {
@@ -61,12 +61,7 @@ public class U2FJpaDeviceRepositoryTests extends AbstractU2FDeviceRepositoryTest
 
     @Test
     public void verifyCleaner() {
-        assertDoesNotThrow(new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                cleanerScheduler.run();
-            }
-        });
+        assertDoesNotThrow(() -> cleanerScheduler.clean());
     }
 
     @Test

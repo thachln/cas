@@ -1,20 +1,23 @@
 package org.apereo.cas.authentication.principal;
 
 import org.apereo.cas.CasProtocolConstants;
+import org.apereo.cas.services.CasModelRegisteredService;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.util.HttpRequestUtils;
 import org.apereo.cas.util.function.FunctionUtils;
+import org.apereo.cas.web.UrlValidator;
 
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.val;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.Serial;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * Abstract response builder that provides wrappers for building
@@ -27,12 +30,15 @@ import java.util.function.Function;
 @Setter
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class AbstractWebApplicationServiceResponseBuilder implements ResponseBuilder<WebApplicationService> {
+    @Serial
     private static final long serialVersionUID = -4584738964007702423L;
 
     /**
      * Services manager instance.
      */
-    protected final transient ServicesManager servicesManager;
+    protected final ServicesManager servicesManager;
+
+    private final UrlValidator urlValidator;
 
     private int order;
 
@@ -47,10 +53,19 @@ public abstract class AbstractWebApplicationServiceResponseBuilder implements Re
         return DefaultResponse.getRedirectResponse(determineServiceResponseUrl(service), parameters);
     }
 
+    /**
+     * Determine service response url and provide url.
+     *
+     * @param service the service
+     * @return the string
+     */
     protected String determineServiceResponseUrl(final WebApplicationService service) {
         val registeredService = this.servicesManager.findServiceBy(service);
-        if (registeredService != null && StringUtils.isNotBlank(registeredService.getRedirectUrl())) {
-            return registeredService.getRedirectUrl();
+        if (registeredService instanceof CasModelRegisteredService casService) {
+            if (StringUtils.isNotBlank(casService.getRedirectUrl())
+                && getUrlValidator().isValid(casService.getRedirectUrl())) {
+                return casService.getRedirectUrl();
+            }
         }
         return service.getOriginalUrl();
     }
@@ -77,29 +92,19 @@ public abstract class AbstractWebApplicationServiceResponseBuilder implements Re
         return DefaultResponse.getPostResponse(determineServiceResponseUrl(service), parameters);
     }
 
-    /**
-     * Determine response type response.
-     *
-     * @param finalService the final service
-     * @return the response type
-     */
     protected Response.ResponseType getWebApplicationServiceResponseType(final WebApplicationService finalService) {
         val request = HttpRequestUtils.getHttpServletRequestFromRequestAttributes();
         val methodRequest = Optional.ofNullable(request)
             .map(httpServletRequest -> httpServletRequest.getParameter(CasProtocolConstants.PARAMETER_METHOD))
             .orElse(null);
-        final Function<String, String> func = FunctionUtils.doIf(StringUtils::isBlank,
-            t -> {
-                val registeredService = this.servicesManager.findServiceBy(finalService);
-                if (registeredService != null) {
-                    return registeredService.getResponseType();
-                }
-                return null;
+        val func = FunctionUtils.doIf(StringUtils::isBlank,
+            __ -> {
+                val registeredService = servicesManager.findServiceBy(finalService);
+                return registeredService instanceof CasModelRegisteredService casService ? casService.getResponseType() : null;
             },
-            f -> methodRequest);
-
+            __ -> methodRequest);
         val method = func.apply(methodRequest);
-        if (StringUtils.isBlank(method)) {
+        if (StringUtils.isBlank(method) || !EnumUtils.isValidEnum(Response.ResponseType.class, method.toUpperCase())) {
             return Response.ResponseType.REDIRECT;
         }
         return Response.ResponseType.valueOf(method.toUpperCase());

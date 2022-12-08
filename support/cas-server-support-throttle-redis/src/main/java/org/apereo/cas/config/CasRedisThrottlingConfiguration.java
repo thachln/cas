@@ -1,25 +1,27 @@
 package org.apereo.cas.config;
 
-import org.apereo.cas.audit.AuditTrailExecutionPlan;
+import org.apereo.cas.authentication.CasSSLContext;
 import org.apereo.cas.configuration.CasConfigurationProperties;
+import org.apereo.cas.configuration.features.CasFeatureModule;
+import org.apereo.cas.redis.core.CasRedisTemplate;
 import org.apereo.cas.redis.core.RedisObjectFactory;
-import org.apereo.cas.throttle.ThrottledRequestExecutor;
-import org.apereo.cas.throttle.ThrottledRequestResponseHandler;
+import org.apereo.cas.util.spring.beans.BeanCondition;
+import org.apereo.cas.util.spring.beans.BeanSupplier;
+import org.apereo.cas.util.spring.boot.ConditionalOnFeatureEnabled;
 import org.apereo.cas.web.support.RedisThrottledSubmissionHandlerInterceptorAdapter;
 import org.apereo.cas.web.support.ThrottledSubmissionHandlerConfigurationContext;
 import org.apereo.cas.web.support.ThrottledSubmissionHandlerInterceptor;
 
 import lombok.val;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
 
 /**
  * This is {@link CasRedisThrottlingConfiguration}.
@@ -27,52 +29,59 @@ import org.springframework.data.redis.core.RedisTemplate;
  * @author Misagh Moayyed
  * @since 6.1.0
  */
-@Configuration("casRedisThrottlingConfiguration")
 @EnableConfigurationProperties(CasConfigurationProperties.class)
+@ConditionalOnFeatureEnabled(feature = CasFeatureModule.FeatureCatalog.Throttling, module = "redis")
+@AutoConfiguration
 public class CasRedisThrottlingConfiguration {
-
-    @Autowired
-    private CasConfigurationProperties casProperties;
-
-    @Autowired
-    @Qualifier("throttledRequestResponseHandler")
-    private ObjectProvider<ThrottledRequestResponseHandler> throttledRequestResponseHandler;
-
-    @Autowired
-    @Qualifier("throttledRequestExecutor")
-    private ObjectProvider<ThrottledRequestExecutor> throttledRequestExecutor;
+    private static final BeanCondition CONDITION = BeanCondition.on("cas.audit.redis.enabled").isTrue().evenIfMissing();
 
     @Bean
     @ConditionalOnMissingBean(name = "redisThrottleConnectionFactory")
-    public RedisConnectionFactory redisThrottleConnectionFactory() {
-        val redis = casProperties.getAudit().getRedis();
-        return RedisObjectFactory.newRedisConnectionFactory(redis);
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public RedisConnectionFactory redisThrottleConnectionFactory(
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier(CasSSLContext.BEAN_NAME)
+        final CasSSLContext casSslContext,
+        final CasConfigurationProperties casProperties) {
+        return BeanSupplier.of(RedisConnectionFactory.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(() -> {
+                val redis = casProperties.getAudit().getRedis();
+                return RedisObjectFactory.newRedisConnectionFactory(redis, casSslContext);
+            })
+            .otherwiseProxy()
+            .get();
     }
 
     @Bean
     @ConditionalOnMissingBean(name = "throttleRedisTemplate")
-    public RedisTemplate throttleRedisTemplate() {
-        return RedisObjectFactory.newRedisTemplate(redisThrottleConnectionFactory());
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+    public CasRedisTemplate throttleRedisTemplate(
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier("redisThrottleConnectionFactory")
+        final RedisConnectionFactory redisThrottleConnectionFactory) {
+        return BeanSupplier.of(CasRedisTemplate.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(() -> RedisObjectFactory.newRedisTemplate(redisThrottleConnectionFactory))
+            .otherwiseProxy()
+            .get();
     }
 
-    @Autowired
     @Bean
-    @RefreshScope
+    @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
     public ThrottledSubmissionHandlerInterceptor authenticationThrottle(
-        @Qualifier("auditTrailExecutionPlan") final AuditTrailExecutionPlan auditTrailExecutionPlan) {
-        val throttle = casProperties.getAuthn().getThrottle();
-        val failure = throttle.getFailure();
-
-        val context = ThrottledSubmissionHandlerConfigurationContext.builder()
-            .failureThreshold(failure.getThreshold())
-            .failureRangeInSeconds(failure.getRangeSeconds())
-            .usernameParameter(throttle.getUsernameParameter())
-            .authenticationFailureCode(failure.getCode())
-            .auditTrailExecutionPlan(auditTrailExecutionPlan)
-            .applicationCode(throttle.getAppCode())
-            .throttledRequestResponseHandler(throttledRequestResponseHandler.getObject())
-            .throttledRequestExecutor(throttledRequestExecutor.getObject())
-            .build();
-        return new RedisThrottledSubmissionHandlerInterceptorAdapter(context, throttleRedisTemplate());
+        final ConfigurableApplicationContext applicationContext,
+        @Qualifier("throttleRedisTemplate")
+        final CasRedisTemplate throttleRedisTemplate,
+        @Qualifier("authenticationThrottlingConfigurationContext")
+        final ThrottledSubmissionHandlerConfigurationContext authenticationThrottlingConfigurationContext,
+        final CasConfigurationProperties casProperties) {
+        return BeanSupplier.of(ThrottledSubmissionHandlerInterceptor.class)
+            .when(CONDITION.given(applicationContext.getEnvironment()))
+            .supply(() -> new RedisThrottledSubmissionHandlerInterceptorAdapter(authenticationThrottlingConfigurationContext,
+                throttleRedisTemplate,
+                casProperties.getAudit().getRedis().getScanCount()))
+            .otherwise(ThrottledSubmissionHandlerInterceptor::noOp)
+            .get();
     }
 }

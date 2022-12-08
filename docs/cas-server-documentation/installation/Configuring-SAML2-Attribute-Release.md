@@ -3,98 +3,19 @@ layout: default
 title: CAS - SAML2 Attribute Release
 category: Attributes
 ---
+{% include variables.html %}
+
 
 # SAML2 Attribute Release
 
-Attribute filtering and release policies are defined per SAML service. See [this guide](../integration/Attribute-Release-Policies.html) for more info.
-
-## Attribute Value Types
-
-By default, attribute value blocks that are created in the final SAML2 response do not carry any type information in the encoded XML.
-You can, if necessary, enforce a particular type for an attribute value per the requirements of the SAML2 service provider, if any.
-An example of an attribute that is encoded with specific type information would be:
-
-```xml
-<saml2:Attribute FriendlyName="givenName" Name="givenName" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri">
-    <saml2:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xsd:string">HelloWorld</saml2:AttributeValue>
-</saml2:Attribute>
-```
-
-The following attribute value types are supported:
-
-| Type              | Description
-|-------------------|---------------------------------------------------------------------------------------
-| `XSString`        | Mark the attribute value type as `string`.
-| `XSURI`           | Mark the attribute value type as `uri`.
-| `XSBoolean`       | Mark the attribute value type as `boolean`.
-| `XSInteger`       | Mark the attribute value type as `integer`.
-| `XSDateTime`      | Mark the attribute value type as `datetime` .
-| `XSBase64Binary`  | Mark the attribute value type as `base64Binary`.
-| `XSObject`        | Skip the attribute value type and serialize the value as a complex XML object/POJO.
-
-...where the types for each attribute would be defined as such:
- 
-```json
-{
-  "@class": "org.apereo.cas.support.saml.services.SamlRegisteredService",
-  "serviceId" : "the-entity-id-of-the-sp",
-  "name": "SAML Service",
-  "metadataLocation" : "../../sp-metadata.xml",
-  "id": 1,
-  "attributeValueTypes": {
-    "@class": "java.util.HashMap",
-    "<attribute-name>": "<attribute-value-type>"
-  }
-}
-```
-
-## Attribute Name Formats
-
-Attribute name formats can be specified per relying party in the service registry.
-
-```json
-{
-  "@class": "org.apereo.cas.support.saml.services.SamlRegisteredService",
-  "serviceId" : "the-entity-id-of-the-sp",
-  "name": "SAML Service",
-  "metadataLocation" : "../../sp-metadata.xml",
-  "id": 100001,
-  "attributeNameFormats": {
-    "@class": "java.util.HashMap",
-    "attributeName": "basic|uri|unspecified|custom-format-etc"
-  }
-}
-```
-
-You may also have the option to define attributes and their relevant name format globally
-via CAS properties. To see the relevant list of CAS properties, please [review this guide](../configuration/Configuration-Properties.html#saml-idp).
-
-## Attribute Friendly Names
-
-Attribute friendly names can be specified per relying party in the service registry, as well as globally via CAS settings. 
-If there is no friendly name defined for the attribute, the 
-attribute name will be used instead in its place. Note that the name of the attribute is one that is designed to be released to the service provider,
-specially if the original attribute is *mapped* to a different name.
-
-```json
-{
-  "@class": "org.apereo.cas.support.saml.services.SamlRegisteredService",
-  "serviceId" : "the-entity-id-of-the-sp",
-  "name": "SAML Service",
-  "metadataLocation" : "../../sp-metadata.xml",
-  "id": 100001,
-  "attributeFriendlyNames": {
-    "@class": "java.util.HashMap",
-    "urn:oid:2.5.4.42": "friendly-name-to-use"
-  }
-}
-```
-
+Attribute filtering and release policies are defined per 
+SAML service. See [this guide](../integration/Attribute-Release-Policies.html) for more info.
 
 ## InCommon Research and Scholarship
 
-A specific attribute release policy is available to release the [attribute bundles](https://spaces.internet2.edu/display/InCFederation/Research+and+Scholarship+Attribute+Bundle)
-needed for InCommon Research and Scholarship service providers using the entity attribute value `http://id.incommon.org/category/research-and-scholarship`:
+A specific attribute release policy is available to release 
+the attribute bundles needed for InCommon Research and Scholarship service providers using the entity 
+attribute value `http://id.incommon.org/category/research-and-scholarship`:
 
 ```json
 {
@@ -107,7 +28,10 @@ needed for InCommon Research and Scholarship service providers using the entity 
     "@class": "org.apereo.cas.services.ChainingAttributeReleasePolicy",
     "policies": [ "java.util.ArrayList",
       [
-         {"@class": "org.apereo.cas.support.saml.services.InCommonRSAttributeReleasePolicy"}
+         {
+           "@class": "org.apereo.cas.support.saml.services.InCommonRSAttributeReleasePolicy",
+           "useUniformResourceName": false
+         }
       ]
     ]
   }
@@ -120,7 +44,8 @@ Attributes authorized for release are set to be `eduPersonPrincipalName`, `eduPe
 ## REFEDS Research and Scholarship
 
 A specific attribute release policy is available to release the [attribute bundles](https://refeds.org/category/research-and-scholarship)
-needed for REFEDS Research and Scholarship service providers using the entity attribute value `http://refeds.org/category/research-and-scholarship`:
+needed for REFEDS Research and Scholarship service providers using 
+the entity attribute value `http://refeds.org/category/research-and-scholarship`:
 
 ```json
 {
@@ -157,13 +82,15 @@ you can let CAS calculate the `eduPersonTargetedID` attribute dynamically at rel
   "attributeReleasePolicy": {
     "@class": "org.apereo.cas.support.saml.services.EduPersonTargetedIdAttributeReleasePolicy",
     "salt": "OqmG80fEKBQt",
-    "attribute": ""
+    "attribute": "",
+    "useUniformResourceName": false
   }
 }
 ```
 
 The generated id may be based off of an existing principal attribute. If left unspecified or attribute not found, 
-the authenticated principal id is used.
+the authenticated principal id is used. You can also control whether the final generated attribute should be named 
+`urn:oid:1.3.6.1.4.1.5923.1.1.1.10` or `eduPersonTargetedID` via the `useUniformResourceName` setting.
 
 ## Groovy Script
 
@@ -183,7 +110,8 @@ This policy allows a Groovy script to calculate the collection of released attri
 }
 ```
 
-The configuration of this component qualifies to use the [Spring Expression Language](../configuration/Configuration-Spring-Expressions.html) syntax.
+The configuration of this component qualifies to use 
+the [Spring Expression Language](../configuration/Configuration-Spring-Expressions.html) syntax.
 
 The outline of the script may be designed as:
 
@@ -192,7 +120,7 @@ import java.util.*
 import org.apereo.cas.support.saml.services.*
 import org.apereo.cas.support.saml.*
 
-def Map<String, Object> run(final Object... args) {
+Map<String, Object> run(final Object... args) {
     def attributes = args[0]
     def service = args[1]
     def resolver = args[2]
@@ -207,15 +135,15 @@ def Map<String, Object> run(final Object... args) {
 
 The following parameters are passed to the script:
 
-| Parameter        | Description
-|------------------|--------------------------------------------------------------------------------------------
-| `attributes`     | Map of current attributes resolved and available for release.
-| `service`        | The SAML service definition matched in the service registry.
-| `resolver`       | The metadata resolver instance of this service provider.
-| `facade`         | A wrapper on top of the metadata resolver that allows access to utility functions.
-| `entityDescriptor`    | The `EntityDescriptor` object matched and linked to this service provider's metadata.
-| `applicationContext`  | CAS application context allowing direct access to beans, etc.
-| `logger`         | The object responsible for issuing log messages such as `logger.info(...)`.
+| Parameter            | Description                                                                           |
+|----------------------|---------------------------------------------------------------------------------------|
+| `attributes`         | Map of current attributes resolved and available for release.                         |
+| `service`            | The SAML service definition matched in the service registry.                          |
+| `resolver`           | The metadata resolver instance of this service provider.                              |
+| `facade`             | A wrapper on top of the metadata resolver that allows access to utility functions.    |
+| `entityDescriptor`   | The `EntityDescriptor` object matched and linked to this service provider's metadata. |
+| `applicationContext` | CAS application context allowing direct access to beans, etc.                         |
+| `logger`             | The object responsible for issuing log messages such as `logger.info(...)`.           |
 
 An example script follows:
 
@@ -242,7 +170,8 @@ def Map<String, Object> run(final Object... args) {
 
 ## Pattern Matching Entity Ids
 
-In the event that an aggregate is defined containing multiple entity ids, the below attribute release policy may be used to release a collection of allowed attributes to entity ids grouped together by a regular expression pattern:
+In the event that an aggregate is defined containing multiple entity ids, the below attribute release 
+policy may be used to release a collection of allowed attributes to entity ids grouped together by a regular expression pattern:
 
 ```json
 {
@@ -263,7 +192,8 @@ In the event that an aggregate is defined containing multiple entity ids, the be
 
 ## Entity Attributes Filter
 
-This attribute release policy authorizes the release of defined attributes, provided the accompanying metadata for the service provider contains attributes that match certain values.
+This attribute release policy authorizes the release of defined attributes, provided the accompanying 
+metadata for the service provider contains attributes that match certain values.
 
 ```json
 {
@@ -284,9 +214,10 @@ This attribute release policy authorizes the release of defined attributes, prov
 
 The specification of `entityAttributeFormat` is optional.
 
-## Requested Attributes Filter
+## Metadata Requested Attributes
 
-This attribute release policy authorizes the release of defined attributes, based on the accompanying metadata for the service provider having requested attributes as part of its `AttributeConsumingService` element.
+This attribute release policy authorizes the release of defined attributes, based on the accompanying 
+metadata for the service provider having requested attributes as part of its `AttributeConsumingService` element.
 
 ```json
 {
@@ -303,3 +234,49 @@ This attribute release policy authorizes the release of defined attributes, base
 ```
 
 The `useFriendlyName` allows the filter to compare the requested attribute's friendly name with the resolved attribute.
+
+## Metadata Registration Authority
+
+This attribute release policy authorizes the release of a subset of attributes if the registration authority
+specified as a metadata extension produces a successful match.
+
+```json
+{
+  "@class": "org.apereo.cas.support.saml.services.SamlRegisteredService",
+  "serviceId": "entity-ids-allowed-via-regex",
+  "name": "SAML",
+  "id": 10,
+  "metadataLocation": "path/to/metadata.xml",
+  "attributeReleasePolicy": {
+    "@class": "org.apereo.cas.support.saml.services.MetadataRegistrationAuthorityAttributeReleasePolicy",
+    "registrationAuthority" : "urn:example:.*",
+    "allowedAttributes" : [ "java.util.ArrayList", [ "cn", "mail", "sn" ] ]
+  }
+}
+```
+
+The `registrationAuthority` is a regular expression that is matched against the registration authority of the 
+`RegistrationInfo` element to authorize release of allowed attributes.
+
+
+## Authentication Request Requested Attributes Filter
+
+This attribute release policy authorizes the release of a subset of attributes requested as extensions of
+the SAML2 authentication request. The intersection of requested attributes and those allowed by 
+the attribute release policy explicitly is evaluated for the final attribute release phase:
+
+```json
+{
+  "@class": "org.apereo.cas.support.saml.services.SamlRegisteredService",
+  "serviceId": "entity-ids-allowed-via-regex",
+  "name": "SAML",
+  "id": 10,
+  "metadataLocation": "path/to/metadata.xml",
+  "attributeReleasePolicy": {
+    "@class": "org.apereo.cas.support.saml.services.AuthnRequestRequestedAttributesAttributeReleasePolicy",
+    "useFriendlyName" : false
+  }
+}
+```
+
+The `useFriendlyName` allows the filter to compare the requested attribute’s friendly name with the resolved attribute.

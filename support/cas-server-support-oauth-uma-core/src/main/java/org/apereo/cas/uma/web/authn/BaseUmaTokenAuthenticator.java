@@ -11,12 +11,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.pac4j.core.context.WebContext;
+import org.pac4j.core.context.session.SessionStore;
+import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.credentials.TokenCredentials;
 import org.pac4j.core.credentials.authenticator.Authenticator;
 import org.pac4j.core.exception.CredentialsException;
 import org.pac4j.core.profile.CommonProfile;
 
 import java.util.LinkedHashMap;
+import java.util.Optional;
 
 /**
  * This is {@link BaseUmaTokenAuthenticator}.
@@ -26,20 +29,18 @@ import java.util.LinkedHashMap;
  */
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 @Slf4j
-public abstract class BaseUmaTokenAuthenticator implements Authenticator<TokenCredentials> {
+public abstract class BaseUmaTokenAuthenticator implements Authenticator {
     private final TicketRegistry ticketRegistry;
+
     private final JwtBuilder accessTokenJwtBuilder;
 
     @Override
-    public void validate(final TokenCredentials credentials, final WebContext webContext) {
+    public Optional<Credentials> validate(final Credentials creds, final WebContext webContext, final SessionStore sessionStore) {
+        val credentials = (TokenCredentials) creds;
         val token = extractAccessTokenFrom(credentials.getToken().trim());
-        val at = this.ticketRegistry.getTicket(token, OAuth20AccessToken.class);
-        if (at == null || at.isExpired()) {
-            val err = String.format("Access token is not found or has expired. Unable to authenticate requesting party access token %s", token);
-            throw new CredentialsException(err);
-        }
+        val at = ticketRegistry.getTicket(token, OAuth20AccessToken.class);
         if (!at.getScopes().contains(getRequiredScope())) {
-            val err = String.format("Missing scope [%s]. Unable to authenticate requesting party access token %s", OAuth20Constants.UMA_PERMISSION_URL, token);
+            val err = String.format("Missing scope [%s]. Unable to authenticate access token %s", getRequiredScope(), token);
             throw new CredentialsException(err);
         }
         val profile = new CommonProfile();
@@ -50,11 +51,13 @@ public abstract class BaseUmaTokenAuthenticator implements Authenticator<TokenCr
         attributes.putAll(principal.getAttributes());
 
         profile.addAttributes(attributes);
-        profile.addPermissions(at.getScopes());
+        profile.addRoles(at.getScopes());
         profile.addAttribute(OAuth20AccessToken.class.getName(), at);
+        profile.addAttribute(OAuth20Constants.CLIENT_ID, at.getClientId());
 
         LOGGER.debug("Authenticated access token [{}]", profile);
         credentials.setUserProfile(profile);
+        return Optional.of(credentials);
     }
 
     /**
@@ -69,7 +72,7 @@ public abstract class BaseUmaTokenAuthenticator implements Authenticator<TokenCr
             .build()
             .decode(token);
     }
-    
+
     /**
      * Gets required scope.
      *
