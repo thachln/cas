@@ -27,6 +27,12 @@ dependencies {
     implementation project(":webapp:cas-server-webapp-init")
     implementation project(":webapp:cas-server-webapp-resources")
 
+    implementation project(":support:cas-server-support-saml-idp")
+    implementation project(":support:cas-server-support-json-service-registry")
+    implementation project(":support:cas-server-support-pac4j-webflow")
+    implementation project(":support:cas-server-support-saml-sp-integrations")
+    implementation project(":support:cas-server-support-oidc")
+
     def casModules = providers.systemProperty("casModules").getOrNull()
     if (casModules != null) {
         def dependencies = casModules.split(",")
