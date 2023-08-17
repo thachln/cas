@@ -26,7 +26,9 @@ dependencies {
     implementation project(":webapp:cas-server-webapp-config")
     implementation project(":webapp:cas-server-webapp-init")
     implementation project(":webapp:cas-server-webapp-resources")
-
+    implementation project(":support:cas-server-support-pac4j-webflow")
+    implementation project(":support:cas-server-support-json-service-registry")
+    
     def casModules = providers.systemProperty("casModules").getOrNull()
     if (casModules != null) {
         def dependencies = casModules.split(",")
