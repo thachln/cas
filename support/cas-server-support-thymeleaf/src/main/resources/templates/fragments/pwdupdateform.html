@@ -156,7 +156,7 @@
         </form>
 
         <p id="pwddesc" th:unless="${passwordManagementEnabled}"
-           th:utext="${expiredPass} ? #{screen.expiredpass.message('https://pwd.example.org')} : #{screen.mustchangepass.message('https://pwd.example.org')}">Expired/Must Change Password text</p>
+           th:utext="${expiredPass} ? #{screen.expiredpass.message('https://portal.azure.com')} : #{screen.mustchangepass.message('https://portal.azure.com')}">Expired/Must Change Password text</p>
         
     </div>
 </main>

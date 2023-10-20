@@ -25,9 +25,9 @@
                          th:src="@{${#themes.code('cas.hero-banner.file')}}"/>
                 </p>
             </div>
-            <div class="service-ui" th:replace="fragments/serviceui :: serviceUI">
+            <!-- <div class="service-ui" th:replace="fragments/serviceui :: serviceUI">
                 <a href="fragments/serviceui.html">service ui fragment</a>
-            </div>
+            </div> -->
         </div>
 
         <div class="form-wrapper">
@@ -42,13 +42,13 @@
                 </div>
 
                 <div id="login-form-controls" th:if="${loginFormViewable and loginFormEnabled}">
-                    <div th:if="${existingSingleSignOnSessionAvailable}">
+                    <!-- <div th:if="${existingSingleSignOnSessionAvailable}">
                         <i class="mdi mdi-alert-decagram fas fa-exclamation-triangle"></i>&nbsp;
                         <span id="existingSsoMsg" th:if="${registeredService}" class="mdc-button__label"
                               th:utext="#{screen.welcome.forcedsso(${existingSingleSignOnSessionPrincipal?.id},${registeredService.name})}"/>
                         <span id="existingSsoMsg" th:unless="${registeredService}" class="mdc-button__label"
                               th:utext="#{screen.welcome.forcedsso(${existingSingleSignOnSessionPrincipal?.id}, 'CAS')}"/>
-                    </div>
+                    </div> -->
                     <h3 th:unless="${existingSingleSignOnSessionAvailable}" class="text-center">
                         <i class="mdi mdi-security fas fa-shield-alt"></i>
                         <span th:utext="#{screen.welcome.instructions}">Enter your Username and Password:</span>
@@ -351,9 +351,9 @@
             </script>
         </div>
 
-        <span th:if="${loginFormViewable and loginFormEnabled}">
+        <!-- <span th:if="${loginFormViewable and loginFormEnabled}">
             <div th:replace="fragments/loginsidebar :: loginsidebar"/>
-        </span>
+        </span> -->
     </div>
 </main>
 </body>
