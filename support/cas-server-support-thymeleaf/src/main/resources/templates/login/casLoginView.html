@@ -15,13 +15,6 @@
    <div class="d-flex justify-content-center flex-md-row flex-column mdc-card mdc-card-content card flex-grow-1"
          th:with="loginFormEnabled=${#strings.defaultString(#themes.code('cas.login-form.enabled'), 'true') == 'true'},
                   loginFormViewable=${@casThymeleafLoginFormDirector.isLoginFormViewable(#vars)}">
-        <section id="loginForm"
-                 th:if="${loginFormViewable and loginFormEnabled}"
-                 class="login-section login-form card-body">
-            <div th:replace="fragments/loginform :: loginform">
-                <a href="fragments/loginform.html">Login Form goes here</a>
-            </div>
-        </section>
         <span th:if="${#bools.isFalse(delegatedAuthenticationDynamicProviderSelection) && #bools.isFalse(delegatedAuthenticationDisabled)}">
             <section id="loginProviders" class="login-section login-providers card-body"
                     th:if="${delegatedAuthenticationProviderConfigurations} OR ${wsfedUrls}">
@@ -30,6 +23,13 @@
                 </div>
             </section>
         </span>
+        <section id="loginForm"
+                 th:if="${loginFormViewable and loginFormEnabled}"
+                 class="login-section login-form card-body">
+            <div th:replace="fragments/loginform :: loginform">
+                <a href="fragments/loginform.html">Login Form goes here</a>
+            </div>
+        </section>
         <section id="acceptto" class="login-section login-qr d-xs-none d-md-block" th:if="${accepttoApplicationId}">
             <div th:replace="fragments/accepttoQRCode :: accepttoQRCode">
                 <a href="fragments/accepttoQRCode.html">accepttoQRCode</a>
