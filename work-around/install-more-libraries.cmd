@@ -1,0 +1,1 @@
+mvn install:install-file -Dfile=sakai-encoder-1.1.jar -DgroupId=org.sakaiproject -DartifactId=sakai-encoder -Dversion=1.1 -Dpackaging=jar
